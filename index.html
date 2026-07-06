@@ -473,6 +473,8 @@
     white-space:nowrap; cursor:pointer; transition:all .15s ease;
   }
   .filter-chip.active{ background:var(--sage); border-color:var(--sage); color:#fff; }
+  .memo-toolbar{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .memo-toolbar-row{ display:flex; flex-wrap:wrap; gap:6px; }
   .shelf-wrap{ padding:10px 18px 110px; }
   .shelf-row{ margin-bottom:22px; }
   .shelf-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
@@ -919,6 +921,8 @@
   let activeFilter = 'all';
   let editingBookId = null;
   let currentDetailId = null;
+  let memoSortOrder = 'page';        // 'page'=ページ順 / 'written'=書いた順
+  let memoEmotionFilter = new Set(); // 選択中の感情タグ(空なら全件表示)
   let currentConnection = null;
 
   const selectedTags = [];
@@ -998,6 +1002,37 @@
   /* =========================================================
      3. 詳細画面
   ========================================================= */
+  function sortAndFilterMemos(memos){
+    let list = memos.map((m, i) => ({ m: m, i: i }));
+    if(memoEmotionFilter.size > 0){
+      list = list.filter(x => (x.m.emotions || []).some(e => memoEmotionFilter.has(e)));
+    }
+    if(memoSortOrder === 'page'){
+      list.sort((a, b) => {
+        const pa = parseInt(a.m.page, 10);
+        const pb = parseInt(b.m.page, 10);
+        const va = isNaN(pa) ? Infinity : pa;
+        const vb = isNaN(pb) ? Infinity : pb;
+        if(va !== vb) return va - vb;
+        return a.i - b.i; // ページが同じ・未入力同士は書いた順を保つ
+      });
+    }
+    return list.map(x => x.m);
+  }
+  function buildMemoToolbarHTML(){
+    const sortHTML = [['page','ページ順'], ['written','書いた順']].map(([key, label]) =>
+      '<span class="filter-chip' + (memoSortOrder === key ? ' active' : '') + '" data-sort="' + key + '">' + label + '</span>'
+    ).join('');
+    const emoHTML = emoOptions.map(e =>
+      '<span class="emo-chip' + (memoEmotionFilter.has(e) ? ' active' : '') + '" data-emo-filter="' + escapeHTML(e) + '">' + escapeHTML(e) + '</span>'
+    ).join('');
+    return (
+      '<div class="memo-toolbar">' +
+        '<div class="memo-toolbar-row">' + sortHTML + '</div>' +
+        '<div class="memo-toolbar-row">' + emoHTML + '</div>' +
+      '</div>'
+    );
+  }
   function buildDetailMemoCard(memo){
     const emosHTML = (memo.emotions && memo.emotions.length)
       ? memo.emotions.map(e => '<div class="emo-chip active" style="cursor:default;">' + escapeHTML(e) + '</div>').join('')
@@ -1046,8 +1081,12 @@
         '</div></div></div>';
     }
     if(b.memos && b.memos.length){
+      const visibleMemos = sortAndFilterMemos(b.memos);
       html += '<div class="section-label" style="margin:4px 2px 10px;"><span class="txt">付箋メモ</span></div>' +
-        '<div class="memo-list">' + b.memos.map(buildDetailMemoCard).join('') + '</div>';
+        buildMemoToolbarHTML() +
+        (visibleMemos.length
+          ? '<div class="memo-list">' + visibleMemos.map(buildDetailMemoCard).join('') + '</div>'
+          : '<p class="field-note" style="margin:0 2px 4px;">選択した感情タグに一致するメモはありません。</p>');
     }
     if(b.impression || b.nextAction || b.rating > 0){
       html += '<div class="info-card">';
@@ -1080,6 +1119,19 @@
         btn.querySelector('.toggle-text').textContent = expanded ? '閉じる' : '気づきを見る';
       });
     });
+    el.querySelectorAll('.memo-toolbar [data-sort]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        memoSortOrder = chip.dataset.sort;
+        renderDetailBody(b);
+      });
+    });
+    el.querySelectorAll('.memo-toolbar [data-emo-filter]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const tag = chip.dataset.emoFilter;
+        if(memoEmotionFilter.has(tag)){ memoEmotionFilter.delete(tag); } else { memoEmotionFilter.add(tag); }
+        renderDetailBody(b);
+      });
+    });
     if(b.rating > 0){
       const row = document.getElementById('detailRatingRow');
       row.innerHTML = '<div class="stars" style="pointer-events:none;"></div><span class="rating-label">' + b.rating.toFixed(1) + '</span>';
@@ -1095,6 +1147,8 @@
   }
   function renderDetail(b){
     currentDetailId = b.id;
+    memoSortOrder = 'page';
+    memoEmotionFilter = new Set();
     const coverEl = document.getElementById('detailCover');
     coverEl.innerHTML = b.cover
       ? '<img src="' + b.cover + '">'
