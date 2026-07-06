@@ -6,6 +6,9 @@
 <title>読書記録</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#F5F5F2;          /* ページ地：ほんのり灰 */
@@ -571,6 +574,32 @@
 <div class="phone">
 
   <!-- =====================================================
+       画面0：ログイン（端末間同期のためのアカウント認証）
+  ===================================================== -->
+  <div class="app-screen" id="screenAuth">
+    <div class="topbar">
+      <p class="eyebrow">book log</p>
+      <h1>ログイン</h1>
+    </div>
+    <div class="form" style="padding-top:22px;">
+      <p class="cover-hint" style="margin-bottom:20px;">同じメールアドレスとパスワードでログインすると、他の端末と記録が自動で同期されます。</p>
+
+      <label class="field-label first">メールアドレス</label>
+      <input type="email" id="authEmailInput" placeholder="you@example.com">
+
+      <label class="field-label">パスワード</label>
+      <input type="password" id="authPasswordInput" placeholder="6文字以上">
+
+      <div class="field-msg error" id="authError" style="margin-top:10px;">
+        <span>⚠</span><span></span>
+      </div>
+
+      <button class="save-btn" id="authLoginBtn" type="button" style="margin-top:22px;">ログイン</button>
+      <button class="save-btn secondary" id="authSignupBtn" type="button" style="margin-top:10px;">新規登録してはじめる</button>
+    </div>
+  </div>
+
+  <!-- =====================================================
        画面1：一覧
   ===================================================== -->
   <div class="app-screen" id="screenList">
@@ -801,10 +830,13 @@
         <button class="modal-close" id="dataMenuClose" type="button">×</button>
       </div>
       <div class="modal-list">
+        <p class="field-note" id="loggedInAs" style="margin:0 0 14px;"></p>
         <button class="menu-action-btn" id="exportBtn" type="button">JSONファイルに書き出す</button>
         <button class="menu-action-btn" id="importBtn" type="button">JSONファイルから読み込む</button>
         <input type="file" id="importFileInput" accept="application/json">
         <p class="field-note">読み込むと、現在の記録はすべて置き換えられます。書き出したファイルは大切に保管してください。</p>
+        <hr class="divider" style="margin:16px 0;">
+        <button class="menu-action-btn" id="logoutBtn" type="button" style="color:var(--danger);">ログアウトする</button>
       </div>
     </div>
   </div>
@@ -819,6 +851,25 @@
       loadBooks / computeNextId は後方定義でも先頭で呼べる）
   ========================================================= */
   const STORAGE_KEY = 'reading-log-books';
+
+  /* ---------- Firebase（端末間同期） ----------
+     firebaseConfigはFirebaseコンソール「プロジェクトの設定 > 全般 >
+     マイアプリ」に表示されるWebアプリ設定をそのまま貼り付ければよい。
+     apiKeyは公開されて問題ない値（アクセス制御はFirestoreのルール側で行う）。
+  */
+  const firebaseConfig = {
+    apiKey: "AIzaSyDcQIUTbi_NwlSg8FiM18zEZrOVwEDaPWE",
+    authDomain: "reading-log-d4284.firebaseapp.com",
+    projectId: "reading-log-d4284",
+    storageBucket: "reading-log-d4284.firebasestorage.app",
+    messagingSenderId: "631154574534",
+    appId: "1:631154574534:web:882c539a23d3334e0083c7"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+  let currentUser = null;
+  let unsubscribeBooksListener = null;
 
   function loadBooks(){
     try{
@@ -1553,19 +1604,22 @@
       return;
     }
     const data = collectFormData();
-    let savedId;
+    let savedId, savedBook;
     if(editingBookId){
       const idx = books.findIndex(b => b.id === editingBookId);
       const coverColorIndex = books[idx].coverColorIndex;
-      books[idx] = Object.assign({}, data, { id: editingBookId, coverColorIndex: coverColorIndex });
+      savedBook = Object.assign({}, data, { id: editingBookId, coverColorIndex: coverColorIndex });
+      books[idx] = savedBook;
       savedId = editingBookId;
     } else {
       const id = uid();
       const coverColorIndex = Math.floor(Math.random() * palette.length);
-      books.push(Object.assign({}, data, { id: id, coverColorIndex: coverColorIndex }));
+      savedBook = Object.assign({}, data, { id: id, coverColorIndex: coverColorIndex });
+      books.push(savedBook);
       savedId = id;
     }
-    saveBooks();   // ← ここで永続化
+    saveBooks();   // ← ここでローカル永続化
+    cloudSetBook(savedBook);   // ← クラウドにも反映（他端末に同期）
     if(destination === 'detail'){
       openDetail(savedId);
     } else {
@@ -1591,6 +1645,7 @@
   document.getElementById('detailEditBtn').addEventListener('click', () => openFormEdit(books.find(x => x.id === currentDetailId)));
   document.getElementById('detailDeleteBtn').addEventListener('click', () => {
     if(confirm('この本の記録を削除しますか？この操作は取り消せません。')){
+      cloudDeleteBook(currentDetailId);   // ← クラウドからも削除
       books = books.filter(x => x.id !== currentDetailId);
       saveBooks();   // ← 削除も永続化
       goToList();
@@ -1660,6 +1715,7 @@
       books = data.map(normalizeImportedBook);
       nextIdNum = computeNextId();
       saveBooks();
+      cloudReplaceAllBooks(books);
       closeDataMenu();
       goToList();
       alert('読み込みが完了しました（' + books.length + '冊）。');
@@ -1674,13 +1730,112 @@
   importFileInput.addEventListener('change', e => { importBooksFromFile(e.target.files[0]); importFileInput.value = ''; });
 
   /* =========================================================
-     13. 初期化
+     13. ログイン・端末間同期（Firebase Authentication / Firestore）
   ========================================================= */
-  function init(){
-    renderList();
-    showScreen('List');
+  function cloudSetBook(book){
+    if(!currentUser) return;
+    db.collection('users').doc(currentUser.uid).collection('books').doc(book.id).set(book)
+      .catch(err => console.warn('クラウドへの保存に失敗しました', err));
   }
-  init();
+  function cloudDeleteBook(id){
+    if(!currentUser) return;
+    db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete()
+      .catch(err => console.warn('クラウドからの削除に失敗しました', err));
+  }
+  function cloudReplaceAllBooks(newBooks){
+    if(!currentUser) return;
+    const booksRef = db.collection('users').doc(currentUser.uid).collection('books');
+    booksRef.get().then(snapshot => {
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      newBooks.forEach(b => batch.set(booksRef.doc(b.id), b));
+      return batch.commit();
+    }).catch(err => console.warn('クラウドへの一括反映に失敗しました', err));
+  }
+  function attachBooksListener(booksRef){
+    if(unsubscribeBooksListener) unsubscribeBooksListener();
+    unsubscribeBooksListener = booksRef.onSnapshot(snapshot => {
+      books = snapshot.docs.map(doc => doc.data());
+      nextIdNum = computeNextId();
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+      if(document.querySelector('.app-screen.active')?.id === 'screenList'){
+        renderList();
+      }
+    }, err => console.warn('クラウドの同期に失敗しました', err));
+  }
+  function startCloudSync(user){
+    document.getElementById('loggedInAs').textContent = 'ログイン中：' + user.email;
+    const booksRef = db.collection('users').doc(user.uid).collection('books');
+    booksRef.get().then(snapshot => {
+      if(snapshot.empty && books.length > 0){
+        if(confirm('ローカルにある' + books.length + '冊の記録をクラウドにアップロードしますか？\n（他の端末で既にこのアカウントを使っている場合は「キャンセル」してください）')){
+          const batch = db.batch();
+          books.forEach(b => batch.set(booksRef.doc(b.id), b));
+          batch.commit().catch(err => console.warn('アップロードに失敗しました', err));
+        }
+      }
+      attachBooksListener(booksRef);
+      renderList();
+      showScreen('List');
+    }).catch(err => {
+      console.warn('クラウドの読み込みに失敗しました', err);
+      renderList();
+      showScreen('List');
+    });
+  }
+  function showAuthError(msg){
+    const el = document.getElementById('authError');
+    el.querySelector('span:last-child').textContent = msg;
+    el.classList.add('show');
+  }
+  function clearAuthError(){
+    document.getElementById('authError').classList.remove('show');
+  }
+  function mapAuthError(err){
+    switch(err.code){
+      case 'auth/invalid-email': return 'メールアドレスの形式が正しくありません。';
+      case 'auth/user-not-found':
+      case 'auth/wrong-password':
+      case 'auth/invalid-credential': return 'メールアドレスまたはパスワードが正しくありません。';
+      case 'auth/email-already-in-use': return 'このメールアドレスは既に登録されています。ログインをお試しください。';
+      case 'auth/weak-password': return 'パスワードは6文字以上にしてください。';
+      default: return '通信エラーが発生しました。もう一度お試しください。';
+    }
+  }
+  document.getElementById('authLoginBtn').addEventListener('click', () => {
+    clearAuthError();
+    const email = document.getElementById('authEmailInput').value.trim();
+    const password = document.getElementById('authPasswordInput').value;
+    auth.signInWithEmailAndPassword(email, password).catch(err => showAuthError(mapAuthError(err)));
+  });
+  document.getElementById('authSignupBtn').addEventListener('click', () => {
+    clearAuthError();
+    const email = document.getElementById('authEmailInput').value.trim();
+    const password = document.getElementById('authPasswordInput').value;
+    auth.createUserWithEmailAndPassword(email, password).catch(err => showAuthError(mapAuthError(err)));
+  });
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    if(confirm('ログアウトしますか？')){
+      closeDataMenu();
+      auth.signOut();
+    }
+  });
+
+  /* =========================================================
+     14. 初期化
+  ========================================================= */
+  auth.onAuthStateChanged(user => {
+    currentUser = user;
+    if(user){
+      startCloudSync(user);
+    } else {
+      if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
+      document.getElementById('authEmailInput').value = '';
+      document.getElementById('authPasswordInput').value = '';
+      clearAuthError();
+      showScreen('Auth');
+    }
+  });
 </script>
 
 </body>
