@@ -506,6 +506,7 @@
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
   }
   .book-author{ font-size:10.5px; color:var(--ink-soft); }
+  .book-date{ font-size:9.5px; color:var(--ink-faint); margin-top:1px; }
   .empty-state{
     text-align:center; padding:64px 24px; color:var(--ink-soft);
     font-size:13px; line-height:2;
@@ -957,6 +958,17 @@
   /* =========================================================
      2. 一覧画面
   ========================================================= */
+  function buildCardDateLabel(b){
+    if(b.status === 'reading' && b.startDate){
+      return formatDate(b.startDate) + ' 〜';
+    }
+    if(b.status === 'done' && (b.startDate || b.endDate)){
+      if(b.startDate && b.endDate) return formatDate(b.startDate) + ' 〜 ' + formatDate(b.endDate);
+      if(b.endDate) return '〜 ' + formatDate(b.endDate);
+      return formatDate(b.startDate) + ' 〜';
+    }
+    return '';
+  }
   function buildBookCard(b){
     const card = document.createElement('div');
     card.className = 'book-card';
@@ -966,6 +978,8 @@
       : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>';
     const coverBg = b.cover ? '' : ('background:' + palette[b.coverColorIndex % palette.length] + ';');
     const ratingHTML = b.rating > 0 ? '<div class="book-rating-mini">★' + b.rating.toFixed(1) + '</div>' : '';
+    const dateLabel = buildCardDateLabel(b);
+    const dateHTML = dateLabel ? '<div class="book-date">' + escapeHTML(dateLabel) + '</div>' : '';
     card.innerHTML =
       '<div class="book-cover" style="' + coverBg + '">' +
         coverInner +
@@ -973,7 +987,8 @@
         ratingHTML +
       '</div>' +
       '<div class="book-title">' + escapeHTML(b.title).replace(/\n/g, '<br>') + '</div>' +
-      '<div class="book-author">' + escapeHTML(b.author || '') + '</div>';
+      '<div class="book-author">' + escapeHTML(b.author || '') + '</div>' +
+      dateHTML;
     return card;
   }
   function renderList(){
