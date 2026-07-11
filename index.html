@@ -48,6 +48,9 @@
   .phone{
     width:100%;
     max-width:414px;
+    height:calc(100vh - 88px);
+    height:calc(100dvh - 88px);
+    min-height:480px;
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:22px;
@@ -55,9 +58,18 @@
     position:relative;
   }
 
-  /* ---------- 画面切り替え(state管理) ---------- */
+  /* ---------- 画面切り替え(state管理) ----------
+     .phoneをビューポート基準の高さに固定し、各画面はその内部だけで
+     スクロールさせる。こうすることで、position:absolute; bottom:0の
+     要素(タブバー・FAB・save-bar等)が常に画面の可視領域下端に
+     固定される(本棚が伸びてもページ全体は伸びない)。 */
   .app-screen{ display:none; }
-  .app-screen.active{ display:block; }
+  .app-screen.active{
+    display:block;
+    height:100%;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
 
   .topbar{
     padding:22px 22px 16px;
@@ -102,18 +114,6 @@
   }
   .section-label .txt{ font-weight:700; font-size:14.5px; color:var(--ink); }
   .section-label .sub{ font-size:11px; color:var(--ink-soft); margin-left:auto; }
-  .mic-btn{
-    width:26px; height:26px; border-radius:50%; border:1px solid var(--line);
-    background:var(--surface); color:var(--ink-soft); font-size:12px;
-    display:flex; align-items:center; justify-content:center; cursor:pointer;
-    flex-shrink:0; transition:all .15s ease; padding:0;
-  }
-  .mic-btn.listening{ background:var(--sage); border-color:var(--sage); color:#fff; animation:mic-pulse 1s ease-in-out infinite; }
-  @keyframes mic-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
-  .section-label .mic-btn{ margin-left:auto; }
-  .field-label-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:16px 0 7px; }
-  .field-label-row.first{ margin-top:0; }
-  .field-label-row .field-label{ margin:0; }
   .divider{
     border:none;
     border-top:1px solid var(--line);   /* 極細の実線のみ（立体感なし） */
@@ -340,12 +340,6 @@
     text-align:center; padding:44px 24px; color:var(--ink-soft);
     font-size:12.5px; line-height:1.9;
   }
-  .paste-template{
-    background:var(--surface-alt); border:1px solid var(--line); border-radius:10px;
-    padding:10px 12px; font-size:11px; line-height:1.7; color:var(--ink-soft);
-    white-space:pre-wrap; overflow-x:auto; margin:0 0 12px;
-    font-family:ui-monospace, "SFMono-Regular", Menlo, monospace;
-  }
   .menu-action-btn{
     width:100%; border:1.5px dashed var(--line-strong);
     background:var(--surface); border-radius:12px;
@@ -479,6 +473,14 @@
   /* =====================================================
      一覧画面
   ===================================================== */
+  .search-wrap{ padding:16px 18px 0; }
+  .search-input{
+    width:100%; border:1px solid var(--line); background:var(--surface);
+    border-radius:var(--pill); padding:10px 16px; font-size:13.5px;
+    color:var(--ink); font-family:inherit; outline:none;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  .search-input:focus{ border-color:var(--sage); box-shadow:0 0 0 3px rgba(138,154,123,.15); }
   .filter-tabs{
     display:flex; gap:8px; overflow-x:auto;
     padding:16px 18px 8px; scrollbar-width:none;
@@ -491,6 +493,9 @@
     white-space:nowrap; cursor:pointer; transition:all .15s ease;
   }
   .filter-chip.active{ background:var(--sage); border-color:var(--sage); color:#fff; }
+  .tag-filter-row{ border-top:1px solid var(--line); padding-top:2px; }
+  .tag-filter-label{ font-size:11px; color:var(--ink-soft); font-weight:500; margin:10px 18px 0; }
+  .tag-filter-row .filter-tabs{ padding-top:6px; }
   .memo-toolbar{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
   .memo-toolbar-row{ display:flex; flex-wrap:wrap; gap:6px; }
   .shelf-wrap{ padding:10px 18px 150px; }
@@ -674,6 +679,9 @@
       <h1>本棚</h1>
       <button class="topbar-menu-btn" id="menuBtn" title="データのバックアップ" type="button">⋯</button>
     </div>
+    <div class="search-wrap">
+      <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
+    </div>
     <div class="filter-tabs" id="filterTabs">
       <div class="filter-chip active" data-filter="all">すべて</div>
       <div class="filter-chip" data-filter="buy">買いたい</div>
@@ -681,6 +689,10 @@
       <div class="filter-chip" data-filter="reading">読書中</div>
       <div class="filter-chip" data-filter="done">読了</div>
       <div class="filter-chip" data-filter="paused">中断</div>
+    </div>
+    <div class="tag-filter-row" id="tagFilterRow" style="display:none;">
+      <p class="tag-filter-label">ジャンル・タグ</p>
+      <div class="filter-tabs" id="tagFilterTabs"></div>
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
@@ -745,8 +757,6 @@
     </div>
 
     <div class="form">
-
-      <button class="menu-action-btn" id="openPasteImportBtn" type="button" style="margin-bottom:22px;">📋 貼り付けて自動入力</button>
 
       <!-- 表紙画像 -->
       <div class="section">
@@ -839,9 +849,7 @@
 
       <!-- ①きっかけ -->
       <div class="section">
-        <div class="section-label"><span class="num">①</span><span class="txt">きっかけ・期待</span>
-          <button class="mic-btn" data-mic-target="kikkakeInput" type="button" title="音声入力">🎤</button>
-        </div>
+        <div class="section-label"><span class="num">①</span><span class="txt">きっかけ・期待</span></div>
         <textarea id="kikkakeInput" placeholder="なぜこの本を選んだか、何を得たいと思って読み始めたか"></textarea>
       </div>
 
@@ -878,10 +886,7 @@
       <!-- 読んだ後 -->
       <div class="section conditional" id="sec-after">
         <div class="section-label"><span class="num">③</span><span class="txt">読んだ後</span></div>
-        <div class="field-label-row first">
-          <label class="field-label">全体の感想</label>
-          <button class="mic-btn" data-mic-target="impressionInput" type="button" title="音声入力">🎤</button>
-        </div>
+        <label class="field-label first">全体の感想</label>
         <textarea id="impressionInput" placeholder="読み終えて感じたこと"></textarea>
 
         <label class="field-label">評価</label>
@@ -891,10 +896,7 @@
         </div>
         <p class="rating-hint">星の左半分／右半分をタップして0.5刻みで評価。同じ位置を再タップすると取り消せます。</p>
 
-        <div class="field-label-row">
-          <label class="field-label">次にやりたいこと</label>
-          <button class="mic-btn" data-mic-target="nextActionInput" type="button" title="音声入力">🎤</button>
-        </div>
+        <label class="field-label">次にやりたいこと</label>
         <textarea id="nextActionInput" placeholder="読んで得た気づきをどう行動に移すか"></textarea>
       </div>
 
@@ -940,38 +942,6 @@
     </div>
   </div>
 
-  <!-- 貼り付けて自動入力 -->
-  <div class="modal-overlay" id="pasteImportOverlay">
-    <div class="modal-sheet">
-      <div class="modal-header">
-        <span class="modal-title">貼り付けて自動入力</span>
-        <button class="modal-close" id="pasteImportClose" type="button">×</button>
-      </div>
-      <div class="modal-list">
-        <p class="field-note" style="margin:0 0 10px;">Claudeなどの生成AIアプリに話した内容を整理してもらい、下の形式で出力してもらってから貼り付けてください。項目は一部だけでも構いません。</p>
-        <pre class="paste-template">タイトル: 本のタイトル
-著者: 著者名
-ステータス: 読了
-きっかけ: きっかけや期待
-感想: 全体の感想
-次にやりたいこと: 次の行動
-タグ: 自己啓発, 心理学
-付箋:
-ページ: 23
-引用: 引用文
-感情: 共感, 気づき
-気づき: 気づいたこと
----
-付箋:
-ページ: 45
-引用: 引用文2
-感情: 感動
-気づき: 気づいたこと2</pre>
-        <textarea id="pasteImportInput" rows="6" placeholder="ここに貼り付け"></textarea>
-        <button class="save-btn" id="pasteImportApplyBtn" type="button" style="margin-top:12px;">フォームに反映する</button>
-      </div>
-    </div>
-  </div>
 
 </div>
 
@@ -1058,6 +1028,7 @@
   let goals = loadGoals();
   let nextIdNum = computeNextId();
   let activeFilter = 'all';
+  let searchQuery = '';
   let editingBookId = null;
   let currentDetailId = null;
   let memoSortOrder = 'page';        // 'page'=ページ順 / 'written'=書いた順
@@ -1085,7 +1056,9 @@
 
   function showScreen(name){
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
-    document.getElementById('screen' + name).classList.add('active');
+    const screenEl = document.getElementById('screen' + name);
+    screenEl.classList.add('active');
+    screenEl.scrollTop = 0;
     const tabBar = document.getElementById('tabBar');
     const isTabScreen = (name === 'List' || name === 'Stats');
     tabBar.classList.toggle('show', isTabScreen);
@@ -1141,33 +1114,45 @@
     return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
   }
   function renderFilterTabs(){
-    const tabsEl = document.getElementById('filterTabs');
-    tabsEl.querySelectorAll('.filter-chip[data-tag]').forEach(el => el.remove());
-    getAllTags().forEach(tag => {
-      const chip = document.createElement('div');
-      chip.className = 'filter-chip';
-      chip.dataset.filter = 'tag:' + tag;
-      chip.dataset.tag = '1';
-      chip.textContent = tag;
-      tabsEl.appendChild(chip);
-    });
-    tabsEl.querySelectorAll('.filter-chip').forEach(chip => {
+    document.getElementById('filterTabs').querySelectorAll('.filter-chip').forEach(chip => {
       chip.classList.toggle('active', chip.dataset.filter === activeFilter);
+    });
+
+    const tagRow = document.getElementById('tagFilterRow');
+    const tagTabsEl = document.getElementById('tagFilterTabs');
+    const tags = getAllTags();
+    tagRow.style.display = tags.length ? 'block' : 'none';
+    tagTabsEl.innerHTML = '';
+    tags.forEach(tag => {
+      const chip = document.createElement('div');
+      chip.className = 'filter-chip' + (activeFilter === 'tag:' + tag ? ' active' : '');
+      chip.dataset.filter = 'tag:' + tag;
+      chip.textContent = tag;
+      tagTabsEl.appendChild(chip);
     });
   }
   function renderList(){
     renderFilterTabs();
     const wrap = document.getElementById('shelfWrap');
-    const filtered = activeFilter === 'all'
-      ? books
-      : activeFilter.indexOf('tag:') === 0
-        ? books.filter(b => (b.tags || []).includes(activeFilter.slice(4)))
-        : books.filter(b => b.status === activeFilter);
+    const isSearching = searchQuery.trim() !== '';
+    let filtered;
+    if(isSearching){
+      const q = normalize(searchQuery);
+      filtered = books.filter(b => normalize(b.title).includes(q) || normalize(b.author || '').includes(q));
+    } else if(activeFilter === 'all'){
+      filtered = books;
+    } else if(activeFilter.indexOf('tag:') === 0){
+      filtered = books.filter(b => (b.tags || []).includes(activeFilter.slice(4)));
+    } else {
+      filtered = books.filter(b => b.status === activeFilter);
+    }
     wrap.innerHTML = '';
     if(filtered.length === 0){
       const msg = books.length === 0
         ? 'まだ本が登録されていません。<br>右下の「＋」から追加しましょう。'
-        : 'この条件の本はありません。';
+        : isSearching
+          ? '一致する本が見つかりません。'
+          : 'この条件の本はありません。';
       wrap.innerHTML = '<div class="empty-state">' + msg + '</div>';
       return;
     }
@@ -1660,56 +1645,6 @@
   });
 
   /* =========================================================
-     6.5 音声入力（Web Speech API。未対応ブラウザではボタンを隠す）
-  ========================================================= */
-  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-  function startVoiceInputInto(targetEl, btnEl){
-    if(!SpeechRecognitionCtor){
-      alert('お使いのブラウザは音声入力に対応していません。Chromeなどをお試しください。');
-      return;
-    }
-    if(btnEl.classList.contains('listening')){
-      if(btnEl._recognition) btnEl._recognition.stop();
-      return;
-    }
-    const recognition = new SpeechRecognitionCtor();
-    btnEl._recognition = recognition;
-    recognition.lang = 'ja-JP';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-    recognition.onstart = () => btnEl.classList.add('listening');
-    recognition.onend = () => btnEl.classList.remove('listening');
-    recognition.onerror = () => btnEl.classList.remove('listening');
-    recognition.onresult = e => {
-      const text = e.results[0][0].transcript;
-      if(!text) return;
-      const needsBreak = targetEl.value && !/[\n\s]$/.test(targetEl.value);
-      targetEl.value = targetEl.value + (needsBreak ? '\n' : '') + text;
-      targetEl.dispatchEvent(new Event('input'));
-    };
-    recognition.start();
-  }
-  function initStaticVoiceButtons(){
-    document.querySelectorAll('.mic-btn[data-mic-target]').forEach(btn => {
-      if(!SpeechRecognitionCtor) btn.style.display = 'none';
-      btn.addEventListener('click', () => {
-        const target = document.getElementById(btn.dataset.micTarget);
-        if(target) startVoiceInputInto(target, btn);
-      });
-    });
-  }
-  function attachMemoVoiceButtons(card){
-    card.querySelectorAll('.mic-btn[data-mic-field]').forEach(btn => {
-      if(!SpeechRecognitionCtor) btn.style.display = 'none';
-      btn.addEventListener('click', () => {
-        const field = btn.dataset.micField;
-        const target = field === 'quote' ? card.querySelector('input[type=text]') : card.querySelector('textarea');
-        if(target) startVoiceInputInto(target, btn);
-      });
-    });
-  }
-
-  /* =========================================================
      7. 付箋メモ(フォーム)
   ========================================================= */
   function attachMemoCardHandlers(card){
@@ -1734,8 +1669,7 @@
         '<div class="page-field"><span>p.</span><input type="number" value="' + (memo && memo.page != null ? escapeHTML(String(memo.page)) : '') + '"></div>' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
-      '<div class="field-label-row first"><label class="field-label">引用・気になった箇所</label>' +
-        '<button class="mic-btn" data-mic-field="quote" type="button" title="音声入力">🎤</button></div>' +
+      '<label class="field-label first">引用・気になった箇所</label>' +
       '<input type="text" placeholder="本文からの引用" value="' + escapeHTML(memo && memo.quote || '') + '">' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
       '<div class="emo-row">' +
@@ -1743,13 +1677,11 @@
       '</div>' +
       '<button class="memo-toggle" type="button"><span class="toggle-text">' + (expanded ? '閉じる' : '気づきを見る') + '</span><span class="toggle-icon">▾</span></button>' +
       '<div class="memo-collapsible">' +
-        '<div class="field-label-row first"><label class="field-label">気づきメモ</label>' +
-          '<button class="mic-btn" data-mic-field="insight" type="button" title="音声入力">🎤</button></div>' +
+        '<label class="field-label first">気づきメモ</label>' +
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
     attachMemoCardHandlers(card);
-    attachMemoVoiceButtons(card);
     return card;
   }
   function addMemo(){
@@ -1990,120 +1922,18 @@
   document.getElementById('saveListBtn').addEventListener('click', () => handleSave('list'));
 
   /* =========================================================
-     10.5 貼り付けて自動入力
-     （外部の生成AIに整形してもらったテキストを、決まったラベル
-      形式でパースしてフォームの各項目に振り分ける）
-  ========================================================= */
-  const FIELD_LABELS = {
-    'タイトル': 'title', '著者': 'author', 'ステータス': 'status',
-    'きっかけ': 'kikkake', '感想': 'impression', '次にやりたいこと': 'nextAction',
-    'タグ': 'tags'
-  };
-  const MEMO_FIELD_LABELS = { 'ページ': 'page', '引用': 'quote', '感情': 'emotions', '気づき': 'insight' };
-  const STATUS_LABEL_TO_KEY = { '買いたい': 'buy', '積読': 'stack', '読書中': 'reading', '読了': 'done', '中断': 'paused' };
-
-  function parsePastedText(text){
-    const lines = text.split(/\r\n|\r|\n/);
-    const result = { title: '', author: '', status: '', kikkake: '', impression: '', nextAction: '', tags: [], memos: [] };
-    let mode = null;
-    let currentMemo = null;
-
-    function commitLine(targetObj, key, value){
-      if(Array.isArray(targetObj[key])){
-        targetObj[key] = value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
-      } else {
-        targetObj[key] = (targetObj[key] ? targetObj[key] + '\n' : '') + value;
-      }
-    }
-
-    lines.forEach(rawLine => {
-      const line = rawLine.trim();
-      if(line === '') return;
-      if(line === '---'){ currentMemo = null; mode = null; return; }
-      if(/^付箋[:：]?$/.test(line)){
-        currentMemo = { page: '', quote: '', emotions: [], insight: '' };
-        result.memos.push(currentMemo);
-        mode = null;
-        return;
-      }
-      const m = line.match(/^([^:：]+)[:：]\s*(.*)$/);
-      if(m){
-        const label = m[1].trim();
-        const value = m[2];
-        if(currentMemo && MEMO_FIELD_LABELS[label]){
-          const key = MEMO_FIELD_LABELS[label];
-          commitLine(currentMemo, key, value);
-          mode = (key === 'emotions') ? null : { obj: currentMemo, key: key };
-          return;
-        }
-        if(!currentMemo && FIELD_LABELS[label]){
-          const key = FIELD_LABELS[label];
-          if(key === 'status'){
-            result.status = STATUS_LABEL_TO_KEY[value.trim()] || '';
-            mode = null;
-          } else {
-            commitLine(result, key, value);
-            mode = (key === 'tags') ? null : { obj: result, key: key };
-          }
-          return;
-        }
-      }
-      // ラベルの無い行は、直前の複数行フィールドへの続きとして追記する
-      if(mode && typeof mode.obj[mode.key] === 'string'){
-        mode.obj[mode.key] = mode.obj[mode.key] + '\n' + line;
-      }
-    });
-    return result;
-  }
-  function applyParsedToForm(parsed){
-    if(parsed.title){ document.getElementById('titleInput').value = parsed.title.trim(); autoResizeTitle(); }
-    if(parsed.author){ document.getElementById('authorInput').value = parsed.author.trim(); }
-    if(parsed.kikkake){ document.getElementById('kikkakeInput').value = parsed.kikkake.trim(); }
-    if(parsed.impression){ document.getElementById('impressionInput').value = parsed.impression.trim(); }
-    if(parsed.nextAction){ document.getElementById('nextActionInput').value = parsed.nextAction.trim(); }
-    if(parsed.tags && parsed.tags.length){
-      parsed.tags.forEach(t => { if(t && !selectedTags.includes(t)) selectedTags.push(t); });
-      renderChips();
-    }
-    if(parsed.status){ setStatusUI(parsed.status); }
-    if(parsed.memos && parsed.memos.length){
-      const memoList = document.getElementById('memoList');
-      parsed.memos.forEach(m => {
-        memoList.appendChild(buildFormMemoCard({
-          page: m.page.trim(),
-          quote: m.quote.trim(),
-          emotions: (m.emotions || []).filter(e => emoOptions.includes(e)),
-          insight: m.insight.trim()
-        }, false));
-      });
-    }
-    alert('貼り付けた内容をフォームに反映しました。内容を確認してから保存してください。');
-  }
-  document.getElementById('openPasteImportBtn').addEventListener('click', () => {
-    document.getElementById('pasteImportInput').value = '';
-    document.getElementById('pasteImportOverlay').classList.add('show');
-  });
-  document.getElementById('pasteImportClose').addEventListener('click', () => {
-    document.getElementById('pasteImportOverlay').classList.remove('show');
-  });
-  document.getElementById('pasteImportOverlay').addEventListener('click', e => {
-    if(e.target.id === 'pasteImportOverlay') document.getElementById('pasteImportOverlay').classList.remove('show');
-  });
-  document.getElementById('pasteImportApplyBtn').addEventListener('click', () => {
-    const text = document.getElementById('pasteImportInput').value;
-    if(!text.trim()){ alert('貼り付ける内容がありません。'); return; }
-    const parsed = parsePastedText(text);
-    applyParsedToForm(parsed);
-    document.getElementById('pasteImportOverlay').classList.remove('show');
-  });
-
-  /* =========================================================
      11. 一覧のフィルタ・FAB・詳細のアクションバー
   ========================================================= */
-  document.getElementById('filterTabs').addEventListener('click', e => {
+  function handleFilterChipClick(e){
     const chip = e.target.closest('.filter-chip');
     if(!chip) return;
     activeFilter = chip.dataset.filter;
+    renderList();
+  }
+  document.getElementById('filterTabs').addEventListener('click', handleFilterChipClick);
+  document.getElementById('tagFilterTabs').addEventListener('click', handleFilterChipClick);
+  document.getElementById('searchInput').addEventListener('input', e => {
+    searchQuery = e.target.value;
     renderList();
   });
   document.getElementById('tabBar').addEventListener('click', e => {
@@ -2313,7 +2143,6 @@
   /* =========================================================
      14. 初期化
   ========================================================= */
-  initStaticVoiceButtons();
   auth.onAuthStateChanged(user => {
     currentUser = user;
     if(user){
