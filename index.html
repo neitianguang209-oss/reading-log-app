@@ -102,6 +102,18 @@
   }
   .section-label .txt{ font-weight:700; font-size:14.5px; color:var(--ink); }
   .section-label .sub{ font-size:11px; color:var(--ink-soft); margin-left:auto; }
+  .mic-btn{
+    width:26px; height:26px; border-radius:50%; border:1px solid var(--line);
+    background:var(--surface); color:var(--ink-soft); font-size:12px;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    flex-shrink:0; transition:all .15s ease; padding:0;
+  }
+  .mic-btn.listening{ background:var(--sage); border-color:var(--sage); color:#fff; animation:mic-pulse 1s ease-in-out infinite; }
+  @keyframes mic-pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.55; } }
+  .section-label .mic-btn{ margin-left:auto; }
+  .field-label-row{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin:16px 0 7px; }
+  .field-label-row.first{ margin-top:0; }
+  .field-label-row .field-label{ margin:0; }
   .divider{
     border:none;
     border-top:1px solid var(--line);   /* 極細の実線のみ（立体感なし） */
@@ -328,6 +340,12 @@
     text-align:center; padding:44px 24px; color:var(--ink-soft);
     font-size:12.5px; line-height:1.9;
   }
+  .paste-template{
+    background:var(--surface-alt); border:1px solid var(--line); border-radius:10px;
+    padding:10px 12px; font-size:11px; line-height:1.7; color:var(--ink-soft);
+    white-space:pre-wrap; overflow-x:auto; margin:0 0 12px;
+    font-family:ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
   .menu-action-btn{
     width:100%; border:1.5px dashed var(--line-strong);
     background:var(--surface); border-radius:12px;
@@ -475,7 +493,7 @@
   .filter-chip.active{ background:var(--sage); border-color:var(--sage); color:#fff; }
   .memo-toolbar{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
   .memo-toolbar-row{ display:flex; flex-wrap:wrap; gap:6px; }
-  .shelf-wrap{ padding:10px 18px 110px; }
+  .shelf-wrap{ padding:10px 18px 150px; }
   .shelf-row{ margin-bottom:22px; }
   .shelf-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; }
   .book-card{ cursor:pointer; display:flex; flex-direction:column; gap:7px; }
@@ -512,7 +530,7 @@
     font-size:13px; line-height:2;
   }
   .fab{
-    position:absolute; right:20px; bottom:26px;
+    position:absolute; right:20px; bottom:calc(88px + env(safe-area-inset-bottom));
     width:54px; height:54px; border-radius:50%;
     background:var(--sage); color:#fff;
     display:flex; align-items:center; justify-content:center;
@@ -521,6 +539,46 @@
   }
   .fab:hover{ background:var(--sage-deep); }
   .fab:active{ transform:scale(.95); }
+
+  /* =====================================================
+     下部タブバー(本棚/統計)
+  ===================================================== */
+  .tab-bar{
+    position:absolute; left:0; right:0; bottom:0;
+    display:none; background:var(--surface); border-top:1px solid var(--line);
+    padding:8px 0 calc(8px + env(safe-area-inset-bottom));
+    z-index:15;
+  }
+  .tab-bar.show{ display:flex; }
+  .tab-bar-btn{
+    flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+    background:none; border:none; cursor:pointer; padding:4px 0;
+    color:var(--ink-faint); font-family:inherit; font-size:10.5px; font-weight:500;
+    transition:color .15s ease;
+  }
+  .tab-bar-btn svg{ width:22px; height:22px; stroke:var(--ink-faint); fill:none; stroke-width:1.8; transition:stroke .15s ease; }
+  .tab-bar-btn.active{ color:var(--sage-deep); }
+  .tab-bar-btn.active svg{ stroke:var(--sage-deep); }
+
+  /* =====================================================
+     統計画面
+  ===================================================== */
+  .stats-body{ padding:20px 18px calc(100px + env(safe-area-inset-bottom)); }
+  .stat-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:16px 18px; margin-bottom:14px;
+  }
+  .stat-card-head{ display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  .stat-label{ font-family:'Shippori Mincho', serif; font-weight:600; font-size:15px; color:var(--ink); }
+  .stat-count{ font-size:22px; font-weight:700; color:var(--sage-deep); }
+  .stat-count-unit{ font-size:12px; font-weight:500; color:var(--ink-soft); margin-left:2px; }
+  .stat-progress{ height:8px; border-radius:var(--pill); background:var(--sage-tint); overflow:hidden; margin-bottom:10px; }
+  .stat-progress-fill{ height:100%; background:var(--sage); border-radius:var(--pill); transition:width .25s ease; }
+  .stat-goal-row{ display:flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-soft); }
+  .stat-goal-input{
+    width:56px; border:1px solid var(--line); border-radius:8px; padding:5px 8px;
+    font-size:13px; text-align:center; color:var(--ink); font-family:inherit;
+  }
 
   /* =====================================================
      詳細画面
@@ -616,7 +674,7 @@
       <h1>本棚</h1>
       <button class="topbar-menu-btn" id="menuBtn" title="データのバックアップ" type="button">⋯</button>
     </div>
-    <div class="filter-tabs">
+    <div class="filter-tabs" id="filterTabs">
       <div class="filter-chip active" data-filter="all">すべて</div>
       <div class="filter-chip" data-filter="buy">買いたい</div>
       <div class="filter-chip" data-filter="stack">積読</div>
@@ -626,6 +684,29 @@
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
+  </div>
+
+  <!-- =====================================================
+       画面1.5：統計
+  ===================================================== -->
+  <div class="app-screen" id="screenStats">
+    <div class="topbar">
+      <p class="eyebrow">book log</p>
+      <h1>統計</h1>
+    </div>
+    <div class="stats-body" id="statsBody"></div>
+  </div>
+
+  <!-- 下部タブバー(本棚/統計画面でのみ表示) -->
+  <div class="tab-bar" id="tabBar">
+    <button class="tab-bar-btn active" data-tab="List" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5C4 4.67 4.67 4 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5v-13Z"/><path d="M20 5.5C20 4.67 19.33 4 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5v-13Z"/></svg>
+      <span>本棚</span>
+    </button>
+    <button class="tab-bar-btn" data-tab="Stats" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10"/><path d="M12 20V4"/><path d="M20 20v-7"/></svg>
+      <span>統計</span>
+    </button>
   </div>
 
   <!-- =====================================================
@@ -664,6 +745,8 @@
     </div>
 
     <div class="form">
+
+      <button class="menu-action-btn" id="openPasteImportBtn" type="button" style="margin-bottom:22px;">📋 貼り付けて自動入力</button>
 
       <!-- 表紙画像 -->
       <div class="section">
@@ -756,7 +839,9 @@
 
       <!-- ①きっかけ -->
       <div class="section">
-        <div class="section-label"><span class="num">①</span><span class="txt">きっかけ・期待</span></div>
+        <div class="section-label"><span class="num">①</span><span class="txt">きっかけ・期待</span>
+          <button class="mic-btn" data-mic-target="kikkakeInput" type="button" title="音声入力">🎤</button>
+        </div>
         <textarea id="kikkakeInput" placeholder="なぜこの本を選んだか、何を得たいと思って読み始めたか"></textarea>
       </div>
 
@@ -793,7 +878,10 @@
       <!-- 読んだ後 -->
       <div class="section conditional" id="sec-after">
         <div class="section-label"><span class="num">③</span><span class="txt">読んだ後</span></div>
-        <label class="field-label first">全体の感想</label>
+        <div class="field-label-row first">
+          <label class="field-label">全体の感想</label>
+          <button class="mic-btn" data-mic-target="impressionInput" type="button" title="音声入力">🎤</button>
+        </div>
         <textarea id="impressionInput" placeholder="読み終えて感じたこと"></textarea>
 
         <label class="field-label">評価</label>
@@ -803,7 +891,10 @@
         </div>
         <p class="rating-hint">星の左半分／右半分をタップして0.5刻みで評価。同じ位置を再タップすると取り消せます。</p>
 
-        <label class="field-label">次にやりたいこと</label>
+        <div class="field-label-row">
+          <label class="field-label">次にやりたいこと</label>
+          <button class="mic-btn" data-mic-target="nextActionInput" type="button" title="音声入力">🎤</button>
+        </div>
         <textarea id="nextActionInput" placeholder="読んで得た気づきをどう行動に移すか"></textarea>
       </div>
 
@@ -845,6 +936,39 @@
         <p class="field-note">読み込むと、現在の記録はすべて置き換えられます。書き出したファイルは大切に保管してください。</p>
         <hr class="divider" style="margin:16px 0;">
         <button class="menu-action-btn" id="logoutBtn" type="button" style="color:var(--danger);">ログアウトする</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 貼り付けて自動入力 -->
+  <div class="modal-overlay" id="pasteImportOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">貼り付けて自動入力</span>
+        <button class="modal-close" id="pasteImportClose" type="button">×</button>
+      </div>
+      <div class="modal-list">
+        <p class="field-note" style="margin:0 0 10px;">Claudeなどの生成AIアプリに話した内容を整理してもらい、下の形式で出力してもらってから貼り付けてください。項目は一部だけでも構いません。</p>
+        <pre class="paste-template">タイトル: 本のタイトル
+著者: 著者名
+ステータス: 読了
+きっかけ: きっかけや期待
+感想: 全体の感想
+次にやりたいこと: 次の行動
+タグ: 自己啓発, 心理学
+付箋:
+ページ: 23
+引用: 引用文
+感情: 共感, 気づき
+気づき: 気づいたこと
+---
+付箋:
+ページ: 45
+引用: 引用文2
+感情: 感動
+気づき: 気づいたこと2</pre>
+        <textarea id="pasteImportInput" rows="6" placeholder="ここに貼り付け"></textarea>
+        <button class="save-btn" id="pasteImportApplyBtn" type="button" style="margin-top:12px;">フォームに反映する</button>
       </div>
     </div>
   </div>
@@ -897,6 +1021,19 @@
       console.warn('localStorage保存に失敗しました', e);
     }
   }
+  const GOALS_STORAGE_KEY = 'reading-log-goals';
+  function loadGoals(){
+    try{
+      const saved = localStorage.getItem(GOALS_STORAGE_KEY);
+      const g = saved ? JSON.parse(saved) : {};
+      return { week: g.week || 0, month: g.month || 0, year: g.year || 0 };
+    }catch(e){
+      return { week: 0, month: 0, year: 0 };
+    }
+  }
+  function saveGoals(){
+    try{ localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals)); }catch(e){ console.warn('目標の保存に失敗しました', e); }
+  }
   function computeNextId(){
     let max = 0;
     books.forEach(b => {
@@ -918,6 +1055,7 @@
   const emoOptions = ['共感','気づき','違和感','感動','疑問'];
 
   let books = loadBooks();
+  let goals = loadGoals();
   let nextIdNum = computeNextId();
   let activeFilter = 'all';
   let editingBookId = null;
@@ -948,6 +1086,12 @@
   function showScreen(name){
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
     document.getElementById('screen' + name).classList.add('active');
+    const tabBar = document.getElementById('tabBar');
+    const isTabScreen = (name === 'List' || name === 'Stats');
+    tabBar.classList.toggle('show', isTabScreen);
+    if(isTabScreen){
+      document.querySelectorAll('.tab-bar-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
+    }
     window.scrollTo(0, 0);
   }
   function goToList(){
@@ -991,9 +1135,34 @@
       dateHTML;
     return card;
   }
+  function getAllTags(){
+    const set = new Set();
+    books.forEach(b => (b.tags || []).forEach(t => set.add(t)));
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
+  }
+  function renderFilterTabs(){
+    const tabsEl = document.getElementById('filterTabs');
+    tabsEl.querySelectorAll('.filter-chip[data-tag]').forEach(el => el.remove());
+    getAllTags().forEach(tag => {
+      const chip = document.createElement('div');
+      chip.className = 'filter-chip';
+      chip.dataset.filter = 'tag:' + tag;
+      chip.dataset.tag = '1';
+      chip.textContent = tag;
+      tabsEl.appendChild(chip);
+    });
+    tabsEl.querySelectorAll('.filter-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.filter === activeFilter);
+    });
+  }
   function renderList(){
+    renderFilterTabs();
     const wrap = document.getElementById('shelfWrap');
-    const filtered = activeFilter === 'all' ? books : books.filter(b => b.status === activeFilter);
+    const filtered = activeFilter === 'all'
+      ? books
+      : activeFilter.indexOf('tag:') === 0
+        ? books.filter(b => (b.tags || []).includes(activeFilter.slice(4)))
+        : books.filter(b => b.status === activeFilter);
     wrap.innerHTML = '';
     if(filtered.length === 0){
       const msg = books.length === 0
@@ -1012,6 +1181,70 @@
       row.appendChild(grid);
       wrap.appendChild(row);
     }
+  }
+
+  /* =========================================================
+     2.5 統計画面
+  ========================================================= */
+  function toDateStr(d){
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function getWeekRange(d){
+    const day = (d.getDay() + 6) % 7; // 0=月曜始まり
+    const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - day);
+    const nextMonday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+    return [toDateStr(monday), toDateStr(nextMonday)];
+  }
+  function countDoneInRange(startDate, endDateExclusive){
+    return books.filter(b => b.status === 'done' && b.endDate && b.endDate >= startDate && b.endDate < endDateExclusive).length;
+  }
+  function statsCounts(){
+    const now = new Date();
+    const [weekStart, weekEndExcl] = getWeekRange(now);
+    const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+    const monthEndExcl = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1));
+    const yearStart = now.getFullYear() + '-01-01';
+    const yearEndExcl = (now.getFullYear() + 1) + '-01-01';
+    return {
+      week: countDoneInRange(weekStart, weekEndExcl),
+      month: countDoneInRange(monthStart, monthEndExcl),
+      year: countDoneInRange(yearStart, yearEndExcl)
+    };
+  }
+  function buildStatCard(label, key, count, goal){
+    const pct = goal > 0 ? Math.min(100, Math.round(count / goal * 100)) : 0;
+    return (
+      '<div class="stat-card">' +
+        '<div class="stat-card-head">' +
+          '<span class="stat-label">' + label + '</span>' +
+          '<span class="stat-count">' + count + '<span class="stat-count-unit">冊</span></span>' +
+        '</div>' +
+        '<div class="stat-progress"><div class="stat-progress-fill" style="width:' + pct + '%;"></div></div>' +
+        '<div class="stat-goal-row">' +
+          '<span>目標</span>' +
+          '<input type="number" min="0" inputmode="numeric" class="stat-goal-input" data-goal-key="' + key + '" value="' + goal + '">' +
+          '<span>冊' + (goal > 0 ? '（達成率 ' + pct + '%）' : '') + '</span>' +
+        '</div>' +
+      '</div>'
+    );
+  }
+  function renderStats(){
+    const counts = statsCounts();
+    const body = document.getElementById('statsBody');
+    body.innerHTML =
+      buildStatCard('今週', 'week', counts.week, goals.week) +
+      buildStatCard('今月', 'month', counts.month, goals.month) +
+      buildStatCard('今年', 'year', counts.year, goals.year);
+    body.querySelectorAll('.stat-goal-input').forEach(input => {
+      input.addEventListener('change', () => {
+        const key = input.dataset.goalKey;
+        const val = Math.max(0, parseInt(input.value, 10) || 0);
+        goals[key] = val;
+        saveGoals();
+        cloudSaveGoals();
+        renderStats();
+      });
+    });
   }
 
   /* =========================================================
@@ -1427,6 +1660,56 @@
   });
 
   /* =========================================================
+     6.5 音声入力（Web Speech API。未対応ブラウザではボタンを隠す）
+  ========================================================= */
+  const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition || null;
+  function startVoiceInputInto(targetEl, btnEl){
+    if(!SpeechRecognitionCtor){
+      alert('お使いのブラウザは音声入力に対応していません。Chromeなどをお試しください。');
+      return;
+    }
+    if(btnEl.classList.contains('listening')){
+      if(btnEl._recognition) btnEl._recognition.stop();
+      return;
+    }
+    const recognition = new SpeechRecognitionCtor();
+    btnEl._recognition = recognition;
+    recognition.lang = 'ja-JP';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognition.onstart = () => btnEl.classList.add('listening');
+    recognition.onend = () => btnEl.classList.remove('listening');
+    recognition.onerror = () => btnEl.classList.remove('listening');
+    recognition.onresult = e => {
+      const text = e.results[0][0].transcript;
+      if(!text) return;
+      const needsBreak = targetEl.value && !/[\n\s]$/.test(targetEl.value);
+      targetEl.value = targetEl.value + (needsBreak ? '\n' : '') + text;
+      targetEl.dispatchEvent(new Event('input'));
+    };
+    recognition.start();
+  }
+  function initStaticVoiceButtons(){
+    document.querySelectorAll('.mic-btn[data-mic-target]').forEach(btn => {
+      if(!SpeechRecognitionCtor) btn.style.display = 'none';
+      btn.addEventListener('click', () => {
+        const target = document.getElementById(btn.dataset.micTarget);
+        if(target) startVoiceInputInto(target, btn);
+      });
+    });
+  }
+  function attachMemoVoiceButtons(card){
+    card.querySelectorAll('.mic-btn[data-mic-field]').forEach(btn => {
+      if(!SpeechRecognitionCtor) btn.style.display = 'none';
+      btn.addEventListener('click', () => {
+        const field = btn.dataset.micField;
+        const target = field === 'quote' ? card.querySelector('input[type=text]') : card.querySelector('textarea');
+        if(target) startVoiceInputInto(target, btn);
+      });
+    });
+  }
+
+  /* =========================================================
      7. 付箋メモ(フォーム)
   ========================================================= */
   function attachMemoCardHandlers(card){
@@ -1451,7 +1734,8 @@
         '<div class="page-field"><span>p.</span><input type="number" value="' + (memo && memo.page != null ? escapeHTML(String(memo.page)) : '') + '"></div>' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
-      '<label class="field-label first">引用・気になった箇所</label>' +
+      '<div class="field-label-row first"><label class="field-label">引用・気になった箇所</label>' +
+        '<button class="mic-btn" data-mic-field="quote" type="button" title="音声入力">🎤</button></div>' +
       '<input type="text" placeholder="本文からの引用" value="' + escapeHTML(memo && memo.quote || '') + '">' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
       '<div class="emo-row">' +
@@ -1459,11 +1743,13 @@
       '</div>' +
       '<button class="memo-toggle" type="button"><span class="toggle-text">' + (expanded ? '閉じる' : '気づきを見る') + '</span><span class="toggle-icon">▾</span></button>' +
       '<div class="memo-collapsible">' +
-        '<label class="field-label first">気づきメモ</label>' +
+        '<div class="field-label-row first"><label class="field-label">気づきメモ</label>' +
+          '<button class="mic-btn" data-mic-field="insight" type="button" title="音声入力">🎤</button></div>' +
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
     attachMemoCardHandlers(card);
+    attachMemoVoiceButtons(card);
     return card;
   }
   function addMemo(){
@@ -1704,15 +1990,131 @@
   document.getElementById('saveListBtn').addEventListener('click', () => handleSave('list'));
 
   /* =========================================================
+     10.5 貼り付けて自動入力
+     （外部の生成AIに整形してもらったテキストを、決まったラベル
+      形式でパースしてフォームの各項目に振り分ける）
+  ========================================================= */
+  const FIELD_LABELS = {
+    'タイトル': 'title', '著者': 'author', 'ステータス': 'status',
+    'きっかけ': 'kikkake', '感想': 'impression', '次にやりたいこと': 'nextAction',
+    'タグ': 'tags'
+  };
+  const MEMO_FIELD_LABELS = { 'ページ': 'page', '引用': 'quote', '感情': 'emotions', '気づき': 'insight' };
+  const STATUS_LABEL_TO_KEY = { '買いたい': 'buy', '積読': 'stack', '読書中': 'reading', '読了': 'done', '中断': 'paused' };
+
+  function parsePastedText(text){
+    const lines = text.split(/\r\n|\r|\n/);
+    const result = { title: '', author: '', status: '', kikkake: '', impression: '', nextAction: '', tags: [], memos: [] };
+    let mode = null;
+    let currentMemo = null;
+
+    function commitLine(targetObj, key, value){
+      if(Array.isArray(targetObj[key])){
+        targetObj[key] = value.split(/[,、]/).map(s => s.trim()).filter(Boolean);
+      } else {
+        targetObj[key] = (targetObj[key] ? targetObj[key] + '\n' : '') + value;
+      }
+    }
+
+    lines.forEach(rawLine => {
+      const line = rawLine.trim();
+      if(line === '') return;
+      if(line === '---'){ currentMemo = null; mode = null; return; }
+      if(/^付箋[:：]?$/.test(line)){
+        currentMemo = { page: '', quote: '', emotions: [], insight: '' };
+        result.memos.push(currentMemo);
+        mode = null;
+        return;
+      }
+      const m = line.match(/^([^:：]+)[:：]\s*(.*)$/);
+      if(m){
+        const label = m[1].trim();
+        const value = m[2];
+        if(currentMemo && MEMO_FIELD_LABELS[label]){
+          const key = MEMO_FIELD_LABELS[label];
+          commitLine(currentMemo, key, value);
+          mode = (key === 'emotions') ? null : { obj: currentMemo, key: key };
+          return;
+        }
+        if(!currentMemo && FIELD_LABELS[label]){
+          const key = FIELD_LABELS[label];
+          if(key === 'status'){
+            result.status = STATUS_LABEL_TO_KEY[value.trim()] || '';
+            mode = null;
+          } else {
+            commitLine(result, key, value);
+            mode = (key === 'tags') ? null : { obj: result, key: key };
+          }
+          return;
+        }
+      }
+      // ラベルの無い行は、直前の複数行フィールドへの続きとして追記する
+      if(mode && typeof mode.obj[mode.key] === 'string'){
+        mode.obj[mode.key] = mode.obj[mode.key] + '\n' + line;
+      }
+    });
+    return result;
+  }
+  function applyParsedToForm(parsed){
+    if(parsed.title){ document.getElementById('titleInput').value = parsed.title.trim(); autoResizeTitle(); }
+    if(parsed.author){ document.getElementById('authorInput').value = parsed.author.trim(); }
+    if(parsed.kikkake){ document.getElementById('kikkakeInput').value = parsed.kikkake.trim(); }
+    if(parsed.impression){ document.getElementById('impressionInput').value = parsed.impression.trim(); }
+    if(parsed.nextAction){ document.getElementById('nextActionInput').value = parsed.nextAction.trim(); }
+    if(parsed.tags && parsed.tags.length){
+      parsed.tags.forEach(t => { if(t && !selectedTags.includes(t)) selectedTags.push(t); });
+      renderChips();
+    }
+    if(parsed.status){ setStatusUI(parsed.status); }
+    if(parsed.memos && parsed.memos.length){
+      const memoList = document.getElementById('memoList');
+      parsed.memos.forEach(m => {
+        memoList.appendChild(buildFormMemoCard({
+          page: m.page.trim(),
+          quote: m.quote.trim(),
+          emotions: (m.emotions || []).filter(e => emoOptions.includes(e)),
+          insight: m.insight.trim()
+        }, false));
+      });
+    }
+    alert('貼り付けた内容をフォームに反映しました。内容を確認してから保存してください。');
+  }
+  document.getElementById('openPasteImportBtn').addEventListener('click', () => {
+    document.getElementById('pasteImportInput').value = '';
+    document.getElementById('pasteImportOverlay').classList.add('show');
+  });
+  document.getElementById('pasteImportClose').addEventListener('click', () => {
+    document.getElementById('pasteImportOverlay').classList.remove('show');
+  });
+  document.getElementById('pasteImportOverlay').addEventListener('click', e => {
+    if(e.target.id === 'pasteImportOverlay') document.getElementById('pasteImportOverlay').classList.remove('show');
+  });
+  document.getElementById('pasteImportApplyBtn').addEventListener('click', () => {
+    const text = document.getElementById('pasteImportInput').value;
+    if(!text.trim()){ alert('貼り付ける内容がありません。'); return; }
+    const parsed = parsePastedText(text);
+    applyParsedToForm(parsed);
+    document.getElementById('pasteImportOverlay').classList.remove('show');
+  });
+
+  /* =========================================================
      11. 一覧のフィルタ・FAB・詳細のアクションバー
   ========================================================= */
-  document.querySelectorAll('.filter-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      activeFilter = chip.dataset.filter;
-      renderList();
-    });
+  document.getElementById('filterTabs').addEventListener('click', e => {
+    const chip = e.target.closest('.filter-chip');
+    if(!chip) return;
+    activeFilter = chip.dataset.filter;
+    renderList();
+  });
+  document.getElementById('tabBar').addEventListener('click', e => {
+    const btn = e.target.closest('.tab-bar-btn');
+    if(!btn) return;
+    if(btn.dataset.tab === 'Stats'){
+      renderStats();
+      showScreen('Stats');
+    } else {
+      goToList();
+    }
   });
   document.getElementById('fabAdd').addEventListener('click', openFormNew);
   document.getElementById('detailEditIconBtn').addEventListener('click', () => openFormEdit(books.find(x => x.id === currentDetailId)));
@@ -1832,14 +2234,27 @@
       books = snapshot.docs.map(doc => doc.data());
       nextIdNum = computeNextId();
       localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
-      if(document.querySelector('.app-screen.active')?.id === 'screenList'){
-        renderList();
-      }
+      const activeId = document.querySelector('.app-screen.active')?.id;
+      if(activeId === 'screenList'){ renderList(); }
+      if(activeId === 'screenStats'){ renderStats(); }
     }, err => console.warn('クラウドの同期に失敗しました', err));
+  }
+  function cloudSaveGoals(){
+    if(!currentUser) return;
+    db.collection('users').doc(currentUser.uid).set({ goals: goals }, { merge: true })
+      .catch(err => console.warn('目標のクラウド保存に失敗しました', err));
   }
   function startCloudSync(user){
     document.getElementById('loggedInAs').textContent = 'ログイン中：' + user.email;
-    const booksRef = db.collection('users').doc(user.uid).collection('books');
+    const userRef = db.collection('users').doc(user.uid);
+    const booksRef = userRef.collection('books');
+    userRef.get().then(docSnap => {
+      if(docSnap.exists && docSnap.data().goals){
+        goals = Object.assign({ week: 0, month: 0, year: 0 }, docSnap.data().goals);
+        saveGoals();
+        if(document.querySelector('.app-screen.active')?.id === 'screenStats') renderStats();
+      }
+    }).catch(err => console.warn('目標の読み込みに失敗しました', err));
     booksRef.get().then(snapshot => {
       if(snapshot.empty && books.length > 0){
         if(confirm('ローカルにある' + books.length + '冊の記録をクラウドにアップロードしますか？\n（他の端末で既にこのアカウントを使っている場合は「キャンセル」してください）')){
@@ -1898,6 +2313,7 @@
   /* =========================================================
      14. 初期化
   ========================================================= */
+  initStaticVoiceButtons();
   auth.onAuthStateChanged(user => {
     currentUser = user;
     if(user){
