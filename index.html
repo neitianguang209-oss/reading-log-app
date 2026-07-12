@@ -358,7 +358,7 @@
   .topbar-menu-btn:hover{ background:var(--sage-tint); color:var(--ink); }
 
   .conditional{
-    max-height:2000px; overflow:hidden;
+    max-height:200000px; overflow:hidden;
     transition: max-height .3s ease, opacity .25s ease, margin .3s ease;
     opacity:1;
   }
@@ -392,6 +392,11 @@
     background:var(--sage-tint); padding:3px 10px; border-radius:var(--pill);
     display:inline-block; margin-bottom:10px;
   }
+  .memo-date-input{
+    border:1px solid var(--line); border-radius:8px; padding:5px 8px;
+    font-size:11.5px; color:var(--ink-soft); font-family:inherit; background:var(--surface);
+  }
+  .impression-index-label{ font-size:12.5px; font-weight:700; color:var(--ink); }
   .memo-del{
     margin-left:auto; border:none; background:none;
     color:var(--ink-soft); font-size:12px; cursor:pointer; text-decoration:underline;
@@ -435,6 +440,30 @@
   }
   .memo-card.expanded .memo-collapsible{ max-height:600px; opacity:1; margin-top:6px; }
   .memo-insight-text{ font-size:13.5px; line-height:1.85; white-space:pre-wrap; color:var(--ink); }
+
+  /* ---------- 詳細画面：付箋メモのコンパクト2列グリッド ---------- */
+  .memo-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .memo-card.compact{ padding:12px 13px 11px; cursor:pointer; }
+  .memo-top-compact{ display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
+  .memo-date-badge{ font-size:10px; color:var(--ink-soft); }
+  .memo-card.compact .memo-quote{
+    font-size:12.5px; line-height:1.6; margin:0 0 8px; color:var(--ink);
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .memo-card.compact.expanded .memo-quote{ -webkit-line-clamp:unset; overflow:visible; }
+  .memo-card.compact.expanded{ grid-column:1 / -1; }
+  .memo-card.compact .emo-row{ gap:4px; }
+  .memo-card.compact .emo-chip{ font-size:10px; padding:3px 8px; }
+  .memo-card.compact .memo-insight-compact{
+    display:none; margin-top:8px; padding-top:8px; border-top:1px solid var(--line);
+    font-size:12.5px; line-height:1.75;
+  }
+  .memo-card.compact.expanded .memo-insight-compact{ display:block; }
+
+  /* ---------- 詳細画面：複数回の感想 ---------- */
+  .impression-entry{ margin-bottom:10px; }
+  .impression-entry:last-of-type{ margin-bottom:0; }
+  .impression-entry-label{ font-size:11px; font-weight:700; color:var(--sage-deep); margin-bottom:3px; }
 
   /* ---------- 星評価 ---------- */
   .stars{ display:flex; gap:4px; }
@@ -614,6 +643,7 @@
   .detail-title-block{ text-align:center; padding:16px 20px 0; }
   .detail-title{ font-family:'Shippori Mincho', serif; font-weight:600; font-size:19px; color:var(--ink); line-height:1.6; text-wrap:balance; }
   .detail-author{ font-size:12.5px; color:var(--ink-soft); margin-top:5px; }
+  .detail-publisher{ font-size:11px; color:var(--ink-faint); margin-top:2px; }
   .detail-status-chip{
     display:inline-block; margin-top:12px;
     font-size:11px; font-weight:500; padding:5px 14px;
@@ -735,6 +765,7 @@
     <div class="detail-title-block">
       <div class="detail-title" id="detailTitle"></div>
       <div class="detail-author" id="detailAuthor"></div>
+      <div class="detail-publisher" id="detailPublisher"></div>
       <div class="detail-status-chip" id="detailStatusChip"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
@@ -797,6 +828,9 @@
 
         <label class="field-label">著者</label>
         <input type="text" id="authorInput" placeholder="例：ヴィクトール・フランクル">
+
+        <label class="field-label">出版社</label>
+        <input type="text" id="publisherInput" placeholder="例：みすず書房">
 
         <label class="field-label">ジャンル・タグ</label>
         <div class="tag-field" id="tagField">
@@ -886,8 +920,10 @@
       <!-- 読んだ後 -->
       <div class="section conditional" id="sec-after">
         <div class="section-label"><span class="num">③</span><span class="txt">読んだ後</span></div>
-        <label class="field-label first">全体の感想</label>
-        <textarea id="impressionInput" placeholder="読み終えて感じたこと"></textarea>
+
+        <label class="field-label first">感想<span class="opt">読むたびに追加できます</span></label>
+        <div class="memo-list" id="impressionList"></div>
+        <button class="add-memo-btn" onclick="addImpression()" type="button">＋ 感想を追加</button>
 
         <label class="field-label">評価</label>
         <div class="rating-row">
@@ -1022,7 +1058,7 @@
   const palette = ['#8A9A7B','#B0A088','#9C8577','#7E8CA0','#A99C88','#8B9AA0'];
   const statusLabelMap = {buy:'買いたい', stack:'積読', reading:'読書中', done:'読了', paused:'中断'};
   const statusColorMap = {buy:'#B7A98C', stack:'#A99C88', reading:'#7E8CA0', done:'#8A9A7B', paused:'#B5867A'};
-  const emoOptions = ['共感','気づき','違和感','感動','疑問'];
+  const emoOptions = ['共感','気づき','違和感','感動','疑問','学び'];
 
   let books = loadBooks();
   let goals = loadGoals();
@@ -1270,16 +1306,19 @@
     const emosHTML = (memo.emotions && memo.emotions.length)
       ? memo.emotions.map(e => '<div class="emo-chip active" style="cursor:default;">' + escapeHTML(e) + '</div>').join('')
       : '<span class="no-emo">タグなし</span>';
-    const toggleHTML = memo.insight
-      ? '<button class="memo-toggle" type="button"><span class="toggle-text">気づきを見る</span><span class="toggle-icon">▾</span></button>' +
-        '<div class="memo-collapsible"><div class="memo-insight-text">' + escapeHTML(memo.insight).replace(/\n/g, '<br>') + '</div></div>'
+    const dateHTML = memo.date ? '<span class="memo-date-badge">' + escapeHTML(formatDate(memo.date)) + '</span>' : '';
+    const insightHTML = memo.insight
+      ? '<div class="memo-insight-text memo-insight-compact">' + escapeHTML(memo.insight).replace(/\n/g, '<br>') + '</div>'
       : '';
     return (
-      '<div class="memo-card">' +
-        '<div class="page-field-display">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
+      '<div class="memo-card compact">' +
+        '<div class="memo-top-compact">' +
+          '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
+          dateHTML +
+        '</div>' +
         '<div class="memo-quote">' + (memo.quote ? escapeHTML(memo.quote) : '（引用未入力）') + '</div>' +
         '<div class="emo-row">' + emosHTML + '</div>' +
-        toggleHTML +
+        insightHTML +
       '</div>'
     );
   }
@@ -1318,20 +1357,27 @@
       html += '<div class="section-label" style="margin:4px 2px 10px;"><span class="txt">付箋メモ</span></div>' +
         buildMemoToolbarHTML() +
         (visibleMemos.length
-          ? '<div class="memo-list">' + visibleMemos.map(buildDetailMemoCard).join('') + '</div>'
+          ? '<div class="memo-grid">' + visibleMemos.map(buildDetailMemoCard).join('') + '</div>'
           : '<p class="field-note" style="margin:0 2px 4px;">選択した感情タグに一致するメモはありません。</p>');
     }
-    if(b.impression || b.nextAction || b.rating > 0){
+    const impressionsToShow = (b.impressions && b.impressions.length)
+      ? b.impressions
+      : (b.impression ? [{ date: '', text: b.impression }] : []);
+    if(impressionsToShow.length || b.nextAction || b.rating > 0){
       html += '<div class="info-card">';
       if(b.rating > 0){
         html += '<div class="ic-label">評価</div><div class="rating-row" id="detailRatingRow" style="margin-bottom:10px;"></div>';
       }
-      if(b.impression){
-        html += '<div class="ic-label">感想</div><div class="ic-text" style="margin-bottom:10px;">' +
-          escapeHTML(b.impression).replace(/\n/g, '<br>') + '</div>';
+      if(impressionsToShow.length){
+        html += '<div class="ic-label">感想</div>';
+        impressionsToShow.forEach((imp, i) => {
+          const label = (i + 1) + '回目の感想' + (imp.date ? '（' + formatDate(imp.date) + '）' : '');
+          html += '<div class="impression-entry"><div class="impression-entry-label">' + escapeHTML(label) + '</div>' +
+            '<div class="ic-text">' + escapeHTML(imp.text).replace(/\n/g, '<br>') + '</div></div>';
+        });
       }
       if(b.nextAction){
-        html += '<div class="ic-label">次にやりたいこと</div><div class="ic-text">' +
+        html += '<div class="ic-label" style="margin-top:10px;">次にやりたいこと</div><div class="ic-text">' +
           escapeHTML(b.nextAction).replace(/\n/g, '<br>') + '</div>';
       }
       html += '</div>';
@@ -1345,12 +1391,8 @@
     if(connCardEl){
       connCardEl.addEventListener('click', () => openDetail(connCardEl.dataset.connId));
     }
-    el.querySelectorAll('.memo-toggle').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const card = btn.closest('.memo-card');
-        const expanded = card.classList.toggle('expanded');
-        btn.querySelector('.toggle-text').textContent = expanded ? '閉じる' : '気づきを見る';
-      });
+    el.querySelectorAll('.memo-grid .memo-card.compact').forEach(card => {
+      card.addEventListener('click', () => card.classList.toggle('expanded'));
     });
     el.querySelectorAll('.memo-toolbar [data-sort]').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -1391,6 +1433,9 @@
     const authorEl = document.getElementById('detailAuthor');
     authorEl.textContent = b.author || '';
     authorEl.style.display = b.author ? 'block' : 'none';
+    const publisherEl = document.getElementById('detailPublisher');
+    publisherEl.textContent = b.publisher || '';
+    publisherEl.style.display = b.publisher ? 'block' : 'none';
     document.getElementById('detailStatusChip').textContent = statusLabelMap[b.status];
     renderDetailBody(b);
   }
@@ -1667,6 +1712,7 @@
     card.innerHTML =
       '<div class="memo-top">' +
         '<div class="page-field"><span>p.</span><input type="number" value="' + (memo && memo.page != null ? escapeHTML(String(memo.page)) : '') + '"></div>' +
+        '<input type="date" class="memo-date-input" value="' + escapeHTML(memo && memo.date || '') + '">' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
       '<label class="field-label first">引用・気になった箇所</label>' +
@@ -1690,10 +1736,41 @@
   function gatherMemos(){
     return Array.from(document.querySelectorAll('#memoList .memo-card')).map(card => ({
       page: card.querySelector('.page-field input').value,
+      date: card.querySelector('.memo-date-input').value,
       quote: card.querySelector('input[type=text]').value.trim(),
       emotions: Array.from(card.querySelectorAll('.emo-chip.active')).map(e => e.textContent.trim()),
       insight: card.querySelector('textarea').value.trim()
     }));
+  }
+
+  /* ---------- 感想（読むたびに複数追加できる） ---------- */
+  function buildFormImpressionCard(impression){
+    const card = document.createElement('div');
+    card.className = 'memo-card impression-card';
+    card.innerHTML =
+      '<div class="memo-top">' +
+        '<span class="impression-index-label"></span>' +
+        '<input type="date" class="memo-date-input" value="' + escapeHTML(impression && impression.date || '') + '">' +
+        '<button class="memo-del" type="button">削除</button>' +
+      '</div>' +
+      '<textarea placeholder="読み終えて感じたこと">' + escapeHTML(impression && impression.text || '') + '</textarea>';
+    card.querySelector('.memo-del').addEventListener('click', () => { card.remove(); renumberImpressions(); });
+    return card;
+  }
+  function renumberImpressions(){
+    document.querySelectorAll('#impressionList .impression-card').forEach((card, i) => {
+      card.querySelector('.impression-index-label').textContent = (i + 1) + '回目の感想';
+    });
+  }
+  function addImpression(impression){
+    document.getElementById('impressionList').appendChild(buildFormImpressionCard(impression));
+    renumberImpressions();
+  }
+  function gatherImpressions(){
+    return Array.from(document.querySelectorAll('#impressionList .impression-card')).map(card => ({
+      date: card.querySelector('.memo-date-input').value,
+      text: card.querySelector('textarea').value.trim()
+    })).filter(imp => imp.text || imp.date);
   }
 
   /* =========================================================
@@ -1806,13 +1883,14 @@
     document.getElementById('formHeading').textContent = '本を登録';
     document.getElementById('titleInput').value = '';
     document.getElementById('authorInput').value = '';
+    document.getElementById('publisherInput').value = '';
     selectedTags.length = 0;
     renderChips();
     clearCoverImage();
     removeConn();
     document.getElementById('memoList').innerHTML = '';
     document.getElementById('kikkakeInput').value = '';
-    document.getElementById('impressionInput').value = '';
+    document.getElementById('impressionList').innerHTML = '';
     document.getElementById('nextActionInput').value = '';
     rating = 0;
     renderStars();
@@ -1825,6 +1903,7 @@
     document.getElementById('formHeading').textContent = '本を編集';
     document.getElementById('titleInput').value = b.title || '';
     document.getElementById('authorInput').value = b.author || '';
+    document.getElementById('publisherInput').value = b.publisher || '';
     selectedTags.length = 0;
     (b.tags || []).forEach(t => selectedTags.push(t));
     renderChips();
@@ -1839,7 +1918,11 @@
     memoList.innerHTML = '';
     (b.memos || []).forEach(m => memoList.appendChild(buildFormMemoCard(m, false)));
     document.getElementById('kikkakeInput').value = b.kikkake || '';
-    document.getElementById('impressionInput').value = b.impression || '';
+    document.getElementById('impressionList').innerHTML = '';
+    const legacyImpressions = (b.impressions && b.impressions.length)
+      ? b.impressions
+      : (b.impression ? [{ date: '', text: b.impression }] : []);
+    legacyImpressions.forEach(imp => addImpression(imp));
     document.getElementById('nextActionInput').value = b.nextAction || '';
     rating = b.rating || 0;
     renderStars();
@@ -1852,6 +1935,7 @@
     return {
       title: document.getElementById('titleInput').value.trim(),
       author: document.getElementById('authorInput').value.trim(),
+      publisher: document.getElementById('publisherInput').value.trim(),
       tags: selectedTags.slice(),
       status: currentStatus,
       startDate: hideDates ? '' : startDateInput.value,
@@ -1859,7 +1943,7 @@
       kikkake: document.getElementById('kikkakeInput').value.trim(),
       connection: currentConnection ? { id: currentConnection.id || null, title: currentConnection.title, author: currentConnection.author, cover: currentConnection.cover || null } : null,
       memos: gatherMemos(),
-      impression: document.getElementById('impressionInput').value.trim(),
+      impressions: gatherImpressions(),
       rating: rating,
       nextAction: document.getElementById('nextActionInput').value.trim(),
       cover: coverImg ? coverImg.src : null
@@ -1982,18 +2066,25 @@
   }
   // 手動編集されたファイルが読み込まれても描画処理が壊れないよう、欠けている項目を既定値で補う
   function normalizeImportedBook(raw, index){
+    const legacyImpressions = Array.isArray(raw.impressions)
+      ? raw.impressions
+      : (raw.impression ? [{ date: '', text: raw.impression }] : []);
     return {
       id: raw.id || ('b' + (index + 1)),
       title: raw.title || '(無題)',
       author: raw.author || '',
+      publisher: raw.publisher || '',
       tags: Array.isArray(raw.tags) ? raw.tags : [],
       status: statusLabelMap[raw.status] ? raw.status : 'stack',
       startDate: raw.startDate || '',
       endDate: raw.endDate || '',
       kikkake: raw.kikkake || '',
       connection: raw.connection || null,
-      memos: Array.isArray(raw.memos) ? raw.memos : [],
-      impression: raw.impression || '',
+      memos: (Array.isArray(raw.memos) ? raw.memos : []).map(m => ({
+        page: m.page || '', date: m.date || '', quote: m.quote || '',
+        emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || ''
+      })),
+      impressions: legacyImpressions,
       rating: typeof raw.rating === 'number' ? raw.rating : 0,
       nextAction: raw.nextAction || '',
       cover: raw.cover || null,
