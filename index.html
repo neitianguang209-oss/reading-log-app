@@ -194,10 +194,7 @@
     transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
   textarea{ resize:vertical; min-height:70px; transition:min-height .2s ease; }
-  #kikkakeInput:focus,
-  .memo-collapsible textarea:focus,
-  .impression-card textarea:focus,
-  #nextActionInput:focus{
+  #kikkakeInput:focus{
     min-height:160px;
   }
   #titleInput{
@@ -345,6 +342,29 @@
   .modal-empty{
     text-align:center; padding:44px 24px; color:var(--ink-soft);
     font-size:12.5px; line-height:1.9;
+  }
+
+  /* ---------- フルスクリーン編集(感想・引用・気づき・次にやりたいこと) ---------- */
+  .fullscreen-editor{
+    position:absolute; inset:0; z-index:40;
+    background:var(--surface);
+    display:none; flex-direction:column;
+  }
+  .fullscreen-editor.show{ display:flex; }
+  .fullscreen-editor-header{
+    flex:0 0 auto; display:flex; align-items:center; justify-content:space-between;
+    padding:18px 18px 14px; border-bottom:1px solid var(--line);
+  }
+  .fullscreen-editor-title{ font-family:'Shippori Mincho', serif; font-weight:600; font-size:15px; color:var(--ink); }
+  .fullscreen-editor-done{
+    background:var(--sage); color:#fff; border:none; border-radius:var(--pill);
+    padding:8px 18px; font-size:13px; font-weight:700; font-family:inherit; cursor:pointer;
+  }
+  .fullscreen-editor-done:hover{ background:var(--sage-deep); }
+  .fullscreen-editor-textarea{
+    flex:1 1 auto; width:100%; border:none; outline:none; resize:none;
+    padding:18px; font-family:inherit; font-size:15px; line-height:1.9;
+    color:var(--ink); background:var(--surface);
   }
   .menu-action-btn{
     width:100%; border:1.5px dashed var(--line-strong);
@@ -987,6 +1007,14 @@
     </div>
   </div>
 
+  <!-- フルスクリーン編集(感想・引用・気づき・次にやりたいこと) -->
+  <div class="fullscreen-editor" id="fullscreenEditor">
+    <div class="fullscreen-editor-header">
+      <span class="fullscreen-editor-title" id="fullscreenEditorTitle"></span>
+      <button class="fullscreen-editor-done" id="fullscreenEditorDone" type="button">完了</button>
+    </div>
+    <textarea class="fullscreen-editor-textarea" id="fullscreenEditorTextarea"></textarea>
+  </div>
 
 </div>
 
@@ -1740,6 +1768,8 @@
     const quoteInput = card.querySelector('.memo-quote-input');
     quoteInput.addEventListener('input', () => autoResizeTextarea(quoteInput));
     autoResizeTextarea(quoteInput);
+    makeFieldOpenFullscreen(quoteInput, '引用・気になった箇所');
+    makeFieldOpenFullscreen(card.querySelector('.memo-collapsible textarea'), '気づきメモ');
     return card;
   }
   function addMemo(){
@@ -1767,6 +1797,7 @@
       '</div>' +
       '<textarea placeholder="読み終えて感じたこと">' + escapeHTML(impression && impression.text || '') + '</textarea>';
     card.querySelector('.memo-del').addEventListener('click', () => { card.remove(); renumberImpressions(); });
+    makeFieldOpenFullscreen(card.querySelector('textarea'), () => card.querySelector('.impression-index-label').textContent || '感想');
     return card;
   }
   function renumberImpressions(){
@@ -1889,6 +1920,40 @@
     autoResizeTextarea(titleInputEl);
   }
   titleInputEl.addEventListener('input', autoResizeTitle);
+
+  /* =========================================================
+     9.5 フルスクリーン編集
+     （感想・引用・気づき・次にやりたいこと欄をタップすると、
+      画面全体を使った書くスペースに切り替える）
+  ========================================================= */
+  let fullscreenEditorTarget = null;
+  const fullscreenEditorEl = document.getElementById('fullscreenEditor');
+  const fullscreenEditorTextarea = document.getElementById('fullscreenEditorTextarea');
+  const fullscreenEditorTitleEl = document.getElementById('fullscreenEditorTitle');
+
+  function openFullscreenEditor(targetEl, title){
+    fullscreenEditorTarget = targetEl;
+    fullscreenEditorTitleEl.textContent = title;
+    fullscreenEditorTextarea.value = targetEl.value;
+    fullscreenEditorEl.classList.add('show');
+    fullscreenEditorTextarea.focus();
+  }
+  function closeFullscreenEditor(){
+    if(fullscreenEditorTarget){
+      fullscreenEditorTarget.value = fullscreenEditorTextarea.value;
+      fullscreenEditorTarget.dispatchEvent(new Event('input'));
+    }
+    fullscreenEditorEl.classList.remove('show');
+    fullscreenEditorTarget = null;
+  }
+  function makeFieldOpenFullscreen(el, title){
+    el.addEventListener('focus', () => {
+      el.blur();
+      openFullscreenEditor(el, typeof title === 'function' ? title() : title);
+    });
+  }
+  document.getElementById('fullscreenEditorDone').addEventListener('click', closeFullscreenEditor);
+  makeFieldOpenFullscreen(document.getElementById('nextActionInput'), '次にやりたいこと');
 
   /* =========================================================
      10. フォームの初期化・データ読み込み・保存
