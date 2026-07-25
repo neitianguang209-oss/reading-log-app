@@ -193,7 +193,13 @@
     line-height:1.7;
     transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
   }
-  textarea{ resize:vertical; min-height:70px; }
+  textarea{ resize:vertical; min-height:70px; transition:min-height .2s ease; }
+  #kikkakeInput:focus,
+  .memo-collapsible textarea:focus,
+  .impression-card textarea:focus,
+  #nextActionInput:focus{
+    min-height:160px;
+  }
   #titleInput{
     resize:none; min-height:0; overflow:hidden;
     font-family:'Shippori Mincho', serif; font-weight:600; font-size:15px;
@@ -403,6 +409,9 @@
   }
   .memo-card textarea, .memo-card input[type=text]{
     background:var(--surface); border:1px solid var(--line);
+  }
+  .memo-quote-input{
+    resize:none; min-height:0; overflow:hidden;
   }
   .memo-card label.field-label{ color:var(--ink-soft); }
   .memo-quote{ font-size:14px; font-weight:500; line-height:1.75; color:var(--ink); margin:2px 0 10px; }
@@ -1316,7 +1325,7 @@
           '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
           dateHTML +
         '</div>' +
-        '<div class="memo-quote">' + (memo.quote ? escapeHTML(memo.quote) : '（引用未入力）') + '</div>' +
+        '<div class="memo-quote">' + (memo.quote ? escapeHTML(memo.quote).replace(/\n/g, '<br>') : '（引用未入力）') + '</div>' +
         '<div class="emo-row">' + emosHTML + '</div>' +
         insightHTML +
       '</div>'
@@ -1716,7 +1725,7 @@
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
       '<label class="field-label first">引用・気になった箇所</label>' +
-      '<input type="text" placeholder="本文からの引用" value="' + escapeHTML(memo && memo.quote || '') + '">' +
+      '<textarea class="memo-quote-input" rows="1" placeholder="本文からの引用">' + escapeHTML(memo && memo.quote || '') + '</textarea>' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
       '<div class="emo-row">' +
         emoOptions.map(e => '<div class="emo-chip' + (selected.has(e) ? ' active' : '') + '">' + e + '</div>').join('') +
@@ -1728,6 +1737,9 @@
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
     attachMemoCardHandlers(card);
+    const quoteInput = card.querySelector('.memo-quote-input');
+    quoteInput.addEventListener('input', () => autoResizeTextarea(quoteInput));
+    autoResizeTextarea(quoteInput);
     return card;
   }
   function addMemo(){
@@ -1737,9 +1749,9 @@
     return Array.from(document.querySelectorAll('#memoList .memo-card')).map(card => ({
       page: card.querySelector('.page-field input').value,
       date: card.querySelector('.memo-date-input').value,
-      quote: card.querySelector('input[type=text]').value.trim(),
+      quote: card.querySelector('.memo-quote-input').value.trim(),
       emotions: Array.from(card.querySelectorAll('.emo-chip.active')).map(e => e.textContent.trim()),
-      insight: card.querySelector('textarea').value.trim()
+      insight: card.querySelector('.memo-collapsible textarea').value.trim()
     }));
   }
 
@@ -1869,9 +1881,12 @@
       表示時はその改行をそのまま反映する）
   ========================================================= */
   const titleInputEl = document.getElementById('titleInput');
+  function autoResizeTextarea(el){
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  }
   function autoResizeTitle(){
-    titleInputEl.style.height = 'auto';
-    titleInputEl.style.height = titleInputEl.scrollHeight + 'px';
+    autoResizeTextarea(titleInputEl);
   }
   titleInputEl.addEventListener('input', autoResizeTitle);
 
