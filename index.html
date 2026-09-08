@@ -135,7 +135,18 @@
   .topbar.has-back .topbar-heads{ padding-top:2px; }
 
   /* ---------- 検索欄・フィルターチップ（2-2） ---------- */
-  .search-wrap{ padding:0 var(--side) 12px; }
+  .list-header{
+    position:sticky; top:0; z-index:8;
+    background:var(--bg);
+  }
+  .search-wrap{
+    padding:0 var(--side) 12px; max-height:64px; overflow:hidden;
+    transition:max-height .18s ease, opacity .18s ease, padding .18s ease;
+  }
+  /* 下にスクロール中は検索窓と「大分類／小分類」の見出しを畳む */
+  .list-header.compact .search-wrap{ max-height:0; opacity:0; padding-bottom:0; }
+  .list-header.compact .cat-filter-label{ display:none; }
+  .list-header.compact .cat-filter-row .filter-tabs{ padding-bottom:10px; }
   .search-input{
     width:100%; border:1px solid var(--line); background:var(--surface);
     border-radius:var(--pill); padding:11px 18px; font-size:15px;
@@ -162,7 +173,7 @@
   .cat-filter-label{ font-size:12px; color:var(--ink-faint); margin:0 var(--side) 8px; }
 
   /* ---------- 本棚：3列の表紙グリッド ---------- */
-  .shelf-wrap{ padding:0 var(--side) calc(104px + env(safe-area-inset-bottom)); }
+  .shelf-wrap{ padding:0 var(--side) calc(122px + env(safe-area-inset-bottom)); }
   .book-title{
     font-size:17px; font-weight:600; color:var(--ink); line-height:1.35;
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
@@ -196,7 +207,7 @@
     font-size:14px; line-height:1.9;
   }
   .fab{
-    position:absolute; right:18px; bottom:calc(84px + env(safe-area-inset-bottom));
+    position:absolute; right:18px; bottom:calc(102px + env(safe-area-inset-bottom));
     width:54px; height:54px; border-radius:50%;
     background:var(--accent); color:#fff;
     display:flex; align-items:center; justify-content:center;
@@ -209,13 +220,14 @@
   .tab-bar{
     position:absolute; left:0; right:0; bottom:0;
     display:none; background:var(--bg);
-    padding:10px 0 calc(10px + env(safe-area-inset-bottom));
+    /* 画面のいちばん下だと押しづらいので、アイコンを少し上げている */
+    padding:10px 0 calc(26px + env(safe-area-inset-bottom));
     z-index:15;
   }
   .tab-bar.show{ display:flex; }
   .tab-bar-btn{
     flex:1; display:flex; align-items:center; justify-content:center;
-    background:none; border:none; cursor:pointer; padding:8px 0;
+    background:none; border:none; cursor:pointer; padding:10px 0;
     color:var(--ink-faint); font-family:inherit;
   }
   .tab-bar-btn svg{ width:24px; height:24px; stroke:currentColor; fill:none; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; }
@@ -225,7 +237,7 @@
   /* =====================================================
      統計画面（3章）
   ===================================================== */
-  .stats-body{ padding:0 var(--side) calc(104px + env(safe-area-inset-bottom)); }
+  .stats-body{ padding:0 var(--side) calc(122px + env(safe-area-inset-bottom)); }
   .year-nav{
     position:relative; display:flex; align-items:center; justify-content:center;
     gap:22px; height:48px; margin-bottom:14px;
@@ -340,7 +352,7 @@
     font-size:13px; font-weight:400; padding:6px 16px;
     border-radius:var(--pill); background:var(--accent-tint); color:var(--accent-deep);
   }
-  .detail-body{ padding:20px var(--side) 110px; }
+  .detail-body{ padding:20px var(--side) 124px; }
   .info-card{
     background:var(--surface); border-radius:var(--radius);
     box-shadow:var(--shadow); padding:16px; margin-bottom:15px;
@@ -349,10 +361,12 @@
   .info-card .ic-text{ font-size:15px; font-weight:400; line-height:1.85; color:var(--ink); }
   .date-row{ display:flex; gap:28px; font-size:15px; }
   .date-row .d-item .d-label{ font-size:12px; color:var(--ink-faint); margin-bottom:2px; }
+  /* 下の本文が透けて読みにくくならないよう、操作バーは半透明にせず塗りつぶす */
   .detail-actionbar{
     position:absolute; left:0; right:0; bottom:0;
-    padding:14px var(--side) calc(14px + env(safe-area-inset-bottom));
-    background:linear-gradient(180deg, rgba(220,227,231,0), var(--bg) 34%);
+    padding:14px var(--side) calc(18px + env(safe-area-inset-bottom));
+    background:var(--bg);
+    box-shadow:0 -6px 14px rgba(220,227,231,.9);
     display:flex; gap:10px;
   }
   .detail-actionbar .save-btn{ flex:1; }
@@ -363,7 +377,7 @@
   /* =====================================================
      フォーム
   ===================================================== */
-  .form{ padding:6px var(--side) 140px; }
+  .form{ padding:6px var(--side) 156px; }
   .section{ margin-bottom:22px; }
   .section-label{ display:flex; align-items:baseline; gap:8px; margin-bottom:12px; }
   .section-label .num{ font-size:14px; font-weight:600; color:var(--accent-deep); }
@@ -571,8 +585,9 @@
   /* ---------- 保存バー ---------- */
   .save-bar{
     position:absolute; left:0; right:0; bottom:0;
-    padding:14px var(--side) calc(14px + env(safe-area-inset-bottom));
-    background:linear-gradient(180deg, rgba(220,227,231,0), var(--bg) 30%);
+    padding:14px var(--side) calc(18px + env(safe-area-inset-bottom));
+    background:var(--bg);
+    box-shadow:0 -6px 14px rgba(220,227,231,.9);
     display:flex; flex-direction:column; gap:9px;
   }
   .save-btn{
@@ -712,20 +727,25 @@
       </button>
     </div>
     <div class="sync-banner" id="syncBanner"><span id="syncBannerText"></span></div>
-    <div class="search-wrap">
-      <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
-    </div>
-    <div class="filter-tabs" id="filterTabs">
-      <div class="filter-chip" data-status="done">読了</div>
-      <div class="filter-chip" data-status="reading">読書中</div>
-    </div>
-    <div class="cat-filter-row" id="majorFilterRow">
-      <p class="cat-filter-label">大分類</p>
-      <div class="filter-tabs" id="majorFilterTabs"></div>
-    </div>
-    <div class="cat-filter-row" id="minorFilterRow">
-      <p class="cat-filter-label">小分類</p>
-      <div class="filter-tabs" id="minorFilterTabs"></div>
+    <!-- スクロールしても絞り込みに手が届くよう上部に固定する。
+         下にスクロールしている間は検索窓と見出しを畳んで、
+         場所を取りすぎないようにする（listHeader.compact） -->
+    <div class="list-header" id="listHeader">
+      <div class="search-wrap">
+        <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
+      </div>
+      <div class="filter-tabs" id="filterTabs">
+        <div class="filter-chip" data-status="done">読了</div>
+        <div class="filter-chip" data-status="reading">読書中</div>
+      </div>
+      <div class="cat-filter-row" id="majorFilterRow">
+        <p class="cat-filter-label">大分類</p>
+        <div class="filter-tabs" id="majorFilterTabs"></div>
+      </div>
+      <div class="cat-filter-row" id="minorFilterRow">
+        <p class="cat-filter-label">小分類</p>
+        <div class="filter-tabs" id="minorFilterTabs"></div>
+      </div>
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
@@ -1211,12 +1231,17 @@
     }
     return minor;
   }
+  // 著者名は「東野 圭吾」のように姓名の間に空白が入っているものがあるため、
+  // 表記を揃えるため空白（半角・全角）を詰めてつなげる
+  function normalizeAuthorName(name){
+    return (name || '').replace(/[\s　]+/g, '');
+  }
   function normalizeAndMigrateBook(raw, index, total){
     let changed = false;
     const b = {
       id: raw.id || genCatId('b'),
       title: raw.title || '(無題)',
-      author: raw.author || '',
+      author: normalizeAuthorName(raw.author),
       publisher: raw.publisher || '',
       status: (raw.status === 'reading' || raw.status === 'done') ? raw.status : 'reading',
       startDate: raw.startDate || '',
@@ -1239,6 +1264,7 @@
       createdAt: raw.createdAt || null
     };
     if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
+    if((raw.author || '') !== b.author){ changed = true; }   // 空白を詰めた分はクラウドにも反映する
     if(!b.majorCategory && Array.isArray(raw.tags) && raw.tags.length){
       const uncategorized = ensureUncategorizedMajor();
       b.minorCategories = raw.tags.map(t => ensureMinorByLabel(uncategorized.id, t).id);
@@ -2609,6 +2635,11 @@
   document.getElementById('searchInput').addEventListener('input', e => {
     searchQuery = e.target.value;
     renderList();
+  });
+  // 下にスクロールしたら固定ヘッダーを縮める（上に戻すと検索窓も戻る）
+  const listScreenEl = document.getElementById('screenList');
+  listScreenEl.addEventListener('scroll', () => {
+    document.getElementById('listHeader').classList.toggle('compact', listScreenEl.scrollTop > 60);
   });
 
   /* ---------- 並び替え ---------- */
