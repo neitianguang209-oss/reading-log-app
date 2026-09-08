@@ -1079,6 +1079,9 @@
   const GOALS_STORAGE_KEY = 'reading-log-goals';
   const CATEGORIES_STORAGE_KEY = 'reading-log-categories';
   const SORT_STORAGE_KEY = 'reading-log-sort';
+  // 目標・カテゴリを保存するための、booksコレクション内の予約ドキュメントID
+  // （Firestoreでは前後をアンダースコア2つで挟んだIDは使えないため、この名前にしている）
+  const SETTINGS_DOC_ID = 'app-settings';
 
   /* ---------- Firebase（端末間同期） ----------
      firebaseConfigはFirebaseコンソール「プロジェクトの設定 > 全般 >
@@ -1782,7 +1785,7 @@
         const key = input.dataset.goalKey;
         goals[key] = Math.max(0, parseInt(input.value, 10) || 0);
         saveGoals();
-        cloudSaveGoals();
+        cloudSaveSettings();
         renderStats();
       });
     });
@@ -2126,7 +2129,7 @@
       major = { id: genCatId('c'), label: label, minors: [] };
       categories.push(major);
       saveCategories();
-      cloudSaveCategories();
+      cloudSaveSettings();
     }
     selectedMajorId = major.id;
     selectedMinorIds = [];
@@ -2146,7 +2149,7 @@
       minor = { id: genCatId('m'), label: label };
       major.minors.push(minor);
       saveCategories();
-      cloudSaveCategories();
+      cloudSaveSettings();
     }
     if(!selectedMinorIds.includes(minor.id)) selectedMinorIds.push(minor.id);
     e.target.value = '';
@@ -2809,7 +2812,7 @@
     if(!trimmed) return;
     major.label = trimmed;
     saveCategories();
-    cloudSaveCategories();
+    cloudSaveSettings();
     renderCategoryEditList();
     renderMajorChips();
     renderList();
@@ -2825,7 +2828,7 @@
     categories = categories.filter(c => c.id !== id);
     affected.forEach(b => { b.majorCategory = null; b.minorCategories = []; });
     saveCategories();
-    cloudSaveCategories();
+    cloudSaveSettings();
     saveBooks();
     affected.forEach(b => cloudSetBook(b));
     if(selectedMajorId === id){ selectedMajorId = null; selectedMinorIds = []; renderMajorChips(); renderMinorChips(); }
@@ -2846,7 +2849,7 @@
     major.minors = major.minors.filter(m => m.id !== minorId);
     affected.forEach(b => { b.minorCategories = (b.minorCategories || []).filter(mid => mid !== minorId); });
     saveCategories();
-    cloudSaveCategories();
+    cloudSaveSettings();
     saveBooks();
     affected.forEach(b => cloudSetBook(b));
     if(selectedMinorIds.includes(minorId)){ selectedMinorIds = selectedMinorIds.filter(mid => mid !== minorId); renderMinorChips(); }
@@ -2880,32 +2883,60 @@
     const booksRef = db.collection('users').doc(currentUser.uid).collection('books');
     booksRef.get().then(snapshot => {
       const batch = db.batch();
-      snapshot.docs.forEach(doc => batch.delete(doc.ref));
+      // 設定ドキュメントは本ではないので消さない
+      snapshot.docs.forEach(doc => { if(doc.id !== SETTINGS_DOC_ID) batch.delete(doc.ref); });
       newBooks.forEach(b => batch.set(booksRef.doc(b.id), b));
       return batch.commit();
     }).catch(err => console.warn('クラウドへの一括反映に失敗しました', err));
   }
-  function cloudSaveGoals(){
-    if(!currentUser || !db) return;
-    db.collection('users').doc(currentUser.uid).set({ goals: goals }, { merge: true })
-      .catch(err => console.warn('目標のクラウド保存に失敗しました', err));
+  /* ---------- 目標・カテゴリの同期 ----------
+     Firestoreのルールが users/{uid}/books しか許可していないため、
+     users/{uid} 本体には読み書きできない（permission-denied になる）。
+     そこで目標とカテゴリは books コレクション内の予約ドキュメント
+     （SETTINGS_DOC_ID）に保存する。本の一覧を扱う箇所では、
+     このドキュメントを必ず除外すること。 */
+  function cloudSettingsRef(){
+    return db.collection('users').doc(currentUser.uid).collection('books').doc(SETTINGS_DOC_ID);
   }
-  function cloudSaveCategories(){
+  function cloudSaveSettings(){
     if(!currentUser || !db) return;
-    db.collection('users').doc(currentUser.uid).set({ categories: categories }, { merge: true })
-      .catch(err => console.warn('カテゴリのクラウド保存に失敗しました', err));
+    cloudSettingsRef().set({ appSettings: true, goals: goals, categories: categories }, { merge: true })
+      .catch(err => console.warn('設定のクラウド保存に失敗しました', err));
+  }
+  function applyCloudSettings(data){
+    if(!data) return false;
+    let applied = false;
+    if(data.goals){
+      goals = Object.assign({ week: 0, month: 0, year: 0 }, data.goals);
+      saveGoals();
+      applied = true;
+    }
+    if(Array.isArray(data.categories) && data.categories.length){
+      categories = data.categories;
+      saveCategories();
+      applied = true;
+    }
+    return applied;
   }
   function attachBooksListener(booksRef){
     if(unsubscribeBooksListener) unsubscribeBooksListener();
     unsubscribeBooksListener = booksRef.onSnapshot(snapshot => {
       hideSyncBanner();
-      const result = migrateBooks(snapshot.docs.map(doc => doc.data()));
+      // 設定ドキュメントを取り分けてから、残りを本として扱う
+      const rawBooks = [];
+      let cloudSettings = null;
+      snapshot.docs.forEach(doc => {
+        if(doc.id === SETTINGS_DOC_ID){ cloudSettings = doc.data(); return; }
+        rawBooks.push(doc.data());
+      });
+      applyCloudSettings(cloudSettings);
+      const result = migrateBooks(rawBooks);
       books = result.books;
       nextIdNum = computeNextId();
       saveBooks();
-      // 移行で内容が変わった記録（旧ステータス統合・タグ移行・createdAt付与）は
-      // クラウド側にも書き戻し、次回の同期で再び移行が走って並び順が
-      // ぶれることのないようにする。
+      // 移行で内容が変わった記録（旧ステータス統合・タグ移行・著者名の空白詰め・
+      // createdAt付与）はクラウド側にも書き戻し、次回の同期で再び移行が走って
+      // 並び順がぶれることのないようにする。
       if(result.changedBooks.length) result.changedBooks.forEach(b => cloudSetBook(b));
       const activeId = document.querySelector('.app-screen.active')?.id;
       if(activeId === 'screenList'){ renderList(); }
@@ -2917,24 +2948,21 @@
   }
   function startCloudSync(user){
     hideSyncBanner();
-    const userRef = db.collection('users').doc(user.uid);
-    const booksRef = userRef.collection('books');
-    userRef.get().then(docSnap => {
+    const booksRef = db.collection('users').doc(user.uid).collection('books');
+    booksRef.doc(SETTINGS_DOC_ID).get().then(docSnap => {
       if(docSnap.exists){
-        const data = docSnap.data();
-        if(data.goals){
-          goals = Object.assign({ week: 0, month: 0, year: 0 }, data.goals);
-          saveGoals();
+        if(applyCloudSettings(docSnap.data()) && document.querySelector('.app-screen.active')?.id === 'screenStats'){
+          renderStats();
         }
-        if(Array.isArray(data.categories) && data.categories.length){
-          categories = data.categories;
-          saveCategories();
-        }
-        if(document.querySelector('.app-screen.active')?.id === 'screenStats') renderStats();
+      } else {
+        // クラウドにまだ設定が無ければ、この端末の目標・カテゴリを引き上げる
+        cloudSaveSettings();
       }
     }).catch(err => console.warn('設定の読み込みに失敗しました', err));
     booksRef.get().then(snapshot => {
-      if(snapshot.empty && books.length > 0){
+      // 設定ドキュメントは冊数に数えない
+      const cloudBookCount = snapshot.docs.filter(doc => doc.id !== SETTINGS_DOC_ID).length;
+      if(cloudBookCount === 0 && books.length > 0){
         if(confirm('ローカルにある' + books.length + '冊の記録をクラウドにアップロードしますか？\n（他の端末で既にこのアカウントを使っている場合は「キャンセル」してください）')){
           const batch = db.batch();
           books.forEach(b => batch.set(booksRef.doc(b.id), b));
