@@ -2889,47 +2889,37 @@
       return batch.commit();
     }).catch(err => console.warn('クラウドへの一括反映に失敗しました', err));
   }
-  /* ---------- 目標・カテゴリの同期 ----------
+  /* ---------- 目標・カテゴリの保存について ----------
      Firestoreのルールが users/{uid}/books しか許可していないため、
-     users/{uid} 本体には読み書きできない（permission-denied になる）。
-     そこで目標とカテゴリは books コレクション内の予約ドキュメント
-     （SETTINGS_DOC_ID）に保存する。本の一覧を扱う箇所では、
-     このドキュメントを必ず除外すること。 */
-  function cloudSettingsRef(){
-    return db.collection('users').doc(currentUser.uid).collection('books').doc(SETTINGS_DOC_ID);
-  }
+     users/{uid} 本体には読み書きできない（permission-denied）。
+     一度 books コレクション内の予約ドキュメントに逃がしたが、
+     古い版のアプリがそれを「本」として読み込んで空の記録を量産する
+     事故が起きたため取りやめた。目標とカテゴリはこの端末内
+     （localStorage）にのみ保存する。端末間で同期したい場合は
+     Firestoreのルールに users/{uid} への許可を足す必要がある。 */
   function cloudSaveSettings(){
-    if(!currentUser || !db) return;
-    cloudSettingsRef().set({ appSettings: true, goals: goals, categories: categories }, { merge: true })
-      .catch(err => console.warn('設定のクラウド保存に失敗しました', err));
+    /* 現在はクラウドに保存しない（上のコメント参照）。
+       呼び出し側を変えずに済むよう、関数だけ残している。 */
   }
-  function applyCloudSettings(data){
-    if(!data) return false;
-    let applied = false;
-    if(data.goals){
-      goals = Object.assign({ week: 0, month: 0, year: 0 }, data.goals);
-      saveGoals();
-      applied = true;
-    }
-    if(Array.isArray(data.categories) && data.categories.length){
-      categories = data.categories;
-      saveCategories();
-      applied = true;
-    }
-    return applied;
+  // 本らしくないドキュメント（誤って入り込んだ設定用データなど）は本として扱わない
+  function looksLikeBookDoc(data){
+    return !!data && (typeof data.title === 'string' || typeof data.status === 'string');
   }
   function attachBooksListener(booksRef){
     if(unsubscribeBooksListener) unsubscribeBooksListener();
     unsubscribeBooksListener = booksRef.onSnapshot(snapshot => {
       hideSyncBanner();
-      // 設定ドキュメントを取り分けてから、残りを本として扱う
       const rawBooks = [];
-      let cloudSettings = null;
       snapshot.docs.forEach(doc => {
-        if(doc.id === SETTINGS_DOC_ID){ cloudSettings = doc.data(); return; }
-        rawBooks.push(doc.data());
+        if(doc.id === SETTINGS_DOC_ID) return;
+        const data = doc.data();
+        if(!looksLikeBookDoc(data)) return;
+        // idが欠けている場合はドキュメントIDを使う。
+        // ここで新しいIDを振ってしまうと、書き戻すたびに別の記録が
+        // 増え続けてしまうため、必ず元のドキュメントに対応させる。
+        if(!data.id) data.id = doc.id;
+        rawBooks.push(data);
       });
-      applyCloudSettings(cloudSettings);
       const result = migrateBooks(rawBooks);
       books = result.books;
       nextIdNum = computeNextId();
@@ -2949,16 +2939,6 @@
   function startCloudSync(user){
     hideSyncBanner();
     const booksRef = db.collection('users').doc(user.uid).collection('books');
-    booksRef.doc(SETTINGS_DOC_ID).get().then(docSnap => {
-      if(docSnap.exists){
-        if(applyCloudSettings(docSnap.data()) && document.querySelector('.app-screen.active')?.id === 'screenStats'){
-          renderStats();
-        }
-      } else {
-        // クラウドにまだ設定が無ければ、この端末の目標・カテゴリを引き上げる
-        cloudSaveSettings();
-      }
-    }).catch(err => console.warn('設定の読み込みに失敗しました', err));
     booksRef.get().then(snapshot => {
       // 設定ドキュメントは冊数に数えない
       const cloudBookCount = snapshot.docs.filter(doc => doc.id !== SETTINGS_DOC_ID).length;
