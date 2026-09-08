@@ -240,7 +240,7 @@
   .stats-body{ padding:0 var(--side) calc(122px + env(safe-area-inset-bottom)); }
   .year-nav{
     position:relative; display:flex; align-items:center; justify-content:center;
-    gap:22px; height:48px; margin-bottom:14px;
+    gap:22px; height:48px; margin-bottom:18px;
   }
   .year-nav button.year-arrow{
     width:44px; height:44px; display:flex; align-items:center; justify-content:center;
@@ -256,20 +256,6 @@
     font-family:inherit; font-size:13px; font-weight:400; color:var(--ink-soft);
     display:flex; align-items:center;
   }
-  .segment{
-    display:flex; gap:0; padding:4px; margin-bottom:22px;
-    background:var(--surface-alt); border-radius:14px;
-  }
-  .segment button{
-    flex:1; height:36px; border:none; background:transparent; cursor:pointer;
-    font-family:inherit; font-size:15px; font-weight:400; color:var(--ink-soft);
-    border-radius:var(--radius-sm);
-  }
-  .segment button.active{
-    background:var(--surface-raised); color:var(--ink); font-weight:600;
-    box-shadow:var(--shadow);
-  }
-
   .stat-card{
     background:var(--surface); border-radius:var(--radius);
     box-shadow:var(--shadow); padding:16px; margin-bottom:15px;
@@ -776,11 +762,6 @@
           <svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>
         </button>
         <button class="range-pill" id="rangePill" type="button">年間</button>
-      </div>
-      <div class="segment" id="statsSegment">
-        <button data-scope="all" class="active" type="button">すべて</button>
-        <button data-scope="reading" type="button">読書中</button>
-        <button data-scope="done" type="button">読了</button>
       </div>
       <div id="statsBody"></div>
     </div>
@@ -1309,7 +1290,6 @@
   let minorFilter = null;    // 小分類のid
   let searchQuery = '';
   let statsYear = new Date().getFullYear();
-  let statsScope = 'all';               // 'all' / 'reading' / 'done'
   let statsRange = 'year';              // 'year' / 'total'
   let editingBookId = null;
   let currentDetailId = null;
@@ -1531,31 +1511,18 @@
     };
   }
   /* ---------- 集計の対象 ----------
-     セグメント（すべて／読書中／読了）で対象の本を絞り、
-     「読了は読了日・読書中は読み始めた日」を基準日として年で切り出す。
+     統計は読了した本の冊数だけを扱う。読了日を基準に年で切り出し、
      年間ピルで「年間 ⇄ 全期間」を切り替える。 */
-  function statsScopeBooks(){
-    if(statsScope === 'reading') return books.filter(b => b.status === 'reading');
-    if(statsScope === 'done') return books.filter(b => b.status === 'done');
-    return books;
-  }
-  function statsBookDate(b){
-    return b.status === 'done' ? (b.endDate || '') : (b.startDate || '');
+  function doneBooks(){
+    return books.filter(b => b.status === 'done');
   }
   function statsTargetBooks(){
-    const scoped = statsScopeBooks();
-    if(statsRange === 'total') return scoped;
-    return scoped.filter(b => {
-      const d = statsBookDate(b);
-      return d && parseInt(d.slice(0, 4), 10) === statsYear;
-    });
+    const done = doneBooks();
+    if(statsRange === 'total') return done;
+    return done.filter(b => b.endDate && parseInt(b.endDate.slice(0, 4), 10) === statsYear);
   }
-  // 「2026年の読了」「2026年に読み始めた本」のように、助詞まで含めた見出しを作る
   function statsSummaryLabel(){
-    const rangeLabel = statsRange === 'total' ? '全期間' : statsYear + '年';
-    if(statsScope === 'reading') return rangeLabel + 'に読み始めた本';
-    if(statsScope === 'done') return rangeLabel + 'の読了';
-    return rangeLabel + 'の読書の記録';
+    return (statsRange === 'total' ? '全期間' : statsYear + '年') + 'の読了';
   }
   /* ---------- グラフ（SVGを直接組み立てる。外部ライブラリは使わない） ---------- */
   const CHART_W = 354;
@@ -1569,10 +1536,10 @@
     return out;
   }
   function monthlyCounts(months){
-    const scoped = statsScopeBooks();
+    const done = doneBooks();
     return months.map(m => {
       const prefix = m.year + '-' + String(m.month).padStart(2, '0');
-      return scoped.filter(b => statsBookDate(b).slice(0, 7) === prefix).length;
+      return done.filter(b => (b.endDate || '').slice(0, 7) === prefix).length;
     });
   }
   // 冊数バー＋累計ライン（月次の離散データなので曲線補間はしない）
@@ -1644,7 +1611,7 @@
     const total = values.reduce((a, v) => a + v, 0);
     // 棒（冊数）と線（累計）は目盛が異なるため、累計の合計値は凡例に添えて示す
     return '<div class="stat-card">' +
-      '<div class="stat-label">月別の' + (statsScope === 'reading' ? '読み始めた数' : '読了数') + '（直近6ヶ月）</div>' +
+      '<div class="stat-label">月別の読了数（直近6ヶ月）</div>' +
       '<div class="chart-legend">' +
         '<span class="legend-item"><span class="legend-bar"></span>冊数</span>' +
         '<span class="legend-item"><span class="legend-line"></span>累計 ' + total + '</span>' +
@@ -1657,11 +1624,11 @@
     const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
     const monthEndExcl = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1));
     const cols = [
-      ['今月読了', countDoneInRange(monthStart, monthEndExcl)],
-      ['読書中', books.filter(b => b.status === 'reading').length],
-      ['読了', books.filter(b => b.status === 'done').length]
+      ['今月', countDoneInRange(monthStart, monthEndExcl)],
+      ['今年', countDoneInRange(now.getFullYear() + '-01-01', (now.getFullYear() + 1) + '-01-01')],
+      ['累計', doneBooks().length]
     ];
-    return '<div class="section-heading">現在の状況</div><div class="status-cols">' +
+    return '<div class="section-heading">読了の冊数</div><div class="status-cols">' +
       cols.map(([label, n]) =>
         '<div class="status-col"><div class="stat-label">' + label + '</div>' +
         '<div class="stat-value"><span class="stat-num">' + n + '</span> <span class="stat-unit">冊</span></div></div>'
@@ -1761,14 +1728,11 @@
   }
 
   function renderStats(){
-    // 年ナビ・セグメント・年間ピルの状態を反映
+    // 年ナビ・年間ピルの状態を反映
     document.getElementById('yearLabel').textContent = statsRange === 'total' ? '全期間' : statsYear + '年';
     document.getElementById('yearPrevBtn').disabled = (statsRange === 'total');
     document.getElementById('yearNextBtn').disabled = (statsRange === 'total') || statsYear >= new Date().getFullYear();
     document.getElementById('rangePill').textContent = statsRange === 'total' ? '全期間' : '年間';
-    document.getElementById('statsSegment').querySelectorAll('button').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.scope === statsScope);
-    });
 
     const target = statsTargetBooks();
     const body = document.getElementById('statsBody');
@@ -1796,12 +1760,6 @@
   });
   document.getElementById('rangePill').addEventListener('click', () => {
     statsRange = (statsRange === 'year') ? 'total' : 'year';
-    renderStats();
-  });
-  document.getElementById('statsSegment').addEventListener('click', e => {
-    const btn = e.target.closest('button');
-    if(!btn) return;
-    statsScope = btn.dataset.scope;
     renderStats();
   });
 
