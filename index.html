@@ -11,9 +11,6 @@
 <meta name="theme-color" content="#8A9A7B">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <style>
   :root{
     --bg:#F5F5F2;          /* ページ地：ほんのり灰 */
@@ -57,6 +54,27 @@
     overflow:hidden;
     position:relative;
   }
+
+  /* ---------- 起動時ローディング／同期状態バナー ---------- */
+  .loading-screen{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:100%; gap:16px; padding:0 30px; text-align:center;
+  }
+  .spinner{
+    width:34px; height:34px; border-radius:50%;
+    border:3px solid var(--line-strong); border-top-color:var(--sage);
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+  .loading-text{ font-size:12.5px; color:var(--ink-soft); line-height:1.8; }
+  .sync-banner{
+    display:none; align-items:center; gap:8px;
+    background:var(--sage-tint); color:var(--sage-deep);
+    font-size:11.5px; line-height:1.6; padding:9px 16px;
+    border-bottom:1px solid var(--line);
+  }
+  .sync-banner.show{ display:flex; }
+  .sync-banner.error{ background:#FBF2F0; color:var(--danger); }
 
   /* ---------- 画面切り替え(state管理) ----------
      .phoneをビューポート基準の高さに固定し、各画面はその内部だけで
@@ -224,11 +242,7 @@
   .field-msg.error{ color:var(--danger); }
   .field-msg.warn{ color:var(--warn); }
 
-  /* ---------- ジャンル・タグ ---------- */
-  .tag-field{
-    border:1px solid var(--line); border-radius:12px;
-    background:var(--surface); padding:10px 12px; position:relative;
-  }
+  /* ---------- 大分類・小分類 ---------- */
   .chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-bottom:8px; }
   .chip-row:empty{ display:none; }
   .chip{
@@ -244,21 +258,6 @@
     display:flex; align-items:center; justify-content:center;
   }
   .tag-input-wrap{ display:flex; align-items:center; }
-  #tagInput{ border:none; outline:none; background:transparent; padding:4px 2px; box-shadow:none !important; }
-  .suggest-panel{
-    position:absolute; left:0; right:0; top:100%; margin-top:6px;
-    background:#fff; border:1px solid var(--line); border-radius:12px;
-    z-index:5; overflow:hidden; display:none;
-  }
-  .suggest-panel.show{ display:block; }
-  .suggest-item{
-    padding:10px 14px; font-size:13px; display:flex; justify-content:space-between;
-    align-items:center; cursor:pointer; border-bottom:1px solid var(--line);
-  }
-  .suggest-item:last-child{ border-bottom:none; }
-  .suggest-item:hover{ background:var(--sage-tint); }
-  .suggest-item .count{ font-size:10px; color:var(--ink-soft); }
-  .suggest-item.new-tag{ color:var(--sage-deep); font-weight:700; }
   .field-note{ font-size:11px; color:var(--ink-soft); margin:8px 2px 0; line-height:1.7; }
 
   /* ---------- ステータス（ピル型トグル） ---------- */
@@ -704,6 +703,18 @@
 <div class="phone">
 
   <!-- =====================================================
+       画面：起動中の読み込み表示
+       （フォントやFirebaseの読み込みを待つ間、白画面のまま
+        止まって見えないよう、HTML/CSSだけで最初から表示する）
+  ===================================================== -->
+  <div class="app-screen active" id="screenLoading">
+    <div class="loading-screen" id="loadingScreenInner">
+      <div class="spinner"></div>
+      <p class="loading-text" id="loadingText">読み込んでいます…</p>
+    </div>
+  </div>
+
+  <!-- =====================================================
        画面0：ログイン（端末間同期のためのアカウント認証）
   ===================================================== -->
   <div class="app-screen" id="screenAuth">
@@ -736,25 +747,41 @@
     <div class="topbar">
       <p class="eyebrow">book log</p>
       <h1>本棚</h1>
-      <button class="topbar-menu-btn" id="menuBtn" title="データのバックアップ" type="button">⋯</button>
+      <button class="topbar-menu-btn" id="menuBtn" title="メニュー" type="button">⋯</button>
     </div>
+    <div class="sync-banner" id="syncBanner"><span id="syncBannerText"></span></div>
     <div class="search-wrap">
       <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
     </div>
+    <div class="memo-toolbar-row" style="padding:12px 18px 0;">
+      <span class="filter-chip" id="sortBtn">並び替え：<span id="sortBtnLabel">新しい順</span> ▾</span>
+    </div>
     <div class="filter-tabs" id="filterTabs">
       <div class="filter-chip active" data-filter="all">すべて</div>
-      <div class="filter-chip" data-filter="buy">買いたい</div>
-      <div class="filter-chip" data-filter="stack">積読</div>
       <div class="filter-chip" data-filter="reading">読書中</div>
       <div class="filter-chip" data-filter="done">読了</div>
-      <div class="filter-chip" data-filter="paused">中断</div>
     </div>
-    <div class="tag-filter-row" id="tagFilterRow" style="display:none;">
-      <p class="tag-filter-label">ジャンル・タグ</p>
-      <div class="filter-tabs" id="tagFilterTabs"></div>
+    <div class="tag-filter-row" id="majorFilterRow" style="display:none;">
+      <p class="tag-filter-label">大分類</p>
+      <div class="filter-tabs" id="majorFilterTabs"></div>
+    </div>
+    <div class="tag-filter-row" id="minorFilterRow" style="display:none;">
+      <p class="tag-filter-label">小分類</p>
+      <div class="filter-tabs" id="minorFilterTabs"></div>
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
+  </div>
+
+  <!-- 並び替え選択（ボトムシート） -->
+  <div class="modal-overlay" id="sortPickerOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">並び替え</span>
+        <button class="modal-close" id="sortPickerClose" type="button">×</button>
+      </div>
+      <div class="modal-list" id="sortPickerList"></div>
+    </div>
   </div>
 
   <!-- =====================================================
@@ -861,15 +888,19 @@
         <label class="field-label">出版社</label>
         <input type="text" id="publisherInput" placeholder="例：みすず書房">
 
-        <label class="field-label">ジャンル・タグ</label>
-        <div class="tag-field" id="tagField">
-          <div class="chip-row" id="chipRow"></div>
-          <div class="tag-input-wrap">
-            <input type="text" id="tagInput" placeholder="入力して選択、または新規タグを追加">
-          </div>
-          <div class="suggest-panel" id="suggestPanel"></div>
+        <label class="field-label">大分類<span class="opt">任意</span></label>
+        <div class="chip-row" id="majorChipRow"></div>
+        <div class="tag-input-wrap" style="gap:8px;">
+          <input type="text" id="newMajorInput" placeholder="新しい大分類を追加（例：小説）" style="flex:1;">
         </div>
-        <p class="field-note">これまで使ったタグから候補を表示します。候補になければ Enter でそのまま新規タグとして追加できます。</p>
+        <p class="field-note">タップして選択します。もう一度タップすると選択解除できます。</p>
+
+        <label class="field-label">小分類<span class="opt">任意・複数選択可</span></label>
+        <div class="chip-row" id="minorChipRow"></div>
+        <div class="tag-input-wrap" style="gap:8px;">
+          <input type="text" id="newMinorInput" placeholder="新しい小分類を追加（例：ミステリー）" style="flex:1;" disabled>
+        </div>
+        <p class="field-note" id="minorFieldNote">先に大分類を選択すると、その中の小分類を追加・選択できます。</p>
       </div>
 
       <hr class="divider">
@@ -878,11 +909,8 @@
       <div class="section">
         <div class="section-label"><span class="txt">ステータス</span><span class="sub">タップで切替</span></div>
         <div class="status-row" id="statusRow">
-          <div class="status-chip" data-status="buy">買いたい</div>
-          <div class="status-chip" data-status="stack">積読</div>
           <div class="status-chip" data-status="reading">読書中</div>
           <div class="status-chip" data-status="done">読了</div>
-          <div class="status-chip" data-status="paused">中断</div>
         </div>
       </div>
 
@@ -996,14 +1024,27 @@
         <button class="modal-close" id="dataMenuClose" type="button">×</button>
       </div>
       <div class="modal-list">
-        <p class="field-note" id="loggedInAs" style="margin:0 0 14px;"></p>
+        <button class="menu-action-btn" id="editCategoriesBtn" type="button">大分類・小分類を編集する</button>
+        <hr class="divider" style="margin:16px 0;">
         <button class="menu-action-btn" id="exportBtn" type="button">JSONファイルに書き出す</button>
         <button class="menu-action-btn" id="importBtn" type="button">JSONファイルから読み込む</button>
         <input type="file" id="importFileInput" accept="application/json">
         <p class="field-note">読み込むと、現在の記録はすべて置き換えられます。書き出したファイルは大切に保管してください。</p>
         <hr class="divider" style="margin:16px 0;">
+        <p class="field-note" id="loggedInAs" style="margin:0 0 14px;"></p>
         <button class="menu-action-btn" id="logoutBtn" type="button" style="color:var(--danger);">ログアウトする</button>
       </div>
+    </div>
+  </div>
+
+  <!-- 大分類・小分類の編集（ボトムシート） -->
+  <div class="modal-overlay" id="categoryEditOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">大分類・小分類を編集</span>
+        <button class="modal-close" id="categoryEditClose" type="button">×</button>
+      </div>
+      <div class="modal-list" id="categoryEditList" style="padding:10px 18px 24px;"></div>
     </div>
   </div>
 
@@ -1018,6 +1059,16 @@
 
 </div>
 
+<!--
+  Firebaseは末尾（body最後）で読み込む。<head>内で読み込むと、
+  ネットワークが遅い／読み込めない環境で「HTMLの描画そのもの」が
+  ブロックされ、ページを開いた瞬間ずっと白いままに見える原因になる。
+  ここに置くことで、CSSとローディング画面（.loading-screen）は
+  Firebaseの読み込みを待たずに即座に表示される。
+-->
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
 <script>
   /* =========================================================
      0. データ永続化・状態
@@ -1026,11 +1077,18 @@
       loadBooks / computeNextId は後方定義でも先頭で呼べる）
   ========================================================= */
   const STORAGE_KEY = 'reading-log-books';
+  const GOALS_STORAGE_KEY = 'reading-log-goals';
+  const CATEGORIES_STORAGE_KEY = 'reading-log-categories';
+  const SORT_STORAGE_KEY = 'reading-log-sort';
 
   /* ---------- Firebase（端末間同期） ----------
      firebaseConfigはFirebaseコンソール「プロジェクトの設定 > 全般 >
      マイアプリ」に表示されるWebアプリ設定をそのまま貼り付ければよい。
      apiKeyは公開されて問題ない値（アクセス制御はFirestoreのルール側で行う）。
+     初期化はbootApp()内でtry/catchしながら行う。CDNから読み込めない・
+     応答が返らないなどの場合でも真っ白のまま止まらず、この端末内の
+     記録だけで動くオフラインモードに自動で切り替える（詳しくは末尾の
+     「14. 初期化」を参照）。
   */
   const firebaseConfig = {
     apiKey: "AIzaSyDcQIUTbi_NwlSg8FiM18zEZrOVwEDaPWE",
@@ -1040,13 +1098,12 @@
     messagingSenderId: "631154574534",
     appId: "1:631154574534:web:882c539a23d3334e0083c7"
   };
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.firestore();
+  let auth = null;
+  let db = null;
   let currentUser = null;
   let unsubscribeBooksListener = null;
 
-  function loadBooks(){
+  function loadBooksRaw(){
     try{
       const saved = localStorage.getItem(STORAGE_KEY);
       return saved ? JSON.parse(saved) : [];   // 初回は空配列スタート
@@ -1064,11 +1121,13 @@
       console.warn('localStorage保存に失敗しました', e);
     }
   }
-  const GOALS_STORAGE_KEY = 'reading-log-goals';
   function loadGoals(){
     try{
       const saved = localStorage.getItem(GOALS_STORAGE_KEY);
       const g = saved ? JSON.parse(saved) : {};
+      // 月間目標はここでは「毎月の基準値」を1つ保持するだけで、月が変わっても
+      // リセットされない。表示側（statsCounts）で対象月の冊数だけを毎回
+      // 計算し直すので、目標値は変更しない限り翌月以降も自動で引き継がれる。
       return { week: g.week || 0, month: g.month || 0, year: g.year || 0 };
     }catch(e){
       return { week: 0, month: 0, year: 0 };
@@ -1076,6 +1135,42 @@
   }
   function saveGoals(){
     try{ localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals)); }catch(e){ console.warn('目標の保存に失敗しました', e); }
+  }
+  function defaultCategories(){
+    return [
+      { id:'novel', label:'小説', minors:[
+        { id:'novel-mystery', label:'ミステリー' },
+        { id:'novel-romance', label:'恋愛' },
+        { id:'novel-family', label:'家族' },
+        { id:'novel-youth', label:'青春' }
+      ]},
+      { id:'essay', label:'エッセイ', minors:[] },
+      { id:'practical', label:'実用書', minors:[
+        { id:'practical-business', label:'ビジネス' },
+        { id:'practical-selfhelp', label:'自己啓発' },
+        { id:'practical-invest', label:'投資' }
+      ]},
+      { id:'shinsho', label:'新書', minors:[] }
+    ];
+  }
+  function loadCategories(){
+    try{
+      const saved = localStorage.getItem(CATEGORIES_STORAGE_KEY);
+      if(saved){
+        const parsed = JSON.parse(saved);
+        if(Array.isArray(parsed) && parsed.length) return parsed;
+      }
+    }catch(e){ console.warn('カテゴリの読み込みに失敗しました', e); }
+    return defaultCategories();
+  }
+  function saveCategories(){
+    try{ localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories)); }catch(e){ console.warn('カテゴリの保存に失敗しました', e); }
+  }
+  function loadSortOrder(){
+    try{ return localStorage.getItem(SORT_STORAGE_KEY) || 'newest'; }catch(e){ return 'newest'; }
+  }
+  function saveSortOrder(){
+    try{ localStorage.setItem(SORT_STORAGE_KEY, sortOrder); }catch(e){ /* 並び順は端末内の利便性設定なので失敗しても致命的ではない */ }
   }
   function computeNextId(){
     let max = 0;
@@ -1085,21 +1180,119 @@
     });
     return max + 1;
   }
-  // これまでに使ったタグを実データ（books）から集計してサジェスト候補にする
-  function getExistingTags(){
-    const counts = {};
-    books.forEach(b => (b.tags || []).forEach(t => { counts[t] = (counts[t] || 0) + 1; }));
-    return Object.keys(counts).map(label => ({ label, count: counts[label] }));
+  function genCatId(prefix){
+    return prefix + '_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  }
+  function findMajor(id){
+    return categories.find(c => c.id === id) || null;
+  }
+  function findMinor(majorId, minorId){
+    const major = findMajor(majorId);
+    return major ? (major.minors.find(m => m.id === minorId) || null) : null;
   }
 
   const palette = ['#8A9A7B','#B0A088','#9C8577','#7E8CA0','#A99C88','#8B9AA0'];
-  const statusLabelMap = {buy:'買いたい', stack:'積読', reading:'読書中', done:'読了', paused:'中断'};
-  const statusColorMap = {buy:'#B7A98C', stack:'#A99C88', reading:'#7E8CA0', done:'#8A9A7B', paused:'#B5867A'};
+  const statusLabelMap = {reading:'読書中', done:'読了'};
+  const statusColorMap = {reading:'#7E8CA0', done:'#8A9A7B'};
   const emoOptions = ['共感','気づき','違和感','感動','疑問','学び'];
+  const SORT_OPTIONS = [
+    ['newest', '新しい順'], ['oldest', '古い順'],
+    ['rating-desc', '評価が高い順'], ['rating-asc', '評価が低い順']
+  ];
 
-  let books = loadBooks();
+  /* ---------- 既存データの移行 ----------
+     ・ステータスは「読書中／読了」の2つに整理したため、旧「買いたい／
+       積読／中断」はいずれも「読書中」へ統合する（読了と誤認しないよう、
+       読み終わっていない扱いに寄せる）。
+     ・ジャンル・タグ（フラットな配列）は大分類・小分類の階層に置き換えた
+       ため、既存のタグは「未分類」という大分類の下に小分類として自動で
+       移し替える。ラベルの文字列はそのまま保持されるのでデータは失われず、
+       あとから編集画面で正しい大分類・小分類に付け替えられる。
+     ・並び替え用のcreatedAtが無い記録には、元の並び順を保ったまま疑似的な
+       作成日時を割り当てる。
+  */
+  let categoriesChangedDuringMigration = false;
+  function ensureUncategorizedMajor(){
+    let major = categories.find(c => c.id === 'uncategorized');
+    if(!major){
+      major = { id: 'uncategorized', label: '未分類', minors: [] };
+      categories.push(major);
+      categoriesChangedDuringMigration = true;
+    }
+    return major;
+  }
+  function ensureMinorByLabel(majorId, label){
+    const major = findMajor(majorId);
+    let minor = major.minors.find(m => m.label === label);
+    if(!minor){
+      minor = { id: genCatId('m'), label: label };
+      major.minors.push(minor);
+      categoriesChangedDuringMigration = true;
+    }
+    return minor;
+  }
+  function normalizeAndMigrateBook(raw, index, total){
+    let changed = false;
+    const b = {
+      id: raw.id || genCatId('b'),
+      title: raw.title || '(無題)',
+      author: raw.author || '',
+      publisher: raw.publisher || '',
+      status: (raw.status === 'reading' || raw.status === 'done') ? raw.status : 'reading',
+      startDate: raw.startDate || '',
+      endDate: raw.endDate || '',
+      kikkake: raw.kikkake || '',
+      connection: raw.connection || null,
+      memos: (Array.isArray(raw.memos) ? raw.memos : []).map(m => ({
+        page: m.page || '', date: m.date || '', quote: m.quote || '',
+        emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || ''
+      })),
+      impressions: (Array.isArray(raw.impressions) && raw.impressions.length)
+        ? raw.impressions
+        : (raw.impression ? [{ date: '', text: raw.impression }] : []),
+      rating: typeof raw.rating === 'number' ? raw.rating : 0,
+      nextAction: raw.nextAction || '',
+      cover: raw.cover || null,
+      coverColorIndex: typeof raw.coverColorIndex === 'number' ? raw.coverColorIndex : (index % palette.length),
+      majorCategory: raw.majorCategory || null,
+      minorCategories: Array.isArray(raw.minorCategories) ? raw.minorCategories.slice() : [],
+      createdAt: raw.createdAt || null
+    };
+    if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
+    if(!b.majorCategory && Array.isArray(raw.tags) && raw.tags.length){
+      const uncategorized = ensureUncategorizedMajor();
+      b.minorCategories = raw.tags.map(t => ensureMinorByLabel(uncategorized.id, t).id);
+      b.majorCategory = uncategorized.id;
+      changed = true;
+    }
+    if(!b.createdAt){
+      b.createdAt = Date.now() - ((total - 1 - index) * 1000);
+      changed = true;
+    }
+    if(!raw.id) changed = true;
+    return { book: b, changed: changed };
+  }
+  function migrateBooks(rawBooks){
+    categoriesChangedDuringMigration = false;
+    const changedBooks = [];
+    const total = rawBooks.length;
+    const migrated = rawBooks.map((raw, i) => {
+      const result = normalizeAndMigrateBook(raw, i, total);
+      if(result.changed) changedBooks.push(result.book);
+      return result.book;
+    });
+    if(categoriesChangedDuringMigration) saveCategories();
+    return { books: migrated, changedBooks: changedBooks };
+  }
+
+  let categories = loadCategories();
+  const _bootMigration = migrateBooks(loadBooksRaw());
+  let books = _bootMigration.books;
   let goals = loadGoals();
+  let sortOrder = loadSortOrder();
   let nextIdNum = computeNextId();
+  if(_bootMigration.changedBooks.length) saveBooks();
+
   let activeFilter = 'all';
   let searchQuery = '';
   let editingBookId = null;
@@ -1108,8 +1301,9 @@
   let memoEmotionFilter = new Set(); // 選択中の感情タグ(空なら全件表示)
   let currentConnection = null;
 
-  const selectedTags = [];
-  let currentStatus = 'stack';
+  let selectedMajorId = null;
+  let selectedMinorIds = [];
+  let currentStatus = 'reading';
   let rating = 0;
   let coverImg = null;
 
@@ -1181,28 +1375,77 @@
       dateHTML;
     return card;
   }
-  function getAllTags(){
-    const set = new Set();
-    books.forEach(b => (b.tags || []).forEach(t => set.add(t)));
-    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ja'));
+  // 実際に本へ設定されている大分類・小分類だけを絞り込み候補として出す
+  function getUsedMajors(){
+    const ids = new Set();
+    books.forEach(b => { if(b.majorCategory) ids.add(b.majorCategory); });
+    return categories.filter(c => ids.has(c.id));
+  }
+  function getUsedMinors(majorId){
+    const major = findMajor(majorId);
+    if(!major) return [];
+    const ids = new Set();
+    books.forEach(b => {
+      if(b.majorCategory === majorId) (b.minorCategories || []).forEach(id => ids.add(id));
+    });
+    return major.minors.filter(m => ids.has(m.id));
+  }
+  function activeMajorIdFromFilter(){
+    if(activeFilter.indexOf('major:') === 0) return activeFilter.slice(6);
+    if(activeFilter.indexOf('minor:') === 0) return activeFilter.slice(6).split(':')[0];
+    return null;
   }
   function renderFilterTabs(){
     document.getElementById('filterTabs').querySelectorAll('.filter-chip').forEach(chip => {
       chip.classList.toggle('active', chip.dataset.filter === activeFilter);
     });
 
-    const tagRow = document.getElementById('tagFilterRow');
-    const tagTabsEl = document.getElementById('tagFilterTabs');
-    const tags = getAllTags();
-    tagRow.style.display = tags.length ? 'block' : 'none';
-    tagTabsEl.innerHTML = '';
-    tags.forEach(tag => {
+    const majorRow = document.getElementById('majorFilterRow');
+    const majorTabsEl = document.getElementById('majorFilterTabs');
+    const usedMajors = getUsedMajors();
+    majorRow.style.display = usedMajors.length ? 'block' : 'none';
+    majorTabsEl.innerHTML = '';
+    const activeMajorId = activeMajorIdFromFilter();
+    usedMajors.forEach(major => {
+      const filterVal = 'major:' + major.id;
       const chip = document.createElement('div');
-      chip.className = 'filter-chip' + (activeFilter === 'tag:' + tag ? ' active' : '');
-      chip.dataset.filter = 'tag:' + tag;
-      chip.textContent = tag;
-      tagTabsEl.appendChild(chip);
+      chip.className = 'filter-chip' + (activeMajorId === major.id ? ' active' : '');
+      chip.dataset.filter = filterVal;
+      chip.textContent = major.label;
+      majorTabsEl.appendChild(chip);
     });
+
+    const minorRow = document.getElementById('minorFilterRow');
+    const minorTabsEl = document.getElementById('minorFilterTabs');
+    const usedMinors = activeMajorId ? getUsedMinors(activeMajorId) : [];
+    minorRow.style.display = usedMinors.length ? 'block' : 'none';
+    minorTabsEl.innerHTML = '';
+    usedMinors.forEach(minor => {
+      const filterVal = 'minor:' + activeMajorId + ':' + minor.id;
+      const chip = document.createElement('div');
+      chip.className = 'filter-chip' + (activeFilter === filterVal ? ' active' : '');
+      chip.dataset.filter = filterVal;
+      chip.textContent = minor.label;
+      minorTabsEl.appendChild(chip);
+    });
+  }
+  function sortBooks(list){
+    const arr = list.slice();
+    switch(sortOrder){
+      case 'oldest':
+        arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        break;
+      case 'rating-desc':
+        arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+        break;
+      case 'rating-asc':
+        arr.sort((a, b) => (a.rating || 0) - (b.rating || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+        break;
+      case 'newest':
+      default:
+        arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    }
+    return arr;
   }
   function renderList(){
     renderFilterTabs();
@@ -1214,11 +1457,15 @@
       filtered = books.filter(b => normalize(b.title).includes(q) || normalize(b.author || '').includes(q));
     } else if(activeFilter === 'all'){
       filtered = books;
-    } else if(activeFilter.indexOf('tag:') === 0){
-      filtered = books.filter(b => (b.tags || []).includes(activeFilter.slice(4)));
+    } else if(activeFilter.indexOf('major:') === 0){
+      filtered = books.filter(b => b.majorCategory === activeFilter.slice(6));
+    } else if(activeFilter.indexOf('minor:') === 0){
+      const parts = activeFilter.slice(6).split(':');
+      filtered = books.filter(b => b.majorCategory === parts[0] && (b.minorCategories || []).includes(parts[1]));
     } else {
       filtered = books.filter(b => b.status === activeFilter);
     }
+    filtered = sortBooks(filtered);
     wrap.innerHTML = '';
     if(filtered.length === 0){
       const msg = books.length === 0
@@ -1271,6 +1518,9 @@
   }
   function buildStatCard(label, key, count, goal){
     const pct = goal > 0 ? Math.min(100, Math.round(count / goal * 100)) : 0;
+    const hint = key === 'month'
+      ? '<p class="rating-hint" style="margin:10px 0 0;">一度設定すると翌月以降も同じ目標が自動で引き継がれます。変更したいときはこの数値を書き換えてください。</p>'
+      : '';
     return (
       '<div class="stat-card">' +
         '<div class="stat-card-head">' +
@@ -1283,6 +1533,7 @@
           '<input type="number" min="0" inputmode="numeric" class="stat-goal-input" data-goal-key="' + key + '" value="' + goal + '">' +
           '<span>冊' + (goal > 0 ? '（達成率 ' + pct + '%）' : '') + '</span>' +
         '</div>' +
+        hint +
       '</div>'
     );
   }
@@ -1363,12 +1614,17 @@
     const el = document.getElementById('detailBody');
     let html = '';
 
-    if(b.tags && b.tags.length){
-      html += '<div class="info-card"><div class="ic-label">ジャンル・タグ</div><div class="chip-row" style="margin:0;">' +
-        b.tags.map(t => '<span class="chip" style="padding:6px 14px;">' + escapeHTML(t) + '</span>').join('') +
-        '</div></div>';
+    if(b.majorCategory){
+      const major = findMajor(b.majorCategory);
+      if(major){
+        const minors = (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean);
+        html += '<div class="info-card"><div class="ic-label">大分類・小分類</div><div class="chip-row" style="margin:0;">' +
+          '<span class="chip" style="padding:6px 14px;">' + escapeHTML(major.label) + '</span>' +
+          minors.map(m => '<span class="chip" style="padding:6px 14px;background:var(--sage-tint);border-color:var(--sage-tint);color:var(--sage-deep);">' + escapeHTML(m.label) + '</span>').join('') +
+          '</div></div>';
+      }
     }
-    if(b.status !== 'buy' && b.status !== 'stack' && (b.startDate || b.endDate)){
+    if(b.startDate || b.endDate){
       html += '<div class="info-card"><div class="ic-label">日付</div><div class="date-row">' +
         '<div class="d-item"><div class="d-label">開始</div><div>' + formatDate(b.startDate) + '</div></div>' +
         '<div class="d-item"><div class="d-label">終了</div><div>' + formatDate(b.endDate) + '</div></div>' +
@@ -1565,76 +1821,96 @@
   });
 
   /* =========================================================
-     5. ジャンル・タグ サジェスト(フォーム)
+     5. 大分類・小分類（フォーム）
+     大分類は単一選択、小分類はその大分類の中から複数選択できる。
+     どちらも入力欄にEnterで新規追加でき、以後の候補（絞り込み・
+     編集画面）にも反映される。
   ========================================================= */
-  const tagInput = document.getElementById('tagInput');
-  const chipRow = document.getElementById('chipRow');
-  const suggestPanel = document.getElementById('suggestPanel');
-
   function normalize(str){
     return str.replace(/[ァ-ヶ]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0x60)).toLowerCase().trim();
   }
-  function renderChips(){
-    chipRow.innerHTML = '';
-    selectedTags.forEach((tag, i) => {
-      const chip = document.createElement('span');
-      chip.className = 'chip';
-      chip.innerHTML = escapeHTML(tag) + '<button aria-label="削除">×</button>';
-      chip.querySelector('button').addEventListener('click', () => {
-        selectedTags.splice(i, 1);
-        renderChips();
+  function renderMajorChips(){
+    const row = document.getElementById('majorChipRow');
+    row.innerHTML = '';
+    categories.forEach(major => {
+      const chip = document.createElement('div');
+      chip.className = 'status-chip' + (selectedMajorId === major.id ? ' active' : '');
+      chip.textContent = major.label;
+      chip.addEventListener('click', () => {
+        selectedMajorId = (selectedMajorId === major.id) ? null : major.id;
+        selectedMinorIds = [];   // 大分類を変えたら小分類の選択はリセットする
+        renderMajorChips();
+        renderMinorChips();
       });
-      chipRow.appendChild(chip);
+      row.appendChild(chip);
     });
   }
-  function renderSuggestions(query){
-    const existingTags = getExistingTags();   // 実データから毎回集計
-    const norm = normalize(query);
-    const filtered = existingTags.filter(t => !selectedTags.includes(t.label) && normalize(t.label).includes(norm));
-    suggestPanel.innerHTML = '';
-    if(norm.length === 0){ suggestPanel.classList.remove('show'); return; }
-    filtered.slice(0, 5).forEach(t => {
-      const item = document.createElement('div');
-      item.className = 'suggest-item';
-      item.innerHTML = '<span>' + escapeHTML(t.label) + '</span><span class="count">' + t.count + '冊</span>';
-      item.addEventListener('click', () => addTag(t.label));
-      suggestPanel.appendChild(item);
-    });
-    if(!existingTags.some(t => normalize(t.label) === norm)){
-      const addNew = document.createElement('div');
-      addNew.className = 'suggest-item new-tag';
-      addNew.textContent = '＋「' + query + '」を新規タグとして追加';
-      addNew.addEventListener('click', () => addTag(query));
-      suggestPanel.appendChild(addNew);
+  function renderMinorChips(){
+    const row = document.getElementById('minorChipRow');
+    const input = document.getElementById('newMinorInput');
+    const note = document.getElementById('minorFieldNote');
+    row.innerHTML = '';
+    const major = selectedMajorId ? findMajor(selectedMajorId) : null;
+    if(!major){
+      input.disabled = true;
+      note.textContent = '先に大分類を選択すると、その中の小分類を追加・選択できます。';
+      return;
     }
-    suggestPanel.classList.add('show');
+    input.disabled = false;
+    note.textContent = '複数選択できます。候補になければ入力してEnterで新規追加できます。';
+    major.minors.forEach(minor => {
+      const chip = document.createElement('div');
+      chip.className = 'status-chip' + (selectedMinorIds.includes(minor.id) ? ' active' : '');
+      chip.textContent = minor.label;
+      chip.addEventListener('click', () => {
+        const idx = selectedMinorIds.indexOf(minor.id);
+        if(idx >= 0){ selectedMinorIds.splice(idx, 1); } else { selectedMinorIds.push(minor.id); }
+        renderMinorChips();
+      });
+      row.appendChild(chip);
+    });
   }
-  function addTag(label){
-    const trimmed = label.trim();
-    if(!trimmed || selectedTags.includes(trimmed)){ tagInput.value = ''; suggestPanel.classList.remove('show'); return; }
-    selectedTags.push(trimmed);
-    renderChips();
-    tagInput.value = '';
-    suggestPanel.classList.remove('show');
-    tagInput.focus();
-  }
-  tagInput.addEventListener('input', () => renderSuggestions(tagInput.value));
-  tagInput.addEventListener('focus', () => { if(tagInput.value) renderSuggestions(tagInput.value); });
-  tagInput.addEventListener('keydown', e => {
-    if(e.key === 'Enter'){ e.preventDefault(); if(tagInput.value.trim()) addTag(tagInput.value); }
+  document.getElementById('newMajorInput').addEventListener('keydown', e => {
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    const label = e.target.value.trim();
+    if(!label) return;
+    let major = categories.find(c => normalize(c.label) === normalize(label));
+    if(!major){
+      major = { id: genCatId('c'), label: label, minors: [] };
+      categories.push(major);
+      saveCategories();
+      cloudSaveCategories();
+    }
+    selectedMajorId = major.id;
+    selectedMinorIds = [];
+    e.target.value = '';
+    renderMajorChips();
+    renderMinorChips();
   });
-  document.addEventListener('click', e => {
-    if(!document.getElementById('tagField').contains(e.target)) suggestPanel.classList.remove('show');
+  document.getElementById('newMinorInput').addEventListener('keydown', e => {
+    if(e.key !== 'Enter') return;
+    e.preventDefault();
+    if(!selectedMajorId) return;
+    const label = e.target.value.trim();
+    if(!label) return;
+    const major = findMajor(selectedMajorId);
+    let minor = major.minors.find(m => normalize(m.label) === normalize(label));
+    if(!minor){
+      minor = { id: genCatId('m'), label: label };
+      major.minors.push(minor);
+      saveCategories();
+      cloudSaveCategories();
+    }
+    if(!selectedMinorIds.includes(minor.id)) selectedMinorIds.push(minor.id);
+    e.target.value = '';
+    renderMinorChips();
   });
 
   /* =========================================================
      6. ステータス切替 + 日付表示ルール(フォーム)
   ========================================================= */
-  const statusChips = document.querySelectorAll('.status-chip');
-  const secDates = document.getElementById('sec-dates');
-  const secMemo = document.getElementById('sec-memo');
-  const secAfter = document.getElementById('sec-after');
-  const divMemo = document.getElementById('div-memo');
+  const statusChips = document.querySelectorAll('#statusRow .status-chip');
   const startDateInput = document.getElementById('startDateInput');
   const endDateInput = document.getElementById('endDateInput');
   const endDateLabel = document.getElementById('endDateLabel');
@@ -1658,8 +1934,6 @@
   }
   function validateDates(){
     clearFieldErrors();
-    if(currentStatus === 'buy' || currentStatus === 'stack') return true;
-
     const today = todayStr();
     const start = startDateInput.value;
     const end = endDateInput.disabled ? '' : endDateInput.value;
@@ -1683,36 +1957,16 @@
     return ok;
   }
   function applyStatus(status){
-    const prevStatus = currentStatus;
     currentStatus = status;
-
-    const hideDates = (status === 'buy' || status === 'stack');
-    secDates.classList.toggle('hidden', hideDates);
-
     if(status === 'reading'){
       endDateInput.disabled = true;
       endDateInput.value = '';
       endDateLabel.innerHTML = '読み終わった日<span class="opt">読了後に入力できます</span>';
-    } else if(status === 'done'){
-      endDateInput.disabled = false;
-      endDateLabel.innerHTML = '読み終わった日<span class="opt">推奨</span>';
-    } else if(status === 'paused'){
-      endDateInput.disabled = false;
-      endDateLabel.innerHTML = '中断した日<span class="opt">任意</span>';
     } else {
       endDateInput.disabled = false;
-      endDateLabel.innerHTML = '読み終わった日<span class="opt">任意</span>';
-    }
-
-    if(prevStatus === 'done' && status !== 'done'){
-      endDateInput.value = '';
+      endDateLabel.innerHTML = '読み終わった日<span class="opt">推奨</span>';
     }
     clearFieldErrors();
-
-    const showDeep = ['reading', 'done', 'paused'].includes(status);
-    secMemo.classList.toggle('hidden', !showDeep);
-    secAfter.classList.toggle('hidden', !showDeep);
-    divMemo.style.display = showDeep ? 'block' : 'none';
   }
   function setStatusUI(status){
     statusChips.forEach(c => c.classList.toggle('active', c.dataset.status === status));
@@ -1964,8 +2218,10 @@
     document.getElementById('titleInput').value = '';
     document.getElementById('authorInput').value = '';
     document.getElementById('publisherInput').value = '';
-    selectedTags.length = 0;
-    renderChips();
+    selectedMajorId = null;
+    selectedMinorIds = [];
+    renderMajorChips();
+    renderMinorChips();
     clearCoverImage();
     removeConn();
     document.getElementById('memoList').innerHTML = '';
@@ -1976,7 +2232,7 @@
     renderStars();
     startDateInput.value = '';
     endDateInput.value = '';
-    setStatusUI('stack');
+    setStatusUI('reading');
   }
   function loadFormFromBook(b){
     editingBookId = b.id;
@@ -1984,9 +2240,10 @@
     document.getElementById('titleInput').value = b.title || '';
     document.getElementById('authorInput').value = b.author || '';
     document.getElementById('publisherInput').value = b.publisher || '';
-    selectedTags.length = 0;
-    (b.tags || []).forEach(t => selectedTags.push(t));
-    renderChips();
+    selectedMajorId = b.majorCategory || null;
+    selectedMinorIds = Array.isArray(b.minorCategories) ? b.minorCategories.slice() : [];
+    renderMajorChips();
+    renderMinorChips();
     if(b.cover){ setCoverImage(b.cover); } else { clearCoverImage(); }
     if(b.connection){
       currentConnection = Object.assign({}, b.connection);
@@ -2011,15 +2268,15 @@
     setStatusUI(b.status);
   }
   function collectFormData(){
-    const hideDates = (currentStatus === 'buy' || currentStatus === 'stack');
     return {
       title: document.getElementById('titleInput').value.trim(),
       author: document.getElementById('authorInput').value.trim(),
       publisher: document.getElementById('publisherInput').value.trim(),
-      tags: selectedTags.slice(),
+      majorCategory: selectedMajorId,
+      minorCategories: selectedMinorIds.slice(),
       status: currentStatus,
-      startDate: hideDates ? '' : startDateInput.value,
-      endDate: hideDates ? '' : (endDateInput.disabled ? '' : endDateInput.value),
+      startDate: startDateInput.value,
+      endDate: endDateInput.disabled ? '' : endDateInput.value,
       kikkake: document.getElementById('kikkakeInput').value.trim(),
       connection: currentConnection ? { id: currentConnection.id || null, title: currentConnection.title, author: currentConnection.author, cover: currentConnection.cover || null } : null,
       memos: gatherMemos(),
@@ -2064,13 +2321,14 @@
     if(editingBookId){
       const idx = books.findIndex(b => b.id === editingBookId);
       const coverColorIndex = books[idx].coverColorIndex;
-      savedBook = Object.assign({}, data, { id: editingBookId, coverColorIndex: coverColorIndex });
+      const createdAt = books[idx].createdAt;
+      savedBook = Object.assign({}, data, { id: editingBookId, coverColorIndex: coverColorIndex, createdAt: createdAt });
       books[idx] = savedBook;
       savedId = editingBookId;
     } else {
       const id = uid();
       const coverColorIndex = Math.floor(Math.random() * palette.length);
-      savedBook = Object.assign({}, data, { id: id, coverColorIndex: coverColorIndex });
+      savedBook = Object.assign({}, data, { id: id, coverColorIndex: coverColorIndex, createdAt: Date.now() });
       books.push(savedBook);
       savedId = id;
     }
@@ -2095,11 +2353,40 @@
     renderList();
   }
   document.getElementById('filterTabs').addEventListener('click', handleFilterChipClick);
-  document.getElementById('tagFilterTabs').addEventListener('click', handleFilterChipClick);
+  document.getElementById('majorFilterTabs').addEventListener('click', handleFilterChipClick);
+  document.getElementById('minorFilterTabs').addEventListener('click', handleFilterChipClick);
   document.getElementById('searchInput').addEventListener('input', e => {
     searchQuery = e.target.value;
     renderList();
   });
+
+  /* ---------- 並び替え ---------- */
+  function renderSortPickerList(){
+    const list = document.getElementById('sortPickerList');
+    list.innerHTML = '';
+    SORT_OPTIONS.forEach(([key, label]) => {
+      const item = document.createElement('div');
+      item.className = 'modal-item';
+      item.style.justifyContent = 'space-between';
+      item.innerHTML = '<span>' + label + '</span>' + (sortOrder === key ? '<span style="color:var(--sage-deep);font-weight:700;">✓</span>' : '');
+      item.addEventListener('click', () => {
+        sortOrder = key;
+        saveSortOrder();
+        document.getElementById('sortBtnLabel').textContent = label;
+        closeSortPicker();
+        renderList();
+      });
+      list.appendChild(item);
+    });
+  }
+  function openSortPicker(){ renderSortPickerList(); document.getElementById('sortPickerOverlay').classList.add('show'); }
+  function closeSortPicker(){ document.getElementById('sortPickerOverlay').classList.remove('show'); }
+  document.getElementById('sortBtn').addEventListener('click', openSortPicker);
+  document.getElementById('sortPickerClose').addEventListener('click', closeSortPicker);
+  document.getElementById('sortPickerOverlay').addEventListener('click', e => {
+    if(e.target === document.getElementById('sortPickerOverlay')) closeSortPicker();
+  });
+  document.getElementById('sortBtnLabel').textContent = (SORT_OPTIONS.find(o => o[0] === sortOrder) || SORT_OPTIONS[0])[1];
   document.getElementById('tabBar').addEventListener('click', e => {
     const btn = e.target.closest('.tab-bar-btn');
     if(!btn) return;
@@ -2128,7 +2415,21 @@
   const dataMenuOverlay = document.getElementById('dataMenuOverlay');
   const importFileInput = document.getElementById('importFileInput');
 
-  function openDataMenu(){ dataMenuOverlay.classList.add('show'); }
+  function refreshDataMenuAuthUI(){
+    const loggedInEl = document.getElementById('loggedInAs');
+    const logoutBtn = document.getElementById('logoutBtn');
+    if(currentUser){
+      loggedInEl.textContent = 'ログイン中：' + currentUser.email;
+      logoutBtn.textContent = 'ログアウトする';
+    } else if(firebaseAvailable){
+      loggedInEl.textContent = '未ログイン（この端末内のみに保存されています）';
+      logoutBtn.textContent = 'ログイン / 新規登録して同期する';
+    } else {
+      loggedInEl.textContent = 'クラウド同期に接続できません（この端末内のみに保存されています）';
+      logoutBtn.textContent = 'ログイン / 新規登録して同期する';
+    }
+  }
+  function openDataMenu(){ refreshDataMenuAuthUI(); dataMenuOverlay.classList.add('show'); }
   function closeDataMenu(){ dataMenuOverlay.classList.remove('show'); }
 
   function exportBooks(){
@@ -2143,33 +2444,6 @@
     a.remove();
     URL.revokeObjectURL(url);
     closeDataMenu();
-  }
-  // 手動編集されたファイルが読み込まれても描画処理が壊れないよう、欠けている項目を既定値で補う
-  function normalizeImportedBook(raw, index){
-    const legacyImpressions = Array.isArray(raw.impressions)
-      ? raw.impressions
-      : (raw.impression ? [{ date: '', text: raw.impression }] : []);
-    return {
-      id: raw.id || ('b' + (index + 1)),
-      title: raw.title || '(無題)',
-      author: raw.author || '',
-      publisher: raw.publisher || '',
-      tags: Array.isArray(raw.tags) ? raw.tags : [],
-      status: statusLabelMap[raw.status] ? raw.status : 'stack',
-      startDate: raw.startDate || '',
-      endDate: raw.endDate || '',
-      kikkake: raw.kikkake || '',
-      connection: raw.connection || null,
-      memos: (Array.isArray(raw.memos) ? raw.memos : []).map(m => ({
-        page: m.page || '', date: m.date || '', quote: m.quote || '',
-        emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || ''
-      })),
-      impressions: legacyImpressions,
-      rating: typeof raw.rating === 'number' ? raw.rating : 0,
-      nextAction: raw.nextAction || '',
-      cover: raw.cover || null,
-      coverColorIndex: typeof raw.coverColorIndex === 'number' ? raw.coverColorIndex : (index % palette.length)
-    };
   }
   function importBooksFromFile(file){
     if(!file) return;
@@ -2189,7 +2463,7 @@
       if(!confirm('現在の記録（' + books.length + '冊）をすべて置き換えて読み込みます。よろしいですか？')){
         return;
       }
-      books = data.map(normalizeImportedBook);
+      books = migrateBooks(data).books;
       nextIdNum = computeNextId();
       saveBooks();
       cloudReplaceAllBooks(books);
@@ -2206,21 +2480,117 @@
   document.getElementById('importBtn').addEventListener('click', () => importFileInput.click());
   importFileInput.addEventListener('change', e => { importBooksFromFile(e.target.files[0]); importFileInput.value = ''; });
 
+  /* ---------- 大分類・小分類の編集 ---------- */
+  const categoryEditOverlay = document.getElementById('categoryEditOverlay');
+  function renderCategoryEditList(){
+    const wrap = document.getElementById('categoryEditList');
+    wrap.innerHTML = '';
+    if(categories.length === 0){
+      wrap.innerHTML = '<div class="modal-empty">大分類がまだありません。<br>本の登録画面から新しい大分類を追加できます。</div>';
+      return;
+    }
+    categories.forEach(major => {
+      const block = document.createElement('div');
+      block.style.cssText = 'margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);';
+      const minorsHTML = major.minors.map(m =>
+        '<span class="chip" style="padding:6px 8px 6px 14px;">' + escapeHTML(m.label) +
+          '<button data-del-minor="' + m.id + '" data-major="' + major.id + '" aria-label="削除">×</button></span>'
+      ).join('');
+      block.innerHTML =
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">' +
+          '<span style="font-weight:700;font-size:14px;color:var(--ink);flex:1;">' + escapeHTML(major.label) + '</span>' +
+          '<button class="memo-del" data-rename-major="' + major.id + '" type="button">名前変更</button>' +
+          '<button class="memo-del" data-del-major="' + major.id + '" type="button" style="color:var(--danger);">削除</button>' +
+        '</div>' +
+        '<div class="chip-row">' + minorsHTML + '</div>' +
+        (major.minors.length === 0 ? '<p class="field-note" style="margin:4px 0 0;">小分類はまだありません。</p>' : '');
+      wrap.appendChild(block);
+    });
+    wrap.querySelectorAll('[data-rename-major]').forEach(btn => {
+      btn.addEventListener('click', () => renameMajor(btn.dataset.renameMajor));
+    });
+    wrap.querySelectorAll('[data-del-major]').forEach(btn => {
+      btn.addEventListener('click', () => deleteMajor(btn.dataset.delMajor));
+    });
+    wrap.querySelectorAll('[data-del-minor]').forEach(btn => {
+      btn.addEventListener('click', () => deleteMinor(btn.dataset.major, btn.dataset.delMinor));
+    });
+  }
+  function renameMajor(id){
+    const major = findMajor(id);
+    if(!major) return;
+    const next = prompt('大分類の名前を変更', major.label);
+    if(next === null) return;
+    const trimmed = next.trim();
+    if(!trimmed) return;
+    major.label = trimmed;
+    saveCategories();
+    cloudSaveCategories();
+    renderCategoryEditList();
+    renderMajorChips();
+    renderList();
+  }
+  function deleteMajor(id){
+    const major = findMajor(id);
+    if(!major) return;
+    const affected = books.filter(b => b.majorCategory === id);
+    const msg = affected.length > 0
+      ? '「' + major.label + '」を削除しますか？\nこの大分類が設定されている本（' + affected.length + '冊）は、大分類・小分類が未設定の状態になります。'
+      : '「' + major.label + '」を削除しますか？';
+    if(!confirm(msg)) return;
+    categories = categories.filter(c => c.id !== id);
+    affected.forEach(b => { b.majorCategory = null; b.minorCategories = []; });
+    saveCategories();
+    cloudSaveCategories();
+    saveBooks();
+    affected.forEach(b => cloudSetBook(b));
+    if(selectedMajorId === id){ selectedMajorId = null; selectedMinorIds = []; renderMajorChips(); renderMinorChips(); }
+    renderCategoryEditList();
+    renderList();
+  }
+  function deleteMinor(majorId, minorId){
+    const major = findMajor(majorId);
+    if(!major) return;
+    const minor = major.minors.find(m => m.id === minorId);
+    if(!minor) return;
+    const affected = books.filter(b => (b.minorCategories || []).includes(minorId));
+    const msg = affected.length > 0
+      ? '「' + minor.label + '」を削除しますか？\nこの小分類が設定されている本（' + affected.length + '冊）からは、この小分類が外れます。'
+      : '「' + minor.label + '」を削除しますか？';
+    if(!confirm(msg)) return;
+    major.minors = major.minors.filter(m => m.id !== minorId);
+    affected.forEach(b => { b.minorCategories = (b.minorCategories || []).filter(mid => mid !== minorId); });
+    saveCategories();
+    cloudSaveCategories();
+    saveBooks();
+    affected.forEach(b => cloudSetBook(b));
+    if(selectedMinorIds.includes(minorId)){ selectedMinorIds = selectedMinorIds.filter(mid => mid !== minorId); renderMinorChips(); }
+    renderCategoryEditList();
+    renderList();
+  }
+  document.getElementById('editCategoriesBtn').addEventListener('click', () => {
+    closeDataMenu();
+    renderCategoryEditList();
+    categoryEditOverlay.classList.add('show');
+  });
+  document.getElementById('categoryEditClose').addEventListener('click', () => categoryEditOverlay.classList.remove('show'));
+  categoryEditOverlay.addEventListener('click', e => { if(e.target === categoryEditOverlay) categoryEditOverlay.classList.remove('show'); });
+
   /* =========================================================
      13. ログイン・端末間同期（Firebase Authentication / Firestore）
   ========================================================= */
   function cloudSetBook(book){
-    if(!currentUser) return;
+    if(!currentUser || !db) return;
     db.collection('users').doc(currentUser.uid).collection('books').doc(book.id).set(book)
-      .catch(err => console.warn('クラウドへの保存に失敗しました', err));
+      .catch(err => { console.warn('クラウドへの保存に失敗しました', err); showSyncBanner('クラウドへの保存に失敗しました。電波の良い場所でもう一度お試しください。', true); });
   }
   function cloudDeleteBook(id){
-    if(!currentUser) return;
+    if(!currentUser || !db) return;
     db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete()
-      .catch(err => console.warn('クラウドからの削除に失敗しました', err));
+      .catch(err => { console.warn('クラウドからの削除に失敗しました', err); showSyncBanner('クラウドからの削除に失敗しました。電波の良い場所でもう一度お試しください。', true); });
   }
   function cloudReplaceAllBooks(newBooks){
-    if(!currentUser) return;
+    if(!currentUser || !db) return;
     const booksRef = db.collection('users').doc(currentUser.uid).collection('books');
     booksRef.get().then(snapshot => {
       const batch = db.batch();
@@ -2229,33 +2599,54 @@
       return batch.commit();
     }).catch(err => console.warn('クラウドへの一括反映に失敗しました', err));
   }
-  function attachBooksListener(booksRef){
-    if(unsubscribeBooksListener) unsubscribeBooksListener();
-    unsubscribeBooksListener = booksRef.onSnapshot(snapshot => {
-      books = snapshot.docs.map(doc => doc.data());
-      nextIdNum = computeNextId();
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
-      const activeId = document.querySelector('.app-screen.active')?.id;
-      if(activeId === 'screenList'){ renderList(); }
-      if(activeId === 'screenStats'){ renderStats(); }
-    }, err => console.warn('クラウドの同期に失敗しました', err));
-  }
   function cloudSaveGoals(){
-    if(!currentUser) return;
+    if(!currentUser || !db) return;
     db.collection('users').doc(currentUser.uid).set({ goals: goals }, { merge: true })
       .catch(err => console.warn('目標のクラウド保存に失敗しました', err));
   }
+  function cloudSaveCategories(){
+    if(!currentUser || !db) return;
+    db.collection('users').doc(currentUser.uid).set({ categories: categories }, { merge: true })
+      .catch(err => console.warn('カテゴリのクラウド保存に失敗しました', err));
+  }
+  function attachBooksListener(booksRef){
+    if(unsubscribeBooksListener) unsubscribeBooksListener();
+    unsubscribeBooksListener = booksRef.onSnapshot(snapshot => {
+      hideSyncBanner();
+      const result = migrateBooks(snapshot.docs.map(doc => doc.data()));
+      books = result.books;
+      nextIdNum = computeNextId();
+      saveBooks();
+      // 移行で内容が変わった記録（旧ステータス統合・タグ移行・createdAt付与）は
+      // クラウド側にも書き戻し、次回の同期で再び移行が走って並び順が
+      // ぶれることのないようにする。
+      if(result.changedBooks.length) result.changedBooks.forEach(b => cloudSetBook(b));
+      const activeId = document.querySelector('.app-screen.active')?.id;
+      if(activeId === 'screenList'){ renderList(); }
+      if(activeId === 'screenStats'){ renderStats(); }
+    }, err => {
+      console.warn('クラウドの同期に失敗しました', err);
+      showSyncBanner('クラウドとの同期が一時的に失敗しています。この端末内の記録を表示しています。', true);
+    });
+  }
   function startCloudSync(user){
-    document.getElementById('loggedInAs').textContent = 'ログイン中：' + user.email;
+    hideSyncBanner();
     const userRef = db.collection('users').doc(user.uid);
     const booksRef = userRef.collection('books');
     userRef.get().then(docSnap => {
-      if(docSnap.exists && docSnap.data().goals){
-        goals = Object.assign({ week: 0, month: 0, year: 0 }, docSnap.data().goals);
-        saveGoals();
+      if(docSnap.exists){
+        const data = docSnap.data();
+        if(data.goals){
+          goals = Object.assign({ week: 0, month: 0, year: 0 }, data.goals);
+          saveGoals();
+        }
+        if(Array.isArray(data.categories) && data.categories.length){
+          categories = data.categories;
+          saveCategories();
+        }
         if(document.querySelector('.app-screen.active')?.id === 'screenStats') renderStats();
       }
-    }).catch(err => console.warn('目標の読み込みに失敗しました', err));
+    }).catch(err => console.warn('設定の読み込みに失敗しました', err));
     booksRef.get().then(snapshot => {
       if(snapshot.empty && books.length > 0){
         if(confirm('ローカルにある' + books.length + '冊の記録をクラウドにアップロードしますか？\n（他の端末で既にこのアカウントを使っている場合は「キャンセル」してください）')){
@@ -2269,6 +2660,7 @@
       showScreen('List');
     }).catch(err => {
       console.warn('クラウドの読み込みに失敗しました', err);
+      showSyncBanner('クラウドに接続できません。この端末内の記録を表示しています。', true);
       renderList();
       showScreen('List');
     });
@@ -2293,18 +2685,29 @@
     }
   }
   document.getElementById('authLoginBtn').addEventListener('click', () => {
+    if(!auth){ showAuthError('現在クラウド同期に接続できません。ネットワーク状況を確認し、再読み込みしてもう一度お試しください。'); return; }
     clearAuthError();
     const email = document.getElementById('authEmailInput').value.trim();
     const password = document.getElementById('authPasswordInput').value;
     auth.signInWithEmailAndPassword(email, password).catch(err => showAuthError(mapAuthError(err)));
   });
   document.getElementById('authSignupBtn').addEventListener('click', () => {
+    if(!auth){ showAuthError('現在クラウド同期に接続できません。ネットワーク状況を確認し、再読み込みしてもう一度お試しください。'); return; }
     clearAuthError();
     const email = document.getElementById('authEmailInput').value.trim();
     const password = document.getElementById('authPasswordInput').value;
     auth.createUserWithEmailAndPassword(email, password).catch(err => showAuthError(mapAuthError(err)));
   });
   document.getElementById('logoutBtn').addEventListener('click', () => {
+    if(!currentUser){
+      // オフライン表示中、またはまだログインしていない状態からログイン画面へ
+      closeDataMenu();
+      document.getElementById('authEmailInput').value = '';
+      document.getElementById('authPasswordInput').value = '';
+      clearAuthError();
+      showScreen('Auth');
+      return;
+    }
     if(confirm('ログアウトしますか？')){
       closeDataMenu();
       auth.signOut();
@@ -2313,19 +2716,84 @@
 
   /* =========================================================
      14. 初期化
+     ここが白画面・フリーズ対策の中心。
+     ・Firebase(CDN)の読み込みに失敗した場合、あるいは一定時間
+       （BOOT_TIMEOUT_MS）応答が無い場合は、例外で処理が止まらないよう
+       try/catchとタイムアウトの両方で捕捉し、この端末内の記録だけで
+       動く「オフラインモード」に自動で切り替える。
+     ・オフラインモードでもアプリとしては通常どおり使え、後から
+       メニュー「ログイン / 新規登録して同期する」で同期を再開できる。
   ========================================================= */
-  auth.onAuthStateChanged(user => {
-    currentUser = user;
-    if(user){
-      startCloudSync(user);
-    } else {
-      if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
-      document.getElementById('authEmailInput').value = '';
-      document.getElementById('authPasswordInput').value = '';
-      clearAuthError();
-      showScreen('Auth');
+  const BOOT_TIMEOUT_MS = 9000;
+  let firebaseAvailable = false;
+
+  function showSyncBanner(text, isError){
+    const banner = document.getElementById('syncBanner');
+    document.getElementById('syncBannerText').textContent = text;
+    banner.classList.toggle('error', !!isError);
+    banner.classList.add('show');
+  }
+  function hideSyncBanner(){
+    document.getElementById('syncBanner').classList.remove('show');
+  }
+  function enterOfflineMode(reason){
+    currentUser = null;
+    if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
+    renderList();
+    showScreen('List');
+    showSyncBanner(reason || 'クラウド同期に接続できません。この端末内の記録のみで表示しています。', true);
+  }
+
+  function bootApp(){
+    let settled = false;
+    const bootTimeout = setTimeout(() => {
+      if(settled) return;
+      settled = true;
+      enterOfflineMode('通信に時間がかかっているため、この端末内の記録を表示しています。電波の良い場所でメニューからログインすると同期を再開できます。');
+    }, BOOT_TIMEOUT_MS);
+
+    if(typeof firebase === 'undefined'){
+      clearTimeout(bootTimeout);
+      settled = true;
+      enterOfflineMode('クラウド同期の読み込みに失敗しました。この端末内の記録のみで表示しています。');
+      return;
     }
-  });
+    try{
+      firebase.initializeApp(firebaseConfig);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      firebaseAvailable = true;
+    }catch(e){
+      console.warn('Firebaseの初期化に失敗しました', e);
+      clearTimeout(bootTimeout);
+      settled = true;
+      enterOfflineMode('クラウド同期の初期化に失敗しました。この端末内の記録のみで表示しています。');
+      return;
+    }
+
+    auth.onAuthStateChanged(user => {
+      if(settled) return;   // タイムアウト後にオフライン表示へ切り替え済みなら、遅れて届いた結果は無視する
+      settled = true;
+      clearTimeout(bootTimeout);
+      currentUser = user;
+      if(user){
+        startCloudSync(user);
+      } else {
+        if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
+        document.getElementById('authEmailInput').value = '';
+        document.getElementById('authPasswordInput').value = '';
+        clearAuthError();
+        showScreen('Auth');
+      }
+    }, err => {
+      if(settled) return;
+      settled = true;
+      clearTimeout(bootTimeout);
+      console.warn('認証状態の確認に失敗しました', err);
+      enterOfflineMode();
+    });
+  }
+  bootApp();
 </script>
 
 </body>
