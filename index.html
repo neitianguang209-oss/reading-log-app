@@ -716,9 +716,8 @@
       <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
     </div>
     <div class="filter-tabs" id="filterTabs">
-      <div class="filter-chip active" data-filter="all">すべて</div>
-      <div class="filter-chip" data-filter="reading">読書中</div>
-      <div class="filter-chip" data-filter="done">読了</div>
+      <div class="filter-chip" data-status="done">読了</div>
+      <div class="filter-chip" data-status="reading">読書中</div>
     </div>
     <div class="cat-filter-row" id="majorFilterRow">
       <p class="cat-filter-label">大分類</p>
@@ -1274,7 +1273,11 @@
   let nextIdNum = computeNextId();
   if(_bootMigration.changedBooks.length) saveBooks();
 
-  let activeFilter = 'all';
+  /* 絞り込みは3段階の枝分かれ。それぞれ独立して保持し、
+     ステータスを選んだまま大分類・小分類を切り替えられるようにする。 */
+  let statusFilter = null;   // null（指定なし）/ 'reading' / 'done'
+  let majorFilter = null;    // 大分類のid
+  let minorFilter = null;    // 小分類のid
   let searchQuery = '';
   let statsYear = new Date().getFullYear();
   let statsScope = 'all';               // 'all' / 'reading' / 'done'
@@ -1363,85 +1366,80 @@
       '<div class="book-meta">' + escapeHTML(b.author || '') + '</div>';
     return card;
   }
-  // 実際に本へ設定されている大分類・小分類だけを絞り込み候補として出す
-  function getUsedMajors(){
-    const ids = new Set();
-    books.forEach(b => { if(b.majorCategory) ids.add(b.majorCategory); });
-    return categories.filter(c => ids.has(c.id));
-  }
-  function getUsedMinors(majorId){
-    const major = findMajor(majorId);
-    if(!major) return [];
-    const ids = new Set();
-    books.forEach(b => {
-      if(b.majorCategory === majorId) (b.minorCategories || []).forEach(id => ids.add(id));
-    });
-    return major.minors.filter(m => ids.has(m.id));
-  }
-  function activeMajorIdFromFilter(){
-    if(activeFilter.indexOf('major:') === 0) return activeFilter.slice(6);
-    if(activeFilter.indexOf('minor:') === 0) return activeFilter.slice(6).split(':')[0];
-    return null;
-  }
   // 件数はラベルの後ろに半角スペースで続ける（0件のときは数字を出さない）
   function chipLabel(label, count){
     return count > 0 ? label + ' ' + count : label;
   }
+  // 絞り込みの各段階で対象になる本
+  function booksInStatus(){
+    return statusFilter ? books.filter(b => b.status === statusFilter) : books;
+  }
+  function booksInMajor(){
+    return majorFilter ? booksInStatus().filter(b => b.majorCategory === majorFilter) : [];
+  }
+  /* 読了／読書中 → 大分類 → 小分類 と枝分かれして表示する。
+     大分類は「ステータスを選んだとき」、小分類は「大分類を選んだとき」に現れる。 */
   function renderFilterTabs(){
-    const statusCounts = {
-      all: books.length,
-      reading: books.filter(b => b.status === 'reading').length,
-      done: books.filter(b => b.status === 'done').length
-    };
     document.getElementById('filterTabs').querySelectorAll('.filter-chip').forEach(chip => {
-      const key = chip.dataset.filter;
-      chip.classList.toggle('active', key === activeFilter);
-      const baseLabel = key === 'all' ? 'すべて' : statusLabelMap[key];
-      chip.textContent = chipLabel(baseLabel, statusCounts[key]);
+      const key = chip.dataset.status;
+      chip.classList.toggle('active', key === statusFilter);
+      chip.textContent = chipLabel(statusLabelMap[key], books.filter(b => b.status === key).length);
     });
 
+    const statusBooks = booksInStatus();
     const majorTabsEl = document.getElementById('majorFilterTabs');
-    const usedMajors = getUsedMajors();
     majorTabsEl.innerHTML = '';
-    const activeMajorId = activeMajorIdFromFilter();
+    const usedMajors = categories.filter(c => statusBooks.some(b => b.majorCategory === c.id));
     usedMajors.forEach(major => {
       const chip = document.createElement('div');
-      chip.className = 'filter-chip' + (activeMajorId === major.id ? ' active' : '');
-      chip.dataset.filter = 'major:' + major.id;
-      chip.textContent = chipLabel(major.label, books.filter(b => b.majorCategory === major.id).length);
+      chip.className = 'filter-chip' + (majorFilter === major.id ? ' active' : '');
+      chip.dataset.major = major.id;
+      chip.textContent = chipLabel(major.label, statusBooks.filter(b => b.majorCategory === major.id).length);
       majorTabsEl.appendChild(chip);
     });
+    document.getElementById('majorFilterRow').classList.toggle('show', !!statusFilter && usedMajors.length > 0);
 
+    const majorBooks = booksInMajor();
+    const major = majorFilter ? findMajor(majorFilter) : null;
+    const usedMinors = major
+      ? major.minors.filter(m => majorBooks.some(b => (b.minorCategories || []).includes(m.id)))
+      : [];
     const minorTabsEl = document.getElementById('minorFilterTabs');
-    const usedMinors = activeMajorId ? getUsedMinors(activeMajorId) : [];
     minorTabsEl.innerHTML = '';
     usedMinors.forEach(minor => {
       const chip = document.createElement('div');
-      chip.className = 'filter-chip' + (activeFilter === 'minor:' + activeMajorId + ':' + minor.id ? ' active' : '');
-      chip.dataset.filter = 'minor:' + activeMajorId + ':' + minor.id;
-      chip.textContent = chipLabel(minor.label, books.filter(b => b.majorCategory === activeMajorId && (b.minorCategories || []).includes(minor.id)).length);
+      chip.className = 'filter-chip' + (minorFilter === minor.id ? ' active' : '');
+      chip.dataset.minor = minor.id;
+      chip.textContent = chipLabel(minor.label, majorBooks.filter(b => (b.minorCategories || []).includes(minor.id)).length);
       minorTabsEl.appendChild(chip);
     });
-
-    // 大分類・小分類の行は、該当するものがあるときだけ表示する
-    document.getElementById('majorFilterRow').classList.toggle('show', usedMajors.length > 0);
-    document.getElementById('minorFilterRow').classList.toggle('show', usedMinors.length > 0);
+    document.getElementById('minorFilterRow').classList.toggle('show', !!majorFilter && usedMinors.length > 0);
+  }
+  /* 並び替えの基準日は読了日。読了日が無い本（読書中）は読み始めた日、
+     どちらも無ければ登録した日時で比べる。 */
+  function sortTimeOf(b){
+    const d = b.endDate || b.startDate || '';
+    if(d){
+      const t = new Date(d + 'T00:00:00').getTime();
+      if(!isNaN(t)) return t;
+    }
+    return b.createdAt || 0;
   }
   function sortBooks(list){
     const arr = list.slice();
     switch(sortOrder){
       case 'oldest':
-        arr.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+        arr.sort((a, b) => sortTimeOf(a) - sortTimeOf(b));
         break;
       case 'rating-desc':
-        arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+        arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || sortTimeOf(b) - sortTimeOf(a));
         break;
       case 'rating-asc':
-        arr.sort((a, b) => (a.rating || 0) - (b.rating || 0) || (b.createdAt || 0) - (a.createdAt || 0));
+        arr.sort((a, b) => (a.rating || 0) - (b.rating || 0) || sortTimeOf(b) - sortTimeOf(a));
         break;
       case 'newest':
       default:
-        arr.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+        arr.sort((a, b) => sortTimeOf(b) - sortTimeOf(a));
     }
     return arr;
   }
@@ -1449,20 +1447,15 @@
     renderFilterTabs();
     const wrap = document.getElementById('shelfWrap');
     const isSearching = searchQuery.trim() !== '';
-    let filtered;
+    // 検索とステータス・大分類・小分類の絞り込みは重ねて効く
+    let filtered = books;
     if(isSearching){
       const q = normalize(searchQuery);
-      filtered = books.filter(b => normalize(b.title).includes(q) || normalize(b.author || '').includes(q));
-    } else if(activeFilter === 'all'){
-      filtered = books;
-    } else if(activeFilter.indexOf('major:') === 0){
-      filtered = books.filter(b => b.majorCategory === activeFilter.slice(6));
-    } else if(activeFilter.indexOf('minor:') === 0){
-      const parts = activeFilter.slice(6).split(':');
-      filtered = books.filter(b => b.majorCategory === parts[0] && (b.minorCategories || []).includes(parts[1]));
-    } else {
-      filtered = books.filter(b => b.status === activeFilter);
+      filtered = filtered.filter(b => normalize(b.title).includes(q) || normalize(b.author || '').includes(q));
     }
+    if(statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
+    if(majorFilter) filtered = filtered.filter(b => b.majorCategory === majorFilter);
+    if(minorFilter) filtered = filtered.filter(b => (b.minorCategories || []).includes(minorFilter));
     filtered = sortBooks(filtered);
     wrap.innerHTML = '';
     if(filtered.length === 0){
@@ -2573,15 +2566,46 @@
   /* =========================================================
      11. 一覧のフィルタ・FAB・詳細のアクションバー
   ========================================================= */
-  function handleFilterChipClick(e){
+  /* チップはもう一度タップすると解除。ステータスを切り替えても、
+     大分類・小分類の選択は（対象が残っていれば）そのまま保つ。 */
+  document.getElementById('filterTabs').addEventListener('click', e => {
     const chip = e.target.closest('.filter-chip');
     if(!chip) return;
-    activeFilter = chip.dataset.filter;
+    const key = chip.dataset.status;
+    if(statusFilter === key){
+      statusFilter = null;
+      majorFilter = null;
+      minorFilter = null;
+    } else {
+      statusFilter = key;
+      if(majorFilter && !books.some(b => b.status === key && b.majorCategory === majorFilter)){
+        majorFilter = null;
+        minorFilter = null;
+      } else if(minorFilter && !books.some(b => b.status === key && b.majorCategory === majorFilter && (b.minorCategories || []).includes(minorFilter))){
+        minorFilter = null;
+      }
+    }
     renderList();
-  }
-  document.getElementById('filterTabs').addEventListener('click', handleFilterChipClick);
-  document.getElementById('majorFilterTabs').addEventListener('click', handleFilterChipClick);
-  document.getElementById('minorFilterTabs').addEventListener('click', handleFilterChipClick);
+  });
+  document.getElementById('majorFilterTabs').addEventListener('click', e => {
+    const chip = e.target.closest('.filter-chip');
+    if(!chip) return;
+    const id = chip.dataset.major;
+    if(majorFilter === id){
+      majorFilter = null;
+    } else {
+      majorFilter = id;
+    }
+    minorFilter = null;   // 大分類を変えたら小分類の選択はリセットする
+    renderList();
+  });
+  document.getElementById('minorFilterTabs').addEventListener('click', e => {
+    const chip = e.target.closest('.filter-chip');
+    if(!chip) return;
+    const id = chip.dataset.minor;
+    minorFilter = (minorFilter === id) ? null : id;
+    renderList();
+  });
   document.getElementById('searchInput').addEventListener('input', e => {
     searchQuery = e.target.value;
     renderList();
@@ -2590,7 +2614,7 @@
   /* ---------- 並び替え ---------- */
   function renderSortPickerList(){
     const list = document.getElementById('sortPickerList');
-    list.innerHTML = '';
+    list.innerHTML = '<p class="field-note" style="margin:0 2px 12px;">新しい順・古い順は読了日で並べます（読了日が無い本は読み始めた日）。</p>';
     SORT_OPTIONS.forEach(([key, label]) => {
       const item = document.createElement('div');
       item.className = 'modal-item';
@@ -2774,6 +2798,7 @@
     saveBooks();
     affected.forEach(b => cloudSetBook(b));
     if(selectedMajorId === id){ selectedMajorId = null; selectedMinorIds = []; renderMajorChips(); renderMinorChips(); }
+    if(majorFilter === id){ majorFilter = null; minorFilter = null; }
     renderCategoryEditList();
     renderList();
   }
@@ -2794,6 +2819,7 @@
     saveBooks();
     affected.forEach(b => cloudSetBook(b));
     if(selectedMinorIds.includes(minorId)){ selectedMinorIds = selectedMinorIds.filter(mid => mid !== minorId); renderMinorChips(); }
+    if(minorFilter === minorId){ minorFilter = null; }
     renderCategoryEditList();
     renderList();
   }
