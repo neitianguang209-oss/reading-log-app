@@ -1434,22 +1434,20 @@
     }
     return b.createdAt || 0;
   }
+  // 読了を先に、読書中を後にまとめる（並び替えはそれぞれのまとまりの中で効く）
+  function statusRank(b){
+    return b.status === 'done' ? 0 : 1;
+  }
   function sortBooks(list){
     const arr = list.slice();
-    switch(sortOrder){
-      case 'oldest':
-        arr.sort((a, b) => sortTimeOf(a) - sortTimeOf(b));
-        break;
-      case 'rating-desc':
-        arr.sort((a, b) => (b.rating || 0) - (a.rating || 0) || sortTimeOf(b) - sortTimeOf(a));
-        break;
-      case 'rating-asc':
-        arr.sort((a, b) => (a.rating || 0) - (b.rating || 0) || sortTimeOf(b) - sortTimeOf(a));
-        break;
-      case 'newest':
-      default:
-        arr.sort((a, b) => sortTimeOf(b) - sortTimeOf(a));
-    }
+    const within = {
+      oldest: (a, b) => sortTimeOf(a) - sortTimeOf(b),
+      'rating-desc': (a, b) => (b.rating || 0) - (a.rating || 0) || sortTimeOf(b) - sortTimeOf(a),
+      'rating-asc': (a, b) => (a.rating || 0) - (b.rating || 0) || sortTimeOf(b) - sortTimeOf(a),
+      newest: (a, b) => sortTimeOf(b) - sortTimeOf(a)
+    };
+    const compare = within[sortOrder] || within.newest;
+    arr.sort((a, b) => (statusRank(a) - statusRank(b)) || compare(a, b));
     return arr;
   }
   function renderList(){
@@ -1660,27 +1658,34 @@
       '<p class="stat-hint">月間目標は一度設定すると翌月以降も自動で引き継がれます。変更したいときはこの数値を書き換えてください。</p>' +
       '</div>';
   }
-  function buildAuthorCard(target){
+  /* ---------- ドーナツで内訳を見せるカード ----------
+     著者別・大分類別で共通に使う。項目が増えても崩れないよう、
+     多い順に maxSegments 件まで出し、残りは「その他」にまとめる。 */
+  function countEntries(list, keyFn){
     const counts = {};
-    target.forEach(b => {
-      const name = (b.author || '').trim() || '著者未設定';
-      counts[name] = (counts[name] || 0) + 1;
+    list.forEach(b => {
+      const key = keyFn(b);
+      counts[key] = (counts[key] || 0) + 1;
     });
-    const entries = Object.keys(counts).map(name => ({ name: name, count: counts[name] }))
-      .sort((a, b) => b.count - a.count);
+    return Object.keys(counts)
+      .map(name => ({ name: name, count: counts[name] }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ja'));
+  }
+  function buildDonutCard(label, entries, centerText, emptyMessage, maxSegments){
     if(entries.length === 0){
-      return '<div class="stat-card"><div class="stat-label">著者別</div>' +
-        '<p class="stat-empty">まだ記録がありません<span>本を登録すると、著者ごとの内訳が表示されます</span></p></div>';
+      return '<div class="stat-card"><div class="stat-label">' + label + '</div>' +
+        '<p class="stat-empty">まだ記録がありません<span>' + emptyMessage + '</span></p></div>';
     }
-    const top = entries.slice(0, 5);
-    const rest = entries.slice(5);
+    const limit = maxSegments || 5;
+    const top = entries.slice(0, limit);
+    const rest = entries.slice(limit);
     if(rest.length){
       top.push({ name: 'その他', count: rest.reduce((a, e) => a + e.count, 0) });
     }
     const total = entries.reduce((a, e) => a + e.count, 0);
-    return '<div class="stat-card"><div class="stat-label">著者別</div>' +
+    return '<div class="stat-card"><div class="stat-label">' + label + '</div>' +
       '<div class="donut-wrap" style="margin-top:10px;">' +
-        donutSVG(top, total, entries.length + '人') +
+        donutSVG(top, total, centerText) +
         '<div class="donut-legend">' +
           top.map((seg, i) =>
             '<div class="donut-legend-row">' +
@@ -1691,6 +1696,20 @@
           ).join('') +
         '</div>' +
       '</div></div>';
+  }
+  // 大分類は今後増えても、実際に使われているものが自動で並ぶ
+  function buildMajorCategoryCard(target){
+    const entries = countEntries(target, b => {
+      const major = b.majorCategory ? findMajor(b.majorCategory) : null;
+      return major ? major.label : '未設定';
+    });
+    return buildDonutCard('大分類別', entries, entries.length + '種類',
+      '大分類を設定すると、ジャンルごとの内訳が表示されます', 6);
+  }
+  function buildAuthorCard(target){
+    const entries = countEntries(target, b => (b.author || '').trim() || '著者未設定');
+    return buildDonutCard('著者別', entries, entries.length + '人',
+      '本を登録すると、著者ごとの内訳が表示されます', 5);
   }
   // 読書傾向：外部AIは使わず、登録済みの分類・評価から手元で集計する
   function buildInsightCard(){
@@ -1741,6 +1760,7 @@
       buildMonthlyCard() +
       buildCurrentStatusRow() +
       buildGoalCard() +
+      buildMajorCategoryCard(target) +
       buildAuthorCard(target) +
       buildInsightCard();
 
