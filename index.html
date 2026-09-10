@@ -1064,6 +1064,50 @@
   // （Firestoreでは前後をアンダースコア2つで挟んだIDは使えないため、この名前にしている）
   const SETTINGS_DOC_ID = 'app-settings';
 
+  /* ---------- Supabaseへのバックアップ控え ----------
+     このアプリの本体はFirestore。ただしFirestoreは週次のバックアップ
+     （backup-supabase.ps1）の対象外で、クラウド1箇所にしかデータが
+     無い状態だった。就活アプリでSupabaseプロジェクトごと消えた事故が
+     あったため、読み書きの本流は変えずに、控えだけSupabaseへ送る。
+     ライブラリは使わずfetchだけで完結させる（依存を増やさないため）。
+     空データでは上書きしない（アプリ側でもDB側のトリガーでも防ぐ）。 */
+  const BACKUP_URL = 'https://gzayrjlhruhvklsidraw.supabase.co/rest/v1/app_backups';
+  const BACKUP_KEY = 'sb_publishable_-sNQxpwsU7JxhPF9S2vn5A_-CCTqQZL';
+  let backupTimer = null, lastBackupJson = '';
+  function scheduleCloudBackup(){
+    if(backupTimer) clearTimeout(backupTimer);
+    backupTimer = setTimeout(sendCloudBackup, 4000);
+  }
+  async function sendCloudBackup(){
+    try{
+      if(!books || books.length === 0) return;       // 空は送らない
+      const payload = { books: books, goals: goals, categories: categories };
+      const json = JSON.stringify(payload);
+      if(json === lastBackupJson) return;            // 変化が無ければ送らない
+      const res = await fetch(BACKUP_URL, {
+        method: 'POST',
+        headers: {
+          'apikey': BACKUP_KEY,
+          'Authorization': 'Bearer ' + BACKUP_KEY,
+          'Content-Type': 'application/json',
+          'Prefer': 'resolution=merge-duplicates,return=minimal'
+        },
+        body: JSON.stringify({
+          app: 'reading-log',
+          data: payload,
+          item_count: books.length,
+          device: navigator.userAgent.slice(0, 120),
+          updated_at: new Date().toISOString()
+        })
+      });
+      if(res.ok){ lastBackupJson = json; }
+      else { console.warn('バックアップ控えの送信に失敗しました', res.status); }
+    }catch(e){
+      // 控えの送信失敗はアプリの動作に影響させない
+      console.warn('バックアップ控えの送信に失敗しました', e);
+    }
+  }
+
   /* ---------- Firebase（端末間同期） ----------
      firebaseConfigはFirebaseコンソール「プロジェクトの設定 > 全般 >
      マイアプリ」に表示されるWebアプリ設定をそのまま貼り付ければよい。
@@ -1096,6 +1140,7 @@
     }
   }
   function saveBooks(){
+    scheduleCloudBackup();
     try{
       localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
     }catch(e){
@@ -2898,6 +2943,15 @@
         if(!data.id) data.id = doc.id;
         rawBooks.push(data);
       });
+      // クラウド側が0冊で端末に記録がある場合は、端末の記録を消さない。
+      // 起動直後の突き合わせ（startCloudSync）には確認ダイアログがあるが、
+      // その後のリアルタイム同期には無く、アップロードを「キャンセル」した
+      // 場合やクラウド側で記録が失われた場合に、端末の記録まで空で
+      // 上書きされてしまうため。全消しはメニューの操作からのみ行う。
+      if(rawBooks.length === 0 && books.length > 0){
+        showSyncBanner('クラウド側に記録が見つかりません。この端末内の記録を表示しています。', true);
+        return;
+      }
       const result = migrateBooks(rawBooks);
       books = result.books;
       nextIdNum = computeNextId();
