@@ -732,6 +732,10 @@
         <p class="cat-filter-label">小分類</p>
         <div class="filter-tabs" id="minorFilterTabs"></div>
       </div>
+      <div class="cat-filter-row" id="formatFilterRow">
+        <p class="cat-filter-label">判型</p>
+        <div class="filter-tabs" id="formatFilterTabs"></div>
+      </div>
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
@@ -881,6 +885,12 @@
           <input type="text" id="newMinorInput" placeholder="新しい小分類を追加（例：ミステリー）" style="flex:1;" disabled>
         </div>
         <p class="field-note" id="minorFieldNote">先に大分類を選択すると、その中の小分類を追加・選択できます。</p>
+
+        <div id="formatField" style="display:none;">
+          <label class="field-label">判型<span class="opt">任意</span></label>
+          <div class="status-row" id="formatChipRow"></div>
+          <p class="field-note">新書か、それ以外（単行本・文庫など）かを選べます。</p>
+        </div>
       </div>
 
       <hr class="divider">
@@ -1173,7 +1183,16 @@
         { id:'novel-youth', label:'青春' }
       ]},
       { id:'essay', label:'エッセイ', minors:[] },
-      { id:'practical', label:'実用書', minors:[
+      { id:'liberal', label:'教養', hasFormat:true, minors:[
+        { id:'liberal-philosophy', label:'哲学' },
+        { id:'liberal-psychology', label:'心理学' },
+        { id:'liberal-linguistics', label:'言語学' },
+        { id:'liberal-history', label:'歴史' },
+        { id:'liberal-society', label:'社会' },
+        { id:'liberal-science', label:'科学' },
+        { id:'liberal-art', label:'芸術' }
+      ]},
+      { id:'practical', label:'実用書', hasFormat:true, minors:[
         { id:'practical-business', label:'ビジネス' },
         { id:'practical-selfhelp', label:'自己啓発' },
         { id:'practical-invest', label:'投資' }
@@ -1217,6 +1236,20 @@
   function findMinor(majorId, minorId){
     const major = findMajor(majorId);
     return major ? (major.minors.find(m => m.id === minorId) || null) : null;
+  }
+
+  /* ---------- 判型（新書／単行本） ----------
+     「新書」はミステリーや投資のようなジャンルではなく本の形なので、
+     大分類・小分類と並べず、一番下の枝として持たせる。大分類ごとに
+     hasFormat で出すかどうかを切り替えられる（既定は教養・実用書）。 */
+  const FORMATS = [['shinsho', '新書'], ['tankobon', '単行本']];
+  function formatLabel(value){
+    const found = FORMATS.find(f => f[0] === value);
+    return found ? found[1] : '';
+  }
+  function majorHasFormat(majorId){
+    const major = majorId ? findMajor(majorId) : null;
+    return !!(major && major.hasFormat);
   }
 
   // 表紙画像が無いときのモノグラム背景（アクセントと同系のブルーグレー）
@@ -1290,6 +1323,7 @@
       coverColorIndex: typeof raw.coverColorIndex === 'number' ? raw.coverColorIndex : (index % palette.length),
       majorCategory: raw.majorCategory || null,
       minorCategories: Array.isArray(raw.minorCategories) ? raw.minorCategories.slice() : [],
+      format: (raw.format === 'shinsho' || raw.format === 'tankobon') ? raw.format : null,
       createdAt: raw.createdAt || null
     };
     if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
@@ -1320,7 +1354,33 @@
     return { books: migrated, changedBooks: changedBooks };
   }
 
+  /* 既に使っている端末には「教養」と判型の枝が無いので、一度だけ足す。
+     実行したらバージョンを記録し、あとからユーザーが教養を消したり判型を
+     OFFにしたりしても、起動のたびに復活しないようにする。
+     既存の大分類「新書」「エッセイ」やそこに入っている本には触らない。 */
+  const CAT_SCHEMA_KEY = 'reading-log-cat-schema';
+  const CAT_SCHEMA_VERSION = 2;
+  function migrateCategories(){
+    let version = 0;
+    try{ version = parseInt(localStorage.getItem(CAT_SCHEMA_KEY) || '0', 10) || 0; }catch(e){}
+    if(version >= CAT_SCHEMA_VERSION) return false;
+    let changed = false;
+    const isLabel = (c, label) => normalize(c.label) === normalize(label);
+    if(!categories.some(c => isLabel(c, '教養'))){
+      const liberal = defaultCategories().find(c => c.id === 'liberal');
+      const at = categories.findIndex(c => isLabel(c, '実用書'));
+      if(at >= 0){ categories.splice(at, 0, liberal); } else { categories.push(liberal); }
+      changed = true;
+    }
+    categories.forEach(c => {
+      if((isLabel(c, '教養') || isLabel(c, '実用書')) && !c.hasFormat){ c.hasFormat = true; changed = true; }
+    });
+    try{ localStorage.setItem(CAT_SCHEMA_KEY, String(CAT_SCHEMA_VERSION)); }catch(e){}
+    return changed;
+  }
+
   let categories = loadCategories();
+  if(migrateCategories()) saveCategories();
   const _bootMigration = migrateBooks(loadBooksRaw());
   let books = _bootMigration.books;
   let goals = loadGoals();
@@ -1333,6 +1393,7 @@
   let statusFilter = null;   // null（指定なし）/ 'reading' / 'done'
   let majorFilter = null;    // 大分類のid
   let minorFilter = null;    // 小分類のid
+  let formatFilter = null;   // 判型（'shinsho' / 'tankobon'）
   let searchQuery = '';
   let statsYear = new Date().getFullYear();
   let statsRange = 'year';              // 'year' / 'total'
@@ -1344,6 +1405,7 @@
 
   let selectedMajorId = null;
   let selectedMinorIds = [];
+  let selectedFormat = null;
   let currentStatus = 'reading';
   let rating = 0;
   let coverImg = null;
@@ -1431,6 +1493,11 @@
   function booksInMajor(){
     return majorFilter ? booksInStatus().filter(b => b.majorCategory === majorFilter) : [];
   }
+  // 判型の枝で対象になる本（大分類を選んでいないときはステータスまでで絞る）
+  function booksInMinor(){
+    const base = majorFilter ? booksInMajor() : booksInStatus();
+    return minorFilter ? base.filter(b => (b.minorCategories || []).includes(minorFilter)) : base;
+  }
   /* 読了／読書中 → 大分類 → 小分類 と枝分かれして表示する。
      大分類は「ステータスを選んだとき」、小分類は「大分類を選んだとき」に現れる。 */
   function renderFilterTabs(){
@@ -1468,6 +1535,22 @@
       minorTabsEl.appendChild(chip);
     });
     document.getElementById('minorFilterRow').classList.toggle('show', !!majorFilter && usedMinors.length > 0);
+
+    /* 判型は一番下の枝だが、大分類を選んでいなくても「新書だけ」を
+       まとめて見られるよう、判型が付いた本があれば常に出す。 */
+    const formatBase = booksInMinor();
+    if(formatFilter && !formatBase.some(b => b.format === formatFilter)) formatFilter = null;
+    const usedFormats = FORMATS.filter(f => formatBase.some(b => b.format === f[0]));
+    const formatTabsEl = document.getElementById('formatFilterTabs');
+    formatTabsEl.innerHTML = '';
+    usedFormats.forEach(f => {
+      const chip = document.createElement('div');
+      chip.className = 'filter-chip' + (formatFilter === f[0] ? ' active' : '');
+      chip.dataset.format = f[0];
+      chip.textContent = chipLabel(f[1], formatBase.filter(b => b.format === f[0]).length);
+      formatTabsEl.appendChild(chip);
+    });
+    document.getElementById('formatFilterRow').classList.toggle('show', usedFormats.length > 0);
   }
   /* 並び替えの基準日は読了日。読了日が無い本（読書中）は読み始めた日、
      どちらも無ければ登録した日時で比べる。 */
@@ -1508,6 +1591,7 @@
     if(statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
     if(majorFilter) filtered = filtered.filter(b => b.majorCategory === majorFilter);
     if(minorFilter) filtered = filtered.filter(b => (b.minorCategories || []).includes(minorFilter));
+    if(formatFilter) filtered = filtered.filter(b => b.format === formatFilter);
     filtered = sortBooks(filtered);
     wrap.innerHTML = '';
     if(filtered.length === 0){
@@ -1787,6 +1871,8 @@
     let text = '読了した' + done.length + '冊のうち、大分類は「' + escapeHTML(topMajor) + '」が最も多く ' +
       majorCounts[topMajor] + '冊（' + Math.round(majorCounts[topMajor] / done.length * 100) + '%）です。';
     if(topMinor) text += '小分類では「' + escapeHTML(topMinor) + '」が ' + minorCounts[topMinor] + '冊で最多でした。';
+    const shinsho = done.filter(b => b.format === 'shinsho').length;
+    if(shinsho) text += '判型では新書が ' + shinsho + '冊（' + Math.round(shinsho / done.length * 100) + '%）でした。';
     if(rated.length) text += '評価をつけた' + rated.length + '冊の平均は ' + avg.toFixed(1) + ' です。';
     return '<div class="stat-card">' + head + '<p class="insight-body">' + text + '</p></div>';
   }
@@ -1890,9 +1976,13 @@
       const major = findMajor(b.majorCategory);
       if(major){
         const minors = (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean);
-        html += '<div class="info-card"><div class="ic-label">大分類・小分類</div><div class="chip-row" style="margin:0;">' +
+        const formatChip = b.format
+          ? '<span class="chip" style="padding:6px 14px;background:transparent;border-color:var(--accent);color:var(--accent);">' + escapeHTML(formatLabel(b.format)) + '</span>'
+          : '';
+        html += '<div class="info-card"><div class="ic-label">大分類・小分類' + (b.format ? '・判型' : '') + '</div><div class="chip-row" style="margin:0;">' +
           '<span class="chip" style="padding:6px 14px;">' + escapeHTML(major.label) + '</span>' +
           minors.map(m => '<span class="chip" style="padding:6px 14px;background:var(--accent-tint);border-color:var(--accent-tint);color:var(--accent-deep);">' + escapeHTML(m.label) + '</span>').join('') +
+          formatChip +
           '</div></div>';
       }
     }
@@ -2110,7 +2200,8 @@
       chip.textContent = major.label;
       chip.addEventListener('click', () => {
         selectedMajorId = (selectedMajorId === major.id) ? null : major.id;
-        selectedMinorIds = [];   // 大分類を変えたら小分類の選択はリセットする
+        selectedMinorIds = [];   // 大分類を変えたら小分類・判型の選択はリセットする
+        selectedFormat = null;
         renderMajorChips();
         renderMinorChips();
       });
@@ -2126,6 +2217,7 @@
     if(!major){
       input.disabled = true;
       note.textContent = '先に大分類を選択すると、その中の小分類を追加・選択できます。';
+      renderFormatChips();
       return;
     }
     input.disabled = false;
@@ -2138,6 +2230,31 @@
         const idx = selectedMinorIds.indexOf(minor.id);
         if(idx >= 0){ selectedMinorIds.splice(idx, 1); } else { selectedMinorIds.push(minor.id); }
         renderMinorChips();
+      });
+      row.appendChild(chip);
+    });
+    renderFormatChips();
+  }
+  /* 判型は「新書の棚」を作るための一番下の枝。判型を使う大分類
+     （既定では教養・実用書）を選んだときだけ現れる。任意なので、
+     どちらも選ばなければ設定なしのまま保存できる。 */
+  function renderFormatChips(){
+    const field = document.getElementById('formatField');
+    const row = document.getElementById('formatChipRow');
+    row.innerHTML = '';
+    if(!majorHasFormat(selectedMajorId)){
+      selectedFormat = null;
+      field.style.display = 'none';
+      return;
+    }
+    field.style.display = '';
+    FORMATS.forEach(f => {
+      const chip = document.createElement('div');
+      chip.className = 'status-chip' + (selectedFormat === f[0] ? ' active' : '');
+      chip.textContent = f[1];
+      chip.addEventListener('click', () => {
+        selectedFormat = (selectedFormat === f[0]) ? null : f[0];
+        renderFormatChips();
       });
       row.appendChild(chip);
     });
@@ -2492,6 +2609,7 @@
     document.getElementById('publisherInput').value = '';
     selectedMajorId = null;
     selectedMinorIds = [];
+    selectedFormat = null;
     renderMajorChips();
     renderMinorChips();
     clearCoverImage();
@@ -2514,6 +2632,7 @@
     document.getElementById('publisherInput').value = b.publisher || '';
     selectedMajorId = b.majorCategory || null;
     selectedMinorIds = Array.isArray(b.minorCategories) ? b.minorCategories.slice() : [];
+    selectedFormat = b.format || null;
     renderMajorChips();
     renderMinorChips();
     if(b.cover){ setCoverImage(b.cover); } else { clearCoverImage(); }
@@ -2546,6 +2665,7 @@
       publisher: document.getElementById('publisherInput').value.trim(),
       majorCategory: selectedMajorId,
       minorCategories: selectedMinorIds.slice(),
+      format: majorHasFormat(selectedMajorId) ? selectedFormat : null,
       status: currentStatus,
       startDate: startDateInput.value,
       endDate: endDateInput.disabled ? '' : endDateInput.value,
@@ -2656,6 +2776,13 @@
     if(!chip) return;
     const id = chip.dataset.minor;
     minorFilter = (minorFilter === id) ? null : id;
+    renderList();
+  });
+  document.getElementById('formatFilterTabs').addEventListener('click', e => {
+    const chip = e.target.closest('.filter-chip');
+    if(!chip) return;
+    const value = chip.dataset.format;
+    formatFilter = (formatFilter === value) ? null : value;
     renderList();
   });
   document.getElementById('searchInput').addEventListener('input', e => {
@@ -2799,6 +2926,11 @@
       wrap.innerHTML = '<div class="modal-empty">大分類がまだありません。<br>本の登録画面から新しい大分類を追加できます。</div>';
       return;
     }
+    const note = document.createElement('p');
+    note.className = 'field-note';
+    note.style.cssText = 'margin:0 2px 16px;';
+    note.textContent = '「判型あり」にすると、その大分類を選んだときに小分類のあとで「新書／単行本」を選べるようになります。';
+    wrap.appendChild(note);
     categories.forEach(major => {
       const block = document.createElement('div');
       block.style.cssText = 'margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--line);';
@@ -2809,12 +2941,18 @@
       block.innerHTML =
         '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">' +
           '<span style="font-weight:600;font-size:15px;color:var(--ink);flex:1;">' + escapeHTML(major.label) + '</span>' +
+          '<button class="memo-del" data-toggle-format="' + major.id + '" type="button"' +
+            (major.hasFormat ? ' style="color:var(--accent);"' : '') + '>' +
+            (major.hasFormat ? '判型あり' : '判型なし') + '</button>' +
           '<button class="memo-del" data-rename-major="' + major.id + '" type="button">名前変更</button>' +
           '<button class="memo-del" data-del-major="' + major.id + '" type="button" style="color:var(--danger);">削除</button>' +
         '</div>' +
         '<div class="chip-row">' + minorsHTML + '</div>' +
         (major.minors.length === 0 ? '<p class="field-note" style="margin:4px 0 0;">小分類はまだありません。</p>' : '');
       wrap.appendChild(block);
+    });
+    wrap.querySelectorAll('[data-toggle-format]').forEach(btn => {
+      btn.addEventListener('click', () => toggleMajorFormat(btn.dataset.toggleFormat));
     });
     wrap.querySelectorAll('[data-rename-major]').forEach(btn => {
       btn.addEventListener('click', () => renameMajor(btn.dataset.renameMajor));
@@ -2825,6 +2963,32 @@
     wrap.querySelectorAll('[data-del-minor]').forEach(btn => {
       btn.addEventListener('click', () => deleteMinor(btn.dataset.major, btn.dataset.delMinor));
     });
+  }
+  /* 判型を使わないようにするときは、その大分類の本から判型を外す。
+     付いたまま隠れていると、絞り込みの結果と見た目が食い違うため。 */
+  function toggleMajorFormat(id){
+    const major = findMajor(id);
+    if(!major) return;
+    if(major.hasFormat){
+      const affected = books.filter(b => b.majorCategory === id && b.format);
+      const msg = affected.length > 0
+        ? '「' + major.label + '」で判型（新書／単行本）を使わないようにしますか？\nこの大分類の本（' + affected.length + '冊）からは判型が外れます。'
+        : '「' + major.label + '」で判型（新書／単行本）を使わないようにしますか？';
+      if(!confirm(msg)) return;
+      major.hasFormat = false;
+      affected.forEach(b => { b.format = null; });
+      if(affected.length){
+        saveBooks();
+        affected.forEach(b => cloudSetBook(b));
+      }
+    } else {
+      major.hasFormat = true;
+    }
+    saveCategories();
+    cloudSaveSettings();
+    renderCategoryEditList();
+    renderMinorChips();
+    renderList();
   }
   function renameMajor(id){
     const major = findMajor(id);
@@ -2849,12 +3013,12 @@
       : '「' + major.label + '」を削除しますか？';
     if(!confirm(msg)) return;
     categories = categories.filter(c => c.id !== id);
-    affected.forEach(b => { b.majorCategory = null; b.minorCategories = []; });
+    affected.forEach(b => { b.majorCategory = null; b.minorCategories = []; b.format = null; });
     saveCategories();
     cloudSaveSettings();
     saveBooks();
     affected.forEach(b => cloudSetBook(b));
-    if(selectedMajorId === id){ selectedMajorId = null; selectedMinorIds = []; renderMajorChips(); renderMinorChips(); }
+    if(selectedMajorId === id){ selectedMajorId = null; selectedMinorIds = []; selectedFormat = null; renderMajorChips(); renderMinorChips(); }
     if(majorFilter === id){ majorFilter = null; minorFilter = null; }
     renderCategoryEditList();
     renderList();
