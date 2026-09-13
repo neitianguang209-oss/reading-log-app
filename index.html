@@ -633,6 +633,18 @@
   .modal-item .mi-info .t{ font-size:15px; font-weight:400; color:var(--ink); }
   .modal-item .mi-info .a{ font-size:13px; color:var(--ink-soft); margin-top:2px; }
   .modal-empty{ text-align:center; padding:40px 24px; color:var(--ink-soft); font-size:14px; line-height:1.9; }
+  .modal-item .mi-info .m{ font-size:12px; color:var(--ink-faint); margin-top:2px; }
+
+  /* 本の情報の自動入力（バーコード読み取り・タイトル検索） */
+  .lookup-scan-btn{ width:100%; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .lookup-scan-btn svg{ width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.8; }
+  .lookup-row{ display:flex; gap:8px; margin-top:10px; }
+  .lookup-row input{ flex:1; min-width:0; }
+  .lookup-row .btn-outline{ flex-shrink:0; }
+  .field-note.ok{ color:var(--accent-deep); }
+  .scan-body{ padding:0 var(--side) 28px; }
+  #scanReader{ width:100%; min-height:220px; border-radius:var(--radius-sm); overflow:hidden; background:#1A1C1E; }
+  #scanReader video{ width:100% !important; display:block; }
   .menu-action-btn{
     width:100%; border:none; background:var(--surface); box-shadow:var(--shadow);
     border-radius:var(--radius-sm); padding:14px 16px;
@@ -834,6 +846,22 @@
 
     <div class="form">
 
+      <!-- 本の情報の自動入力 -->
+      <div class="section">
+        <div class="section-label"><span class="txt">自動入力</span><span class="sub">表紙・著者・出版社・分類</span></div>
+        <button class="btn-outline lookup-scan-btn" id="scanBtn" type="button">
+          <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M7 8v8M10 8v8M13 8v8M17 8v8"/></svg>
+          バーコードを読み取る
+        </button>
+        <div class="lookup-row">
+          <input type="text" id="lookupInput" placeholder="タイトル または ISBN" enterkeyhint="search">
+          <button class="btn-outline" id="lookupBtn" type="button">検索</button>
+        </div>
+        <p class="field-note" id="lookupNote">本の裏のバーコード（978から始まる方）を映すか、タイトルで検索すると、表紙・著者・出版社・分類を自動で入れます。</p>
+      </div>
+
+      <hr class="divider">
+
       <!-- 表紙画像 -->
       <div class="section">
         <div class="section-label"><span class="txt">表紙画像</span></div>
@@ -1014,6 +1042,31 @@
         <input type="text" id="connSearchInput" placeholder="タイトル・著者で検索">
       </div>
       <div class="modal-list" id="connPickerList"></div>
+    </div>
+  </div>
+
+  <!-- 自動入力：バーコード読み取り -->
+  <div class="modal-overlay" id="scanOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">バーコードを読み取る</span>
+        <button class="modal-close" id="scanClose" type="button">×</button>
+      </div>
+      <div class="scan-body">
+        <div id="scanReader"></div>
+        <p class="field-note" id="scanNote"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 自動入力：タイトル検索の結果 -->
+  <div class="modal-overlay" id="lookupOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">本を選ぶ</span>
+        <button class="modal-close" id="lookupClose" type="button">×</button>
+      </div>
+      <div class="modal-list" id="lookupList"></div>
     </div>
   </div>
 
@@ -2756,6 +2809,7 @@
   function resetForm(){
     editingBookId = null;
     document.getElementById('formHeading').textContent = '本を登録';
+    resetLookupUI();
     document.getElementById('titleInput').value = '';
     document.getElementById('authorInput').value = '';
     document.getElementById('publisherInput').value = '';
@@ -2780,6 +2834,7 @@
   function loadFormFromBook(b){
     editingBookId = b.id;
     document.getElementById('formHeading').textContent = '本を編集';
+    resetLookupUI();
     document.getElementById('titleInput').value = b.title || '';
     document.getElementById('authorInput').value = b.author || '';
     document.getElementById('publisherInput').value = b.publisher || '';
@@ -3458,6 +3513,498 @@
       enterOfflineMode();
     });
   }
+  /* =========================================================
+     12. 本の情報の自動入力（バーコード読み取り／タイトル検索）
+     書誌は国立国会図書館サーチ(NDL)を主に使い、見つからなければ
+     openBD → Google Books で補う。どれもキー不要でブラウザから直接呼べる。
+     分類は NDC(日本十進分類) → Cコード の順に大分類・小分類を推定し、
+     判型はシリーズ名に「新書」があるかで決める。
+     入れるのはタイトル・著者・出版社と、未選択のときの分類・表紙だけ。
+     保存前にいつでも手で直せる。
+  ========================================================= */
+  const NDL_OPENSEARCH = 'https://ndlsearch.ndl.go.jp/api/opensearch';
+  const SCAN_LIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+  const XML_NS = {
+    dc: 'http://purl.org/dc/elements/1.1/',
+    dcndl: 'http://ndl.go.jp/dcndl/terms/',
+    xsi: 'http://www.w3.org/2001/XMLSchema-instance'
+  };
+  const LOOKUP_NOTE_DEFAULT = '本の裏のバーコード（978から始まる方）を映すか、タイトルで検索すると、表紙・著者・出版社・分類を自動で入れます。';
+  const lookupInput = document.getElementById('lookupInput');
+  const lookupNote = document.getElementById('lookupNote');
+  const lookupOverlay = document.getElementById('lookupOverlay');
+  const lookupList = document.getElementById('lookupList');
+  const scanOverlay = document.getElementById('scanOverlay');
+  const scanNote = document.getElementById('scanNote');
+  let lookupToken = 0;       // フォームを開き直したら、遅れて届いた結果を捨てるための番号
+  let lookupResults = [];
+  // 直前に自動で入れた表紙・分類。自分で変えていなければ、次の検索結果で入れ替えてよい
+  let autoFilled = { cover: null, category: null };
+
+  function resetLookupUI(){
+    lookupToken++;
+    autoFilled = { cover: null, category: null };
+    const note = document.getElementById('lookupNote');
+    note.textContent = LOOKUP_NOTE_DEFAULT;
+    note.classList.remove('ok');
+    document.getElementById('lookupInput').value = '';
+  }
+  function setLookupNote(text, ok){
+    lookupNote.textContent = text;
+    lookupNote.classList.toggle('ok', !!ok);
+  }
+
+  /* ---------- ISBN ---------- */
+  function isbn10to13(s){
+    const core = '978' + s.slice(0, 9);
+    let sum = 0;
+    for(let i = 0; i < 12; i++) sum += Number(core[i]) * (i % 2 ? 3 : 1);
+    return core + ((10 - sum % 10) % 10);
+  }
+  function normalizeIsbn(raw){
+    const s = String(raw || '').replace(/[^0-9Xx]/g, '').toUpperCase();
+    if(/^97[89]\d{10}$/.test(s)) return s;
+    if(/^\d{9}[\dX]$/.test(s)) return isbn10to13(s);
+    return null;
+  }
+
+  /* ---------- 文字の整形 ---------- */
+  function cleanTitle(t){
+    // 「嫌われる勇気 : 自己啓発の源流…」のような副題は外す
+    return String(t || '').split(/\s+:\s+/)[0].trim();
+  }
+  // NDLの「岸見, 一郎, 1956-」「フランクル, ヴィクトール・E」を表示用の名前にする
+  function cleanCreator(raw){
+    const parts = String(raw || '').split(/\s*,\s*/).filter(p => p && !/^\d{3,4}-?(\d{3,4})?$/.test(p));
+    if(parts.length < 2) return (parts[0] || '').replace(/[\s　]+/g, '');
+    const family = parts[0], given = parts[1];
+    if(/[一-鿿぀-ゟ]/.test(family + given)) return (family + given).replace(/[\s　]+/g, '');
+    if(/[゠-ヿ]/.test(family)) return given + '・' + family;
+    return given + ' ' + family;
+  }
+  function isEmptyValue(v){
+    return v == null || v === '' || (Array.isArray(v) && v.length === 0);
+  }
+  // a の空欄だけを b で埋める
+  function fillMissing(a, b){
+    if(!a) return Object.assign({}, b);
+    Object.keys(b).forEach(k => { if(isEmptyValue(a[k]) && !isEmptyValue(b[k])) a[k] = b[k]; });
+    return a;
+  }
+
+  /* ---------- 国立国会図書館サーチ ---------- */
+  async function fetchNdl(params){
+    const url = NDL_OPENSEARCH + '?' + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('NDL ' + res.status);
+    const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+    return Array.from(xml.getElementsByTagName('item')).map(parseNdlItem);
+  }
+  function parseNdlItem(item){
+    const all = (ns, tag) => Array.from(item.getElementsByTagNameNS(XML_NS[ns], tag));
+    const text = (ns, tag) => { const n = all(ns, tag)[0]; return n ? n.textContent.trim() : ''; };
+    const typed = (list, type) => {
+      const n = list.find(x => x.getAttributeNS(XML_NS.xsi, 'type') === type);
+      return n ? n.textContent.trim() : '';
+    };
+    const ids = all('dc', 'identifier');
+    const subjects = all('dc', 'subject');
+    const kinds = Array.from(item.getElementsByTagName('category')).map(c => c.textContent.trim());
+    const ndc = typed(subjects, 'dcndl:NDC10') || typed(subjects, 'dcndl:NDC9') || typed(subjects, 'dcndl:NDC8') || typed(subjects, 'dcndl:NDC');
+    return {
+      title: cleanTitle(text('dc', 'title')),
+      volume: text('dcndl', 'volume'),
+      authors: all('dc', 'creator').map(n => cleanCreator(n.textContent)).filter(Boolean),
+      publisher: text('dc', 'publisher'),
+      series: text('dcndl', 'seriesTitle'),
+      year: text('dc', 'date').slice(0, 4),
+      ndc: ndc.replace(/[^\d.]/g, ''),
+      isbn: normalizeIsbn(typed(ids, 'dcndl:ISBN13') || typed(ids, 'dcndl:ISBN')),
+      paper: kinds.includes('紙')
+    };
+  }
+  // 同じ本の複数レコード(紙の本・点字/音声版など)を1冊分にまとめる
+  function mergeNdlItems(items){
+    const paper = items.filter(i => i.paper);
+    const book = (paper.length ? paper : items).reduce((acc, it) => fillMissing(acc, it), null);
+    const shinsho = items.map(i => i.series).find(s => /新書/.test(s));
+    if(shinsho) book.series = shinsho;
+    return book;
+  }
+
+  /* ---------- openBD / Google Books ---------- */
+  async function fetchOpenBd(isbn){
+    const res = await fetch('https://api.openbd.jp/v1/get?isbn=' + isbn);
+    if(!res.ok) return null;
+    const data = await res.json();
+    const d = data && data[0];
+    if(!d || !d.summary) return null;
+    const detail = (d.onix && d.onix.DescriptiveDetail) || {};
+    const ccode = ((detail.Subject || []).find(x => x.SubjectSchemeIdentifier === '78') || {}).SubjectCode || '';
+    const authors = (detail.Contributor || []).map(c => cleanCreator(c.PersonName && c.PersonName.content)).filter(Boolean);
+    return {
+      title: cleanTitle(d.summary.title),
+      authors: authors,
+      publisher: d.summary.publisher || '',
+      series: d.summary.series || '',
+      year: String(d.summary.pubdate || '').slice(0, 4),
+      cover: d.summary.cover || '',
+      ccode: ccode,
+      isbn: isbn
+    };
+  }
+  async function fetchGoogleBooks(q){
+    const params = new URLSearchParams({ q: q, maxResults: '20', printType: 'books' });
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?' + params.toString());
+    if(!res.ok) return [];
+    const data = await res.json();
+    return (data.items || []).map(v => {
+      const info = v.volumeInfo || {};
+      const ids = info.industryIdentifiers || [];
+      const id = ids.find(x => x.type === 'ISBN_13') || ids.find(x => x.type === 'ISBN_10') || {};
+      const thumb = info.imageLinks && (info.imageLinks.thumbnail || info.imageLinks.smallThumbnail);
+      return {
+        title: info.title || '',
+        authors: info.authors || [],
+        publisher: info.publisher || '',
+        series: '',
+        year: String(info.publishedDate || '').slice(0, 4),
+        cover: thumb ? thumb.replace(/^http:/, 'https:').replace('&edge=curl', '') : '',
+        isbn: normalizeIsbn(id.identifier)
+      };
+    }).filter(b => b.title);
+  }
+
+  async function fetchBookByIsbn(isbn){
+    const sources = [
+      () => fetchNdl({ isbn: isbn, cnt: 20 }).then(items => items.length ? mergeNdlItems(items) : null),
+      () => fetchOpenBd(isbn),
+      () => fetchGoogleBooks('isbn:' + isbn).then(list => list[0] || null)
+    ];
+    let book = null;
+    for(const source of sources){
+      if(book && book.title && book.publisher) break;
+      try{
+        const found = await source();
+        if(found) book = fillMissing(book, found);
+      }catch(e){
+        console.warn('本の情報の取得に失敗しました', e);
+      }
+    }
+    if(book) book.isbn = isbn;
+    return book;
+  }
+
+  /* ---------- 分類の推定 ---------- */
+  function guessFromNdc(ndc){
+    const n = Math.floor(parseFloat(ndc));
+    if(isNaN(n)) return null;
+    const cls = Math.floor(n / 100), div = Math.floor(n / 10), form = n % 10;
+    if(cls === 9){
+      // 91x〜99x の3桁目：2戯曲 3小説 8作品集 → 小説、4評論・随筆 5日記・紀行 6記録 → エッセイ
+      if(n >= 910 && [2, 3, 8].includes(form)) return { major: '小説' };
+      if(n >= 910 && [4, 5, 6].includes(form)) return { major: 'エッセイ' };
+      return null;
+    }
+    if(n === 159) return { major: '自己啓発' };                      // 人生訓・教訓
+    if(n === 338) return { major: '実用書', minor: '投資' };          // 金融・投資
+    if(n === 335 || n === 336 || n === 366 || div === 67) return { major: 'ビジネス書' };  // 企業・経営・労働・商業
+    if(div === 59 || div === 79) return { major: '実用書' };          // 家政・諸芸
+    if(cls === 1) return { major: '教養', minor: div === 14 ? '心理学' : '哲学' };
+    if(cls === 2) return { major: '教養', minor: '歴史' };
+    if(cls === 3 || cls === 6) return { major: '教養', minor: '社会' };
+    if(cls === 4 || cls === 5) return { major: '教養', minor: '科学' };
+    if(cls === 7) return { major: '教養', minor: '芸術' };
+    if(cls === 8) return { major: '教養', minor: '言語学' };
+    if(cls === 0) return { major: '教養' };
+    return null;
+  }
+  // Cコード(4桁)の下2桁＝内容
+  function guessFromCcode(ccode){
+    const k = parseInt(String(ccode).replace(/\D/g, '').slice(2, 4), 10);
+    if(isNaN(k)) return null;
+    if(k === 93 || k === 97) return { major: '小説' };
+    if(k === 95 || k === 98) return { major: 'エッセイ' };
+    if(k === 33 || k === 34) return { major: 'ビジネス書' };
+    if(k === 76 || k === 77) return { major: '実用書' };
+    if(k === 11) return { major: '教養', minor: '心理学' };
+    if(k >= 10 && k <= 16) return { major: '教養', minor: '哲学' };
+    if(k >= 20 && k <= 25) return { major: '教養', minor: '歴史' };
+    if(k >= 30 && k <= 39) return { major: '教養', minor: '社会' };
+    if(k >= 40 && k <= 58) return { major: '教養', minor: '科学' };
+    if(k >= 70 && k <= 74) return { major: '教養', minor: '芸術' };
+    if(k >= 80 && k <= 87) return { major: '教養', minor: '言語学' };
+    return null;
+  }
+  function guessCategory(book){
+    return (book.ndc && guessFromNdc(book.ndc)) || (book.ccode && guessFromCcode(book.ccode)) || null;
+  }
+  function isShinshoBook(book){
+    const c = String(book.ccode || '').replace(/\D/g, '');
+    return /新書/.test(book.series || '') || (c.length === 4 && c[1] === '2');
+  }
+
+  /* ---------- 表紙 ---------- */
+  function imageLoads(url){
+    return new Promise(resolve => {
+      const img = new Image();
+      const timer = setTimeout(() => resolve(false), 8000);
+      img.onload = () => { clearTimeout(timer); resolve(img.naturalWidth > 20); };
+      img.onerror = () => { clearTimeout(timer); resolve(false); };
+      img.src = url;
+    });
+  }
+  function isbn13to10(isbn){
+    const core = isbn.slice(3, 12);
+    let sum = 0;
+    for(let i = 0; i < 9; i++) sum += Number(core[i]) * (10 - i);
+    const check = (11 - sum % 11) % 11;
+    return core + (check === 10 ? 'X' : check);
+  }
+  // 版元ドットコム → Amazon → 検索で得た画像 → 国会図書館 の順に、実際に表示できるものを使う
+  // （Amazonは画像が無いと1×1の透明画像を返すので、imageLoads の幅チェックで弾く）
+  async function findCoverUrl(book){
+    const candidates = [];
+    if(book.isbn){
+      candidates.push('https://img.hanmoto.com/bd/img/' + book.isbn + '.jpg');
+      if(book.isbn.startsWith('978')) candidates.push('https://m.media-amazon.com/images/P/' + isbn13to10(book.isbn) + '.09.LZZZZZZZ.jpg');
+    }
+    if(book.cover) candidates.push(book.cover);
+    if(book.isbn) candidates.push('https://ndlsearch.ndl.go.jp/thumbnail/' + book.isbn + '.jpg');
+    for(const url of candidates){
+      if(await imageLoads(url)) return url;
+    }
+    return null;
+  }
+  // 取り込めるなら端末内に画像として保存し、配信元が許可しない場合はURLのまま使う
+  function coverUrlToData(url){
+    return new Promise(resolve => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try{
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
+          canvas.getContext('2d').drawImage(img, 0, 0);
+          resizeImage(canvas.toDataURL('image/jpeg', COVER_QUALITY), COVER_MAX_SIZE, COVER_QUALITY).then(resolve);
+        }catch(e){
+          resolve(url);
+        }
+      };
+      img.onerror = () => resolve(url);
+      img.src = url;
+    });
+  }
+
+  /* ---------- フォームへの反映 ---------- */
+  async function applyLookedUpBook(book, token){
+    if(token !== lookupToken) return;
+    const setIfFound = (id, value) => { if(value) document.getElementById(id).value = value; };
+    setIfFound('titleInput', book.title);
+    setIfFound('authorInput', (book.authors || []).join('、'));
+    setIfFound('publisherInput', book.publisher);
+    autoResizeTitle();
+
+    const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat].join('|');
+    const categoryReplaceable = !selectedMajorId || categoryKey() === autoFilled.category;
+    let catText = '';
+    if(categoryReplaceable){
+      const guess = guessCategory(book);
+      const major = guess ? categories.find(c => c.label === guess.major) : null;
+      const minor = major && guess.minor ? major.minors.find(m => m.label === guess.minor) : null;
+      selectedMajorId = major ? major.id : null;
+      selectedMinorIds = minor ? [minor.id] : [];
+      selectedFormat = major && major.hasFormat ? (isShinshoBook(book) ? 'shinsho' : 'tankobon') : null;
+      renderMajorChips();
+      renderMinorChips();
+      autoFilled.category = major ? categoryKey() : null;
+      if(major) catText = [major.label, minor && minor.label, major.hasFormat && formatLabel(selectedFormat)].filter(Boolean).join('／');
+    }
+    const catMsg = catText ? '分類：' + catText : (selectedMajorId ? '' : '分類は選んでください');
+    const baseMsg = '「' + book.title + '」の情報を入れました。' + (catMsg ? catMsg + '。' : '');
+
+    // 前の検索で自動で入れた表紙は、今回の本の表紙に入れ替える
+    if(coverImg && autoFilled.cover && coverImg.src === autoFilled.cover) clearCoverImage();
+    autoFilled.cover = null;
+    if(coverImg){ setLookupNote(baseMsg, true); return; }
+    setLookupNote(baseMsg + '表紙を探しています…', true);
+    const url = await findCoverUrl(book);
+    if(token !== lookupToken) return;
+    if(url && !coverImg){
+      const cover = await coverUrlToData(url);
+      if(token !== lookupToken || coverImg) return;
+      setCoverImage(cover);
+      autoFilled.cover = coverImg.src;
+      setLookupNote(baseMsg, true);
+    } else if(!coverImg){
+      setLookupNote(baseMsg + '表紙画像は見つからなかったので、必要なら写真を選んでください。', true);
+    }
+  }
+  async function lookupByIsbn(isbn, fallbackBook){
+    const token = lookupToken;
+    setLookupNote('ISBN ' + isbn + ' の本を探しています…');
+    let book = null;
+    try{ book = await fetchBookByIsbn(isbn); }catch(e){ console.warn(e); }
+    if(token !== lookupToken) return;
+    if(!book && fallbackBook) book = fallbackBook;
+    if(!book || !book.title){
+      setLookupNote('この本の情報が見つかりませんでした（ISBN ' + isbn + '）。タイトルで検索するか、手入力してください。');
+      return;
+    }
+    applyLookedUpBook(book, token);
+  }
+
+  /* ---------- タイトル検索 ---------- */
+  function rankTitleResults(books, query){
+    const q = normalize(query.replace(/[\s　]+/g, ''));
+    const score = b => {
+      const t = normalize(b.title.replace(/[\s　]+/g, ''));
+      const match = t === q ? 0 : t.startsWith(q) ? 1 : t.includes(q) ? 2 : 3;
+      // 翻訳版（英語・その他の言語）より日本の出版社の本を先に出す
+      const foreign = /[ぁ-んァ-ヶ一-龠]/.test(b.publisher + b.title) ? 0 : 4;
+      return match + foreign;
+    };
+    return books
+      .filter(b => b.title)
+      .sort((a, b) => score(a) - score(b) || (b.isbn ? 1 : 0) - (a.isbn ? 1 : 0) || String(b.year).localeCompare(String(a.year)))
+      .slice(0, 20);
+  }
+  async function searchByTitle(query){
+    const token = lookupToken;
+    lookupResults = [];
+    lookupList.innerHTML = '<div class="modal-empty">検索しています…</div>';
+    lookupOverlay.classList.add('show');
+    let books = [];
+    try{
+      const items = await fetchNdl({ title: query, cnt: 60, mediatype: 'books' });
+      const groups = new Map();
+      items.forEach(it => {
+        if(!it.isbn && !it.paper) return;   // 点字・音声版だけのレコードは候補に出さない
+        const key = it.isbn || (it.title + '|' + it.publisher + '|' + it.year);
+        if(!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(it);
+      });
+      books = Array.from(groups.values()).map(mergeNdlItems);
+    }catch(e){
+      console.warn('NDLの検索に失敗しました', e);
+    }
+    if(!books.length){
+      try{ books = await fetchGoogleBooks('intitle:' + query); }catch(e){ console.warn(e); }
+    }
+    if(token !== lookupToken || !lookupOverlay.classList.contains('show')) return;
+    lookupResults = rankTitleResults(books, query);
+    if(!lookupResults.length){
+      lookupList.innerHTML = '<div class="modal-empty">「' + escapeHTML(query) + '」に当てはまる本が見つかりませんでした。<br>言葉を短くするか、ISBNで探してみてください。</div>';
+      return;
+    }
+    lookupList.innerHTML = lookupResults.map((b, i) =>
+      '<div class="modal-item" data-idx="' + i + '"><div class="mi-info">' +
+        '<div class="t">' + escapeHTML(b.title + (b.volume ? ' ' + b.volume : '')) + '</div>' +
+        '<div class="a">' + escapeHTML([(b.authors || []).join('、'), b.publisher].filter(Boolean).join(' ／ ')) + '</div>' +
+        '<div class="m">' + escapeHTML([b.series, b.year].filter(Boolean).join('・')) + '</div>' +
+      '</div></div>'
+    ).join('');
+  }
+  lookupList.addEventListener('click', e => {
+    const el = e.target.closest('.modal-item');
+    if(!el) return;
+    const book = lookupResults[Number(el.dataset.idx)];
+    closeLookupPicker();
+    if(!book) return;
+    if(book.isbn){ lookupByIsbn(book.isbn, book); } else { applyLookedUpBook(book, lookupToken); }
+  });
+  function closeLookupPicker(){ lookupOverlay.classList.remove('show'); }
+  document.getElementById('lookupClose').addEventListener('click', closeLookupPicker);
+  lookupOverlay.addEventListener('click', e => { if(e.target === lookupOverlay) closeLookupPicker(); });
+
+  function runLookup(){
+    const q = lookupInput.value.trim();
+    if(!q){ setLookupNote('タイトルかISBNを入力してください。'); lookupInput.focus(); return; }
+    lookupInput.blur();
+    const digits = q.replace(/[-\s]/g, '');
+    const isbn = /^[\dXx]{10,13}$/.test(digits) ? normalizeIsbn(digits) : null;
+    if(isbn){ lookupByIsbn(isbn); } else { searchByTitle(q); }
+  }
+  document.getElementById('lookupBtn').addEventListener('click', runLookup);
+  lookupInput.addEventListener('keydown', e => {
+    if(e.key !== 'Enter' || e.isComposing) return;
+    e.preventDefault();
+    runLookup();
+  });
+
+  /* ---------- バーコード読み取り ----------
+     iPhoneのSafariには標準のバーコード読み取り機能が無いので、
+     html5-qrcode を初めて使うときだけ読み込む。 */
+  let scanLibPromise = null;
+  let scanner = null;
+  let scanHandled = false;
+  function loadScanLib(){
+    if(window.Html5Qrcode) return Promise.resolve();
+    if(!scanLibPromise){
+      scanLibPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = SCAN_LIB_URL;
+        s.onload = resolve;
+        s.onerror = () => { scanLibPromise = null; reject(new Error('html5-qrcode の読み込みに失敗')); };
+        document.head.appendChild(s);
+      });
+    }
+    return scanLibPromise;
+  }
+  async function openScanner(){
+    scanHandled = false;
+    scanNote.textContent = 'カメラを起動しています…';
+    scanOverlay.classList.add('show');
+    try{
+      await loadScanLib();
+    }catch(e){
+      scanNote.textContent = '読み取り機能を読み込めませんでした。通信状況を確認するか、タイトル検索を使ってください。';
+      return;
+    }
+    if(!scanOverlay.classList.contains('show')) return;
+    try{
+      scanner = new Html5Qrcode('scanReader', { formatsToSupport: [Html5QrcodeSupportedFormats.EAN_13], verbose: false });
+      await scanner.start(
+        { facingMode: 'environment' },
+        { fps: 10, qrbox: (w, h) => ({ width: Math.floor(w * 0.85), height: Math.max(60, Math.floor(Math.min(w, h) * 0.4)) }) },
+        onScanSuccess,
+        () => {}
+      );
+      scanNote.textContent = '本の裏の「978」から始まるバーコードを枠に合わせてください。';
+    }catch(e){
+      console.warn('カメラを起動できませんでした', e);
+      scanNote.textContent = 'カメラを使えませんでした。カメラの利用を許可するか、タイトル検索を使ってください。';
+    }
+  }
+  function onScanSuccess(text){
+    if(scanHandled) return;
+    const isbn = /^97[89]/.test(text) ? normalizeIsbn(text) : null;
+    if(!isbn){
+      // 日本の本は下段に価格用のバーコード(192…)もあるので、上段を映してもらう
+      scanNote.textContent = '上の段のバーコード（978から始まる方）を映してください。';
+      return;
+    }
+    scanHandled = true;
+    closeScanner();
+    lookupInput.value = isbn;
+    lookupByIsbn(isbn);
+  }
+  async function closeScanner(){
+    scanOverlay.classList.remove('show');
+    const s = scanner;
+    scanner = null;
+    if(!s) return;
+    try{
+      if(s.isScanning) await s.stop();
+      s.clear();
+    }catch(e){
+      console.warn('カメラの停止に失敗しました', e);
+    }
+  }
+  document.getElementById('scanBtn').addEventListener('click', openScanner);
+  document.getElementById('scanClose').addEventListener('click', closeScanner);
+  scanOverlay.addEventListener('click', e => { if(e.target === scanOverlay) closeScanner(); });
+
   bootApp();
 </script>
 
