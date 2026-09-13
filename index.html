@@ -359,6 +359,11 @@
   .impression-entry{ margin-bottom:12px; }
   .impression-entry:last-of-type{ margin-bottom:0; }
   .impression-entry-label{ font-size:13px; font-weight:600; color:var(--accent-deep); margin-bottom:3px; }
+  .character-entry{ padding:12px 0; border-top:1px solid var(--line); }
+  .ic-label + .character-entry{ border-top:none; padding-top:0; }
+  .character-entry:last-of-type{ padding-bottom:0; }
+  .character-entry-name{ font-size:16px; font-weight:600; color:var(--ink); margin-bottom:4px; }
+  .character-entry-sub{ font-size:12px; color:var(--ink-faint); margin-top:6px; }
 
   /* =====================================================
      フォーム
@@ -972,6 +977,12 @@
         <div class="memo-list" id="impressionList"></div>
         <button class="add-memo-btn" onclick="addImpression()" type="button">＋ 感想を追加</button>
 
+        <div id="characterField" style="display:none;">
+          <label class="field-label">印象に残った人物<span class="opt">何人でも追加できます</span></label>
+          <div class="memo-list" id="characterList"></div>
+          <button class="add-memo-btn" onclick="addCharacter()" type="button">＋ 人物を追加</button>
+        </div>
+
         <label class="field-label">評価</label>
         <div class="rating-row">
           <div class="stars" id="stars"></div>
@@ -1176,7 +1187,7 @@
   }
   function defaultCategories(){
     return [
-      { id:'novel', label:'小説', minors:[
+      { id:'novel', label:'小説', hasCharacters:true, minors:[
         { id:'novel-mystery', label:'ミステリー' },
         { id:'novel-romance', label:'恋愛' },
         { id:'novel-family', label:'家族' },
@@ -1192,12 +1203,11 @@
         { id:'liberal-science', label:'科学' },
         { id:'liberal-art', label:'芸術' }
       ]},
+      { id:'business', label:'ビジネス書', hasFormat:true, minors:[] },
       { id:'practical', label:'実用書', hasFormat:true, minors:[
-        { id:'practical-business', label:'ビジネス' },
-        { id:'practical-selfhelp', label:'自己啓発' },
         { id:'practical-invest', label:'投資' }
       ]},
-      { id:'shinsho', label:'新書', minors:[] }
+      { id:'selfhelp', label:'自己啓発', hasFormat:true, minors:[] }
     ];
   }
   function loadCategories(){
@@ -1250,6 +1260,11 @@
   function majorHasFormat(majorId){
     const major = majorId ? findMajor(majorId) : null;
     return !!(major && major.hasFormat);
+  }
+  // 「印象に残った人物」を書く欄を出す大分類か（既定は小説）
+  function majorHasCharacters(majorId){
+    const major = majorId ? findMajor(majorId) : null;
+    return !!(major && major.hasCharacters);
   }
 
   // 表紙画像が無いときのモノグラム背景（アクセントと同系のブルーグレー）
@@ -1324,8 +1339,12 @@
       majorCategory: raw.majorCategory || null,
       minorCategories: Array.isArray(raw.minorCategories) ? raw.minorCategories.slice() : [],
       format: (raw.format === 'shinsho' || raw.format === 'tankobon') ? raw.format : null,
+      characters: (Array.isArray(raw.characters) ? raw.characters : []).map(c => ({
+        name: (c && c.name) || '', profile: (c && c.profile) || '', reason: (c && c.reason) || ''
+      })),
       createdAt: raw.createdAt || null
     };
+    if(applyCategoryMoves(b)) changed = true;
     if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
     if((raw.author || '') !== b.author){ changed = true; }   // 空白を詰めた分はクラウドにも反映する
     if(!b.majorCategory && Array.isArray(raw.tags) && raw.tags.length){
@@ -1354,32 +1373,100 @@
     return { books: migrated, changedBooks: changedBooks };
   }
 
-  /* 既に使っている端末には「教養」と判型の枝が無いので、一度だけ足す。
-     実行したらバージョンを記録し、あとからユーザーが教養を消したり判型を
-     OFFにしたりしても、起動のたびに復活しないようにする。
-     既存の大分類「新書」「エッセイ」やそこに入っている本には触らない。 */
+  /* ---------- 分類の移行 ----------
+     v2：「教養」と判型（新書／単行本）の枝を足した。
+     v3：大分類を 小説／エッセイ／教養／ビジネス書／実用書／自己啓発 に
+         組み替えた。
+       ・実用書の小分類だった「ビジネス」「自己啓発」は大分類に格上げし、
+         そこに入っていた本もそれぞれの大分類へ移す。
+       ・大分類「新書」は廃止。入っていた本は「教養」＋判型「新書」に移す
+         （新書は教養系が多いため。違う本は編集で付け替えられる）。
+     本の移し替えは「どの大分類（＋小分類）の本をどこへ移すか」という
+     対応表（categoryMoves）として端末に残し、クラウドから届いた本にも
+     同じ対応表を当てる。別の端末がまだ古い分類のまま書き込んだ本も、
+     届いた時点で正しく移る。
+     移行は一度だけ走り、あとからユーザーが消した分類は復活しない。 */
   const CAT_SCHEMA_KEY = 'reading-log-cat-schema';
-  const CAT_SCHEMA_VERSION = 2;
+  const CAT_SCHEMA_VERSION = 3;
+  const CAT_MOVES_STORAGE_KEY = 'reading-log-cat-moves';
+  function loadCategoryMoves(){
+    try{
+      const saved = JSON.parse(localStorage.getItem(CAT_MOVES_STORAGE_KEY) || '[]');
+      return Array.isArray(saved) ? saved : [];
+    }catch(e){ return []; }
+  }
+  function saveCategoryMoves(){
+    try{ localStorage.setItem(CAT_MOVES_STORAGE_KEY, JSON.stringify(categoryMoves)); }catch(e){ console.warn('分類の移行情報の保存に失敗しました', e); }
+  }
+  function applyCategoryMoves(b){
+    for(const mv of categoryMoves){
+      if(b.majorCategory !== mv.major) continue;
+      if(mv.minor && !(b.minorCategories || []).includes(mv.minor)) continue;
+      b.majorCategory = mv.to;
+      if(mv.minor){
+        // 移動先に無い小分類（実用書の「投資」など）は外れる
+        b.minorCategories = (b.minorCategories || []).filter(id => !!findMinor(mv.to, id));
+      }
+      if(mv.format && !b.format) b.format = mv.format;
+      return true;
+    }
+    return false;
+  }
   function migrateCategories(){
     let version = 0;
     try{ version = parseInt(localStorage.getItem(CAT_SCHEMA_KEY) || '0', 10) || 0; }catch(e){}
     if(version >= CAT_SCHEMA_VERSION) return false;
-    let changed = false;
     const isLabel = (c, label) => normalize(c.label) === normalize(label);
-    if(!categories.some(c => isLabel(c, '教養'))){
-      const liberal = defaultCategories().find(c => c.id === 'liberal');
-      const at = categories.findIndex(c => isLabel(c, '実用書'));
-      if(at >= 0){ categories.splice(at, 0, liberal); } else { categories.push(liberal); }
-      changed = true;
-    }
-    categories.forEach(c => {
-      if((isLabel(c, '教養') || isLabel(c, '実用書')) && !c.hasFormat){ c.hasFormat = true; changed = true; }
+    const byLabel = label => categories.find(c => isLabel(c, label)) || null;
+    const defs = defaultCategories();
+    const idTaken = id => categories.some(c => c.id === id);
+
+    // 足りない大分類を足す（既定のidが使われていれば新しいidを振る）
+    defs.forEach(d => {
+      if(byLabel(d.label)) return;
+      const major = JSON.parse(JSON.stringify(d));
+      if(idTaken(major.id)) major.id = genCatId('c');
+      categories.push(major);
     });
+    if(version < 2){
+      ['教養', '実用書'].forEach(l => { const m = byLabel(l); if(m) m.hasFormat = true; });
+    }
+    const novel = byLabel('小説');
+    if(novel && novel.hasCharacters === undefined) novel.hasCharacters = true;
+
+    const liberal = byLabel('教養');
+    const practical = byLabel('実用書');
+    const promote = [['ビジネス', 'ビジネス書'], ['ビジネス書', 'ビジネス書'], ['自己啓発', '自己啓発']];
+    if(practical){
+      practical.minors = practical.minors.filter(minor => {
+        const hit = promote.find(p => isLabel(minor, p[0]));
+        const target = hit ? byLabel(hit[1]) : null;
+        if(!target) return true;
+        categoryMoves.push({ major: practical.id, minor: minor.id, to: target.id });
+        return false;
+      });
+    }
+    const shinsho = byLabel('新書');
+    if(shinsho && liberal){
+      shinsho.minors.forEach(minor => {
+        if(!liberal.minors.some(m => isLabel(m, minor.label) || m.id === minor.id)) liberal.minors.push(minor);
+      });
+      categoryMoves.push({ major: shinsho.id, minor: null, to: liberal.id, format: 'shinsho' });
+      categories = categories.filter(c => c !== shinsho);
+    }
+
+    // 並び順を揃える（ユーザーが足した大分類はその後ろに元の順で並ぶ）
+    const order = defs.map(d => d.label);
+    const rank = c => { const i = order.findIndex(l => isLabel(c, l)); return i < 0 ? order.length : i; };
+    categories = categories.map((c, i) => [c, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(p => p[0]);
+
+    saveCategoryMoves();
     try{ localStorage.setItem(CAT_SCHEMA_KEY, String(CAT_SCHEMA_VERSION)); }catch(e){}
-    return changed;
+    return true;
   }
 
   let categories = loadCategories();
+  let categoryMoves = loadCategoryMoves();
   if(migrateCategories()) saveCategories();
   const _bootMigration = migrateBooks(loadBooksRaw());
   let books = _bootMigration.books;
@@ -2037,6 +2124,17 @@
       }
       html += '</div>';
     }
+    if(b.characters && b.characters.length){
+      html += '<div class="info-card"><div class="ic-label">印象に残った人物</div>';
+      b.characters.forEach(c => {
+        html += '<div class="character-entry">' +
+          '<div class="character-entry-name">' + escapeHTML(c.name || '（名前未記入）') + '</div>' +
+          (c.profile ? '<div class="character-entry-sub">どんな人物か</div><div class="ic-text">' + escapeHTML(c.profile).replace(/\n/g, '<br>') + '</div>' : '') +
+          (c.reason ? '<div class="character-entry-sub">印象に残った理由</div><div class="ic-text">' + escapeHTML(c.reason).replace(/\n/g, '<br>') + '</div>' : '') +
+          '</div>';
+      });
+      html += '</div>';
+    }
     if(!html){
       html = '<div class="empty-state">まだ詳しい記録がありません。<br>編集してメモを追加しましょう。</div>';
     }
@@ -2218,6 +2316,7 @@
       input.disabled = true;
       note.textContent = '先に大分類を選択すると、その中の小分類を追加・選択できます。';
       renderFormatChips();
+      updateCharacterFieldVisibility();
       return;
     }
     input.disabled = false;
@@ -2234,6 +2333,7 @@
       row.appendChild(chip);
     });
     renderFormatChips();
+    updateCharacterFieldVisibility();
   }
   /* 判型は「新書の棚」を作るための一番下の枝。判型を使う大分類
      （既定では教養・実用書）を選んだときだけ現れる。任意なので、
@@ -2459,6 +2559,57 @@
     })).filter(imp => imp.text || imp.date);
   }
 
+  /* ---------- 印象に残った人物（小説など） ----------
+     名前・どんな人物か（性格や言動）・印象に残った理由を書き溜める。
+     人物欄を使う大分類（既定は小説）を選んだときに現れる。すでに人物が
+     書いてある本は、大分類を変えても消えないよう欄を出したままにする。 */
+  function updateCharacterFieldVisibility(){
+    const hasCards = document.querySelectorAll('#characterList .character-card').length > 0;
+    document.getElementById('characterField').style.display =
+      (majorHasCharacters(selectedMajorId) || hasCards) ? '' : 'none';
+  }
+  function buildFormCharacterCard(character){
+    const card = document.createElement('div');
+    card.className = 'memo-card character-card';
+    card.innerHTML =
+      '<div class="memo-top">' +
+        '<span class="impression-index-label"></span>' +
+        '<button class="memo-del" type="button">削除</button>' +
+      '</div>' +
+      '<label class="field-label first">名前</label>' +
+      '<input type="text" class="character-name" placeholder="例：唐沢雪穂" value="' + escapeHTML(character && character.name || '') + '">' +
+      '<label class="field-label">どんな人物か<span class="opt">性格・言動など</span></label>' +
+      '<textarea class="character-profile" placeholder="例：誰にでも完璧に振る舞うが、本心を決して見せない">' + escapeHTML(character && character.profile || '') + '</textarea>' +
+      '<label class="field-label">印象に残った理由</label>' +
+      '<textarea class="character-reason" placeholder="例：最後まで一度も心の内が語られないのに、行動だけで人物像が浮かんでくるから">' + escapeHTML(character && character.reason || '') + '</textarea>';
+    card.querySelector('.memo-del').addEventListener('click', () => {
+      card.remove();
+      renumberCharacters();
+      updateCharacterFieldVisibility();
+    });
+    const titleOf = () => (card.querySelector('.character-name').value.trim() || '人物');
+    makeFieldOpenFullscreen(card.querySelector('.character-profile'), () => titleOf() + '：どんな人物か');
+    makeFieldOpenFullscreen(card.querySelector('.character-reason'), () => titleOf() + '：印象に残った理由');
+    return card;
+  }
+  function renumberCharacters(){
+    document.querySelectorAll('#characterList .character-card').forEach((card, i) => {
+      card.querySelector('.impression-index-label').textContent = '人物 ' + (i + 1);
+    });
+  }
+  function addCharacter(character){
+    document.getElementById('characterList').appendChild(buildFormCharacterCard(character));
+    renumberCharacters();
+    updateCharacterFieldVisibility();
+  }
+  function gatherCharacters(){
+    return Array.from(document.querySelectorAll('#characterList .character-card')).map(card => ({
+      name: card.querySelector('.character-name').value.trim(),
+      profile: card.querySelector('.character-profile').value.trim(),
+      reason: card.querySelector('.character-reason').value.trim()
+    })).filter(c => c.name || c.profile || c.reason);
+  }
+
   /* =========================================================
      8. 本のつながり(フォーム)
   ========================================================= */
@@ -2610,6 +2761,7 @@
     selectedMajorId = null;
     selectedMinorIds = [];
     selectedFormat = null;
+    document.getElementById('characterList').innerHTML = '';
     renderMajorChips();
     renderMinorChips();
     clearCoverImage();
@@ -2633,6 +2785,8 @@
     selectedMajorId = b.majorCategory || null;
     selectedMinorIds = Array.isArray(b.minorCategories) ? b.minorCategories.slice() : [];
     selectedFormat = b.format || null;
+    document.getElementById('characterList').innerHTML = '';
+    (b.characters || []).forEach(c => addCharacter(c));
     renderMajorChips();
     renderMinorChips();
     if(b.cover){ setCoverImage(b.cover); } else { clearCoverImage(); }
@@ -2673,6 +2827,7 @@
       connection: currentConnection ? { id: currentConnection.id || null, title: currentConnection.title, author: currentConnection.author, cover: currentConnection.cover || null } : null,
       memos: gatherMemos(),
       impressions: gatherImpressions(),
+      characters: gatherCharacters(),
       rating: rating,
       nextAction: document.getElementById('nextActionInput').value.trim(),
       cover: coverImg ? coverImg.src : null
@@ -2929,7 +3084,7 @@
     const note = document.createElement('p');
     note.className = 'field-note';
     note.style.cssText = 'margin:0 2px 16px;';
-    note.textContent = '「判型あり」にすると、その大分類を選んだときに小分類のあとで「新書／単行本」を選べるようになります。';
+    note.textContent = '「判型あり」にすると小分類のあとで「新書／単行本」を、「人物メモあり」にすると感想の下に「印象に残った人物」を書けるようになります。';
     wrap.appendChild(note);
     categories.forEach(major => {
       const block = document.createElement('div');
@@ -2939,13 +3094,18 @@
           '<button data-del-minor="' + m.id + '" data-major="' + major.id + '" aria-label="削除">×</button></span>'
       ).join('');
       block.innerHTML =
-        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">' +
+        '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">' +
           '<span style="font-weight:600;font-size:15px;color:var(--ink);flex:1;">' + escapeHTML(major.label) + '</span>' +
-          '<button class="memo-del" data-toggle-format="' + major.id + '" type="button"' +
-            (major.hasFormat ? ' style="color:var(--accent);"' : '') + '>' +
-            (major.hasFormat ? '判型あり' : '判型なし') + '</button>' +
           '<button class="memo-del" data-rename-major="' + major.id + '" type="button">名前変更</button>' +
           '<button class="memo-del" data-del-major="' + major.id + '" type="button" style="color:var(--danger);">削除</button>' +
+        '</div>' +
+        '<div style="display:flex;gap:14px;margin-bottom:10px;">' +
+          '<button class="memo-del" data-toggle-format="' + major.id + '" type="button" style="margin-left:0;' +
+            (major.hasFormat ? 'color:var(--accent);' : '') + '">' +
+            (major.hasFormat ? '判型あり' : '判型なし') + '</button>' +
+          '<button class="memo-del" data-toggle-characters="' + major.id + '" type="button" style="margin-left:0;' +
+            (major.hasCharacters ? 'color:var(--accent);' : '') + '">' +
+            (major.hasCharacters ? '人物メモあり' : '人物メモなし') + '</button>' +
         '</div>' +
         '<div class="chip-row">' + minorsHTML + '</div>' +
         (major.minors.length === 0 ? '<p class="field-note" style="margin:4px 0 0;">小分類はまだありません。</p>' : '');
@@ -2953,6 +3113,9 @@
     });
     wrap.querySelectorAll('[data-toggle-format]').forEach(btn => {
       btn.addEventListener('click', () => toggleMajorFormat(btn.dataset.toggleFormat));
+    });
+    wrap.querySelectorAll('[data-toggle-characters]').forEach(btn => {
+      btn.addEventListener('click', () => toggleMajorCharacters(btn.dataset.toggleCharacters));
     });
     wrap.querySelectorAll('[data-rename-major]').forEach(btn => {
       btn.addEventListener('click', () => renameMajor(btn.dataset.renameMajor));
@@ -2989,6 +3152,17 @@
     renderCategoryEditList();
     renderMinorChips();
     renderList();
+  }
+  /* 人物メモは書いた内容が消えると取り戻せないので、OFFにしても本の
+     記録は残す（欄が新しく出なくなるだけで、書いてある本には表示される）。 */
+  function toggleMajorCharacters(id){
+    const major = findMajor(id);
+    if(!major) return;
+    major.hasCharacters = !major.hasCharacters;
+    saveCategories();
+    cloudSaveSettings();
+    renderCategoryEditList();
+    renderMinorChips();
   }
   function renameMajor(id){
     const major = findMajor(id);
