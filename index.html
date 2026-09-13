@@ -1623,9 +1623,10 @@
     });
     document.getElementById('minorFilterRow').classList.toggle('show', !!majorFilter && usedMinors.length > 0);
 
-    /* 判型は一番下の枝だが、大分類を選んでいなくても「新書だけ」を
-       まとめて見られるよう、判型が付いた本があれば常に出す。 */
+    /* 判型は一番下の枝。最初の画面では出さず、読了／読書中 → 大分類と
+       選んで、その中に判型が付いた本があるときだけ出す。 */
     const formatBase = booksInMinor();
+    if(!majorFilter) formatFilter = null;
     if(formatFilter && !formatBase.some(b => b.format === formatFilter)) formatFilter = null;
     const usedFormats = FORMATS.filter(f => formatBase.some(b => b.format === f[0]));
     const formatTabsEl = document.getElementById('formatFilterTabs');
@@ -1637,7 +1638,7 @@
       chip.textContent = chipLabel(f[1], formatBase.filter(b => b.format === f[0]).length);
       formatTabsEl.appendChild(chip);
     });
-    document.getElementById('formatFilterRow').classList.toggle('show', usedFormats.length > 0);
+    document.getElementById('formatFilterRow').classList.toggle('show', !!majorFilter && usedFormats.length > 0);
   }
   /* 並び替えの基準日は読了日。読了日が無い本（読書中）は読み始めた日、
      どちらも無ければ登録した日時で比べる。 */
