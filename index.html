@@ -3582,6 +3582,11 @@
     if(/[゠-ヿ]/.test(family)) return given + '・' + family;
     return given + ' ' + family;
   }
+  // 「サンクチュアリ出版」→「サンクチュアリ」、「講談社出版」→「講談社」のように短くする
+  function cleanPublisher(p){
+    const s = String(p || '').replace(/株式会社|有限会社|（株）|\(株\)/g, '').trim();
+    return s.replace(/[\s　]*出版(社|部|局)?$/, '') || s;
+  }
   function isEmptyValue(v){
     return v == null || v === '' || (Array.isArray(v) && v.length === 0);
   }
@@ -3702,18 +3707,50 @@
     const cls = Math.floor(n / 100), div = Math.floor(n / 10), form = n % 10;
     if(cls === 9){
       // 91x〜99x の3桁目：2戯曲 3小説 8作品集 → 小説、4評論・随筆 5日記・紀行 6記録 → エッセイ
-      if(n >= 910 && [2, 3, 8].includes(form)) return { major: '小説' };
-      if(n >= 910 && [4, 5, 6].includes(form)) return { major: 'エッセイ' };
+      // 2桁目が1(日本)以外は海外の作品
+      const overseas = n >= 920 ? '海外文学' : undefined;
+      if(n >= 910 && [2, 3, 8].includes(form)) return { major: '小説', minor: overseas };
+      if(n >= 910 && [4, 5, 6].includes(form)) return { major: 'エッセイ', minor: overseas };
       return null;
     }
-    if(n === 159) return { major: '自己啓発' };                      // 人生訓・教訓
-    if(n === 338) return { major: '実用書', minor: '投資' };          // 金融・投資
-    if(n === 335 || n === 336 || n === 366 || div === 67) return { major: 'ビジネス書' };  // 企業・経営・労働・商業
-    if(div === 59 || div === 79) return { major: '実用書' };          // 家政・諸芸
-    if(cls === 1) return { major: '教養', minor: div === 14 ? '心理学' : '哲学' };
-    if(cls === 2) return { major: '教養', minor: '歴史' };
-    if(cls === 3 || cls === 6) return { major: '教養', minor: '社会' };
-    if(cls === 4 || cls === 5) return { major: '教養', minor: '科学' };
+    // 小分類は、今の一覧に無ければ自動で追加される
+    if(n === 159) return { major: '自己啓発' };                              // 人生訓・教訓
+    if(n === 338) return { major: '実用書', minor: '投資' };                  // 金融・投資
+    if(n === 335 || n === 336) return { major: 'ビジネス書', minor: '経営' };
+    if(n === 366) return { major: 'ビジネス書', minor: 'キャリア' };          // 労働・職業
+    if(n === 675) return { major: 'ビジネス書', minor: 'マーケティング' };
+    if(div === 67) return { major: 'ビジネス書' };                           // 商業
+    if(n === 596) return { major: '実用書', minor: '料理' };
+    if(n === 599) return { major: '実用書', minor: '子育て' };
+    if(n === 498) return { major: '実用書', minor: '健康' };
+    if(div === 59) return { major: '実用書', minor: '暮らし' };               // 家政
+    if(div === 79) return { major: '実用書', minor: '趣味' };                 // 諸芸・娯楽
+    if(div === 78) return { major: '実用書', minor: 'スポーツ' };
+    if(n >= 7 && n <= 8) return { major: '教養', minor: 'IT' };              // 情報科学
+    if(cls === 1){
+      if(div === 14) return { major: '教養', minor: '心理学' };
+      if(div >= 16) return { major: '教養', minor: '宗教' };
+      return { major: '教養', minor: '哲学' };
+    }
+    if(cls === 2){
+      if(div === 28) return { major: '教養', minor: '伝記' };
+      if(div === 29) return { major: '教養', minor: '地理・旅行' };
+      return { major: '教養', minor: '歴史' };
+    }
+    if(cls === 3){
+      if(div === 31 || div === 39) return { major: '教養', minor: '政治' };
+      if(div === 32) return { major: '教養', minor: '法律' };
+      if(div === 33 || div === 34) return { major: '教養', minor: '経済' };
+      if(div === 37) return { major: '教養', minor: '教育' };
+      return { major: '教養', minor: '社会' };
+    }
+    if(cls === 4){
+      if(div === 41) return { major: '教養', minor: '数学' };
+      if(div === 49) return { major: '教養', minor: '医学' };
+      return { major: '教養', minor: '科学' };
+    }
+    if(cls === 5) return { major: '教養', minor: '技術' };
+    if(cls === 6) return { major: '教養', minor: '社会' };
     if(cls === 7) return { major: '教養', minor: '芸術' };
     if(cls === 8) return { major: '教養', minor: '言語学' };
     if(cls === 0) return { major: '教養' };
@@ -3723,15 +3760,30 @@
   function guessFromCcode(ccode){
     const k = parseInt(String(ccode).replace(/\D/g, '').slice(2, 4), 10);
     if(isNaN(k)) return null;
-    if(k === 93 || k === 97) return { major: '小説' };
-    if(k === 95 || k === 98) return { major: 'エッセイ' };
-    if(k === 33 || k === 34) return { major: 'ビジネス書' };
-    if(k === 76 || k === 77) return { major: '実用書' };
+    if(k === 93) return { major: '小説' };
+    if(k === 97) return { major: '小説', minor: '海外文学' };
+    if(k === 95) return { major: 'エッセイ' };
+    if(k === 98) return { major: 'エッセイ', minor: '海外文学' };
+    if(k === 34) return { major: 'ビジネス書', minor: '経営' };
+    if(k === 63) return { major: 'ビジネス書' };
+    if(k === 75) return { major: '実用書', minor: 'スポーツ' };
+    if(k === 76) return { major: '実用書', minor: '趣味' };
+    if(k === 77) return { major: '実用書', minor: '暮らし' };
     if(k === 11) return { major: '教養', minor: '心理学' };
-    if(k >= 10 && k <= 16) return { major: '教養', minor: '哲学' };
-    if(k >= 20 && k <= 25) return { major: '教養', minor: '歴史' };
+    if(k === 10 || k === 12) return { major: '教養', minor: '哲学' };
+    if(k >= 14 && k <= 16) return { major: '教養', minor: '宗教' };
+    if(k === 23) return { major: '教養', minor: '伝記' };
+    if(k === 25 || k === 26) return { major: '教養', minor: '地理・旅行' };
+    if(k >= 20 && k <= 22) return { major: '教養', minor: '歴史' };
+    if(k === 31) return { major: '教養', minor: '政治' };
+    if(k === 32) return { major: '教養', minor: '法律' };
+    if(k === 33) return { major: '教養', minor: '経済' };
+    if(k === 37) return { major: '教養', minor: '教育' };
     if(k >= 30 && k <= 39) return { major: '教養', minor: '社会' };
-    if(k >= 40 && k <= 58) return { major: '教養', minor: '科学' };
+    if(k === 41) return { major: '教養', minor: '数学' };
+    if(k === 47) return { major: '教養', minor: '医学' };
+    if(k >= 40 && k <= 45) return { major: '教養', minor: '科学' };
+    if(k >= 50 && k <= 58) return { major: '教養', minor: '技術' };
     if(k >= 70 && k <= 74) return { major: '教養', minor: '芸術' };
     if(k >= 80 && k <= 87) return { major: '教養', minor: '言語学' };
     return null;
@@ -3802,16 +3854,28 @@
     const setIfFound = (id, value) => { if(value) document.getElementById(id).value = value; };
     setIfFound('titleInput', book.title);
     setIfFound('authorInput', (book.authors || []).join('、'));
-    setIfFound('publisherInput', book.publisher);
+    setIfFound('publisherInput', cleanPublisher(book.publisher));
     autoResizeTitle();
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat].join('|');
     const categoryReplaceable = !selectedMajorId || categoryKey() === autoFilled.category;
     let catText = '';
+    let addedMinorLabel = '';
     if(categoryReplaceable){
       const guess = guessCategory(book);
       const major = guess ? categories.find(c => c.label === guess.major) : null;
-      const minor = major && guess.minor ? major.minors.find(m => m.label === guess.minor) : null;
+      let minor = null;
+      if(major && guess.minor){
+        minor = major.minors.find(m => normalize(m.label) === normalize(guess.minor)) || null;
+        if(!minor){
+          // 小分類に無いジャンルは自動で追加する（違っていれば編集画面で直してもらう）
+          minor = { id: genCatId('m'), label: guess.minor };
+          major.minors.push(minor);
+          saveCategories();
+          cloudSaveSettings();
+          addedMinorLabel = minor.label;
+        }
+      }
       selectedMajorId = major ? major.id : null;
       selectedMinorIds = minor ? [minor.id] : [];
       selectedFormat = major && major.hasFormat ? (isShinshoBook(book) ? 'shinsho' : 'tankobon') : null;
@@ -3820,7 +3884,9 @@
       autoFilled.category = major ? categoryKey() : null;
       if(major) catText = [major.label, minor && minor.label, major.hasFormat && formatLabel(selectedFormat)].filter(Boolean).join('／');
     }
-    const catMsg = catText ? '分類：' + catText : (selectedMajorId ? '' : '分類は選んでください');
+    const catMsg = catText
+      ? '分類：' + catText + (addedMinorLabel ? '（小分類「' + addedMinorLabel + '」を新しく追加）' : '')
+      : (selectedMajorId ? '' : '分類は選んでください');
     const baseMsg = '「' + book.title + '」の情報を入れました。' + (catMsg ? catMsg + '。' : '');
 
     // 前の検索で自動で入れた表紙は、今回の本の表紙に入れ替える
@@ -3900,7 +3966,7 @@
     lookupList.innerHTML = lookupResults.map((b, i) =>
       '<div class="modal-item" data-idx="' + i + '"><div class="mi-info">' +
         '<div class="t">' + escapeHTML(b.title + (b.volume ? ' ' + b.volume : '')) + '</div>' +
-        '<div class="a">' + escapeHTML([(b.authors || []).join('、'), b.publisher].filter(Boolean).join(' ／ ')) + '</div>' +
+        '<div class="a">' + escapeHTML([(b.authors || []).join('、'), cleanPublisher(b.publisher)].filter(Boolean).join(' ／ ')) + '</div>' +
         '<div class="m">' + escapeHTML([b.series, b.year].filter(Boolean).join('・')) + '</div>' +
       '</div></div>'
     ).join('');
