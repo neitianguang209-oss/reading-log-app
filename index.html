@@ -315,6 +315,11 @@
     background:var(--surface-raised); outline:none;
   }
   .goal-row input.stat-goal-input:focus{ border-color:var(--accent); box-shadow:none; }
+  .stats-chip-row{ display:flex; gap:8px; overflow-x:auto; margin:10px 0 2px; scrollbar-width:none; }
+  .stats-chip-row::-webkit-scrollbar{ display:none; }
+  .stats-chip-row .filter-chip{ height:32px; padding:0 14px; font-size:13px; }
+  .rate-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
+  .rate-name{ width:118px; flex:0 0 118px; font-size:14px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stat-hint{ font-size:12px; font-weight:400; color:var(--ink-faint); line-height:1.7; margin:12px 0 0; }
 
   /* =====================================================
@@ -740,6 +745,7 @@
       <div class="filter-tabs" id="filterTabs">
         <div class="filter-chip" data-status="done">読了</div>
         <div class="filter-chip" data-status="reading">読書中</div>
+        <div class="filter-chip" data-status="tsundoku">積読</div>
       </div>
       <div class="cat-filter-row" id="majorFilterRow">
         <p class="cat-filter-label">大分類</p>
@@ -924,7 +930,7 @@
 
         <label class="field-label">書き方<span class="opt">任意</span></label>
         <div class="status-row" id="styleChipRow"></div>
-        <p class="field-note">判型は本の形、書き方は長編・短編集・エッセイのような本のスタイルです。短編集を選ぶと、感想の下に各話のメモ欄が出ます。</p>
+        <p class="field-note">判型は本の形です。書き方は、小説なら長編・短編・短編集、それ以外の本ならエッセイかどうかを選べます。短編集を選ぶと、感想の下に各話のメモ欄が出ます。</p>
       </div>
 
       <hr class="divider">
@@ -935,7 +941,9 @@
         <div class="status-row" id="statusRow">
           <div class="status-chip" data-status="reading">読書中</div>
           <div class="status-chip" data-status="done">読了</div>
+          <div class="status-chip" data-status="tsundoku">積読</div>
         </div>
+        <p class="field-note">積読は、買った・借りたけれどまだ読み始めていない本です。</p>
       </div>
 
       <hr class="divider">
@@ -1162,7 +1170,7 @@
   async function sendCloudBackup(){
     try{
       if(!books || books.length === 0) return;       // 空は送らない
-      const payload = { books: books, goals: goals, categories: categories };
+      const payload = { books: books.map(toStoredBook), goals: goals, categories: categories };
       const json = JSON.stringify(payload);
       if(json === lastBackupJson) return;            // 変化が無ければ送らない
       const res = await fetch(BACKUP_URL, {
@@ -1223,7 +1231,7 @@
   function saveBooks(){
     scheduleCloudBackup();
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(books.map(toStoredBook)));
     }catch(e){
       // 容量超過（QuotaExceededError）など
       alert('保存容量の上限に達した可能性があります。\n表紙画像の枚数を減らすか、不要な記録を削除してください。');
@@ -1245,28 +1253,67 @@
   function saveGoals(){
     try{ localStorage.setItem(GOALS_STORAGE_KEY, JSON.stringify(goals)); }catch(e){ console.warn('目標の保存に失敗しました', e); }
   }
+  /* ---------- 分類の一覧（v5） ----------
+     大分類・小分類の一覧は端末ごとの保存で、端末間では同期されない。
+     以前は小分類を足すたびにランダムなidを振っていたため、iPhoneで足した
+     小分類がiPadでは「知らないid」になり、表示されないことがあった。
+     v5からは、
+       ・よく使う小分類は下の固定idで全端末に同じものを持つ
+       ・新しく足す小分類は id を「m:ラベル」、大分類は「c:ラベル」にする
+     ことで、本に付いたidだけから、どの端末でもラベルを復元できるようにした。 */
   function defaultCategories(){
+    const minors = (prefix, list) => list.map(([id, label]) => ({ id: prefix + '-' + id, label: label }));
     return [
-      { id:'novel', label:'小説', hasCharacters:true, minors:[
-        { id:'novel-mystery', label:'ミステリー' },
-        { id:'novel-romance', label:'恋愛' },
-        { id:'novel-family', label:'家族' },
-        { id:'novel-youth', label:'青春' }
-      ]},
-      { id:'liberal', label:'教養', hasFormat:true, minors:[
-        { id:'liberal-philosophy', label:'哲学' },
-        { id:'liberal-psychology', label:'心理学' },
-        { id:'liberal-linguistics', label:'言語学' },
-        { id:'liberal-history', label:'歴史' },
-        { id:'liberal-society', label:'社会' },
-        { id:'liberal-science', label:'科学' },
-        { id:'liberal-art', label:'芸術' }
-      ]},
-      { id:'business', label:'ビジネス・実用', minors:[
-        { id:'practical-invest', label:'投資' }
-      ]},
-      { id:'selfhelp', label:'自己啓発', minors:[] }
+      { id:'novel', label:'小説', hasCharacters:true, minors: minors('novel', [
+        ['mystery', 'ミステリー'], ['suspense', 'サスペンス・犯罪'], ['social', '社会派'], ['human', 'ヒューマンドラマ'],
+        ['romance', '恋愛'], ['youth', '青春'], ['family', '家族'], ['work', 'お仕事'], ['literary', '純文学'],
+        ['sf', 'SF'], ['fantasy', 'ファンタジー'], ['history', '歴史・時代'], ['horror', 'ホラー'],
+        ['economy', '経済・金融'], ['overseas', '海外文学']
+      ])},
+      { id:'liberal', label:'教養', minors: minors('liberal', [
+        ['philosophy', '哲学'], ['psychology', '心理学'], ['history', '歴史'], ['politics', '政治・国際'],
+        ['society', '社会'], ['economy', '経済'], ['science', '科学'], ['tech', 'IT・技術'],
+        ['art', '芸術・文化'], ['language', '言葉'], ['food', '食']
+      ])},
+      { id:'business', label:'ビジネス・実用', minors: minors('business', [
+        ['invest', '投資・お金'], ['work', '仕事術'], ['management', '経営・マーケティング'], ['writing', '文章・思考'],
+        ['health', '健康・睡眠'], ['hobby', '音楽・趣味'], ['life', '料理・暮らし']
+      ])},
+      { id:'selfhelp', label:'自己啓発', minors: minors('selfhelp', [
+        ['time', '時間術'], ['life', '生き方'], ['habit', '習慣'], ['mind', 'メンタル']
+      ])}
     ];
+  }
+  // 似ている分類は1つにまとめる（左の名前で足そうとすると右の分類になる）
+  const MAJOR_ALIASES = { 'ビジネス書': 'ビジネス・実用', '実用書': 'ビジネス・実用', 'ビジネス': 'ビジネス・実用', '実用': 'ビジネス・実用' };
+  const MINOR_ALIASES = {
+    '小説': { 'サスペンス': 'サスペンス・犯罪', '犯罪': 'サスペンス・犯罪', '心理': 'サスペンス・犯罪', '政治': '社会派', '社会': '社会派',
+      '時代': '歴史・時代', '歴史': '歴史・時代', '仕事': 'お仕事', '経済': '経済・金融', '金融': '経済・金融', '海外': '海外文学' },
+    '教養': { '政治': '政治・国際', '国際': '政治・国際', '地政学': '政治・国際', '芸術': '芸術・文化', '文化': '芸術・文化',
+      '言語学': '言葉', '言語': '言葉', 'IT': 'IT・技術', '技術': 'IT・技術', '数学': '科学', '食文化': '食' },
+    'ビジネス・実用': { '投資': '投資・お金', 'お金': '投資・お金', '経営': '経営・マーケティング', 'マーケティング': '経営・マーケティング',
+      'キャリア': '仕事術', '健康': '健康・睡眠', '睡眠': '健康・睡眠', '音楽': '音楽・趣味', '趣味': '音楽・趣味', 'スポーツ': '音楽・趣味',
+      '料理': '料理・暮らし', '暮らし': '料理・暮らし', '子育て': '料理・暮らし', '文章': '文章・思考', '思考': '文章・思考' }
+  };
+  function canonicalMinorLabel(major, label){
+    const aliases = MINOR_ALIASES[major.label];
+    return (aliases && aliases[label]) || label;
+  }
+  function findMinorByLabel(major, label){
+    const want = normalize(canonicalMinorLabel(major, label));
+    return major.minors.find(m => normalize(m.label) === want) || null;
+  }
+  // 無ければ「m:ラベル」のidで足す。added で新しく足したかを返す
+  function ensureMinor(major, label){
+    const found = findMinorByLabel(major, label);
+    if(found) return { minor: found, added: false };
+    const canonical = canonicalMinorLabel(major, label);
+    const minor = { id: 'm:' + canonical, label: canonical };
+    major.minors.push(minor);
+    return { minor: minor, added: true };
+  }
+  function isNovelMajor(major){
+    return !!major && (major.id === 'novel' || major.label === '小説');
   }
   function loadCategories(){
     try{
@@ -1310,7 +1357,13 @@
      どちらもミステリーや投資のようなジャンルではなく本の形・スタイルなので、
      大分類・小分類とは別の欄として、どの大分類の本でも選べるようにしている。 */
   const FORMATS = [['shinsho', '新書'], ['tankobon', '単行本'], ['bunko', '文庫']];
-  const STYLES = [['long', '長編'], ['short', '短編集'], ['essay', 'エッセイ']];
+  const STYLES = [['long', '長編'], ['single', '短編'], ['short', '短編集'], ['essay', 'エッセイ']];
+  // 長編・短編は小説にしか意味が無いので、小説以外の本ではエッセイだけを出す
+  function allowedStyles(majorId){
+    const major = majorId ? findMajor(majorId) : null;
+    if(!major) return STYLES;
+    return isNovelMajor(major) ? STYLES.filter(s => s[0] !== 'essay') : STYLES.filter(s => s[0] === 'essay');
+  }
   function formatLabel(value){
     const found = FORMATS.find(f => f[0] === value);
     return found ? found[1] : '';
@@ -1331,8 +1384,96 @@
 
   // 表紙画像が無いときのモノグラム背景（アクセントと同系のブルーグレー）
   const palette = ['#5B8FC9','#7E93A8','#8FA6B8','#6E88A5','#A3B2BE','#7FA9D6'];
-  const statusLabelMap = {reading:'読書中', done:'読了'};
-  const statusColorMap = {reading:'#5B8FC9', done:'#5BC0A0'};
+  const statusLabelMap = {reading:'読書中', done:'読了', tsundoku:'積読'};
+  const statusColorMap = {reading:'#5B8FC9', done:'#5BC0A0', tsundoku:'#9BA1A5'};
+
+  /* ---------- 積読の保存形式 ----------
+     画面の中では status:'tsundoku' として扱うが、保存するときは
+     status:'reading' ＋ tsundoku:true にする。
+     キャッシュに残った古い版のアプリは「読書中／読了」以外のステータスを
+     見つけると読書中に直してクラウドへ書き戻すため、そのまま 'tsundoku' を
+     保存すると、古い版が開いている端末があるだけで積読が全部消えてしまう。 */
+  function toStoredBook(b){
+    const isTsundoku = b.status === 'tsundoku';
+    return Object.assign({}, b, { status: isTsundoku ? 'reading' : b.status, tsundoku: isTsundoku });
+  }
+  function readStoredStatus(raw){
+    if(raw.status === 'done') return 'done';
+    if(raw.status === 'tsundoku' || (raw.status === 'reading' && raw.tsundoku === true)) return 'tsundoku';
+    return 'reading';
+  }
+
+  /* ---------- 2026-09-14 の分類の見直し ----------
+     それまでに登録されていた本を、小分類の整理に合わせて付け直す。
+     [本のid, タイトルの先頭, 見直し前の [大分類, 小分類, 書き方], 見直し後]
+     見直し前と今の分類が一致する本だけに当てる（そのあと自分で直した本は
+     触らない）。当てたあとは一致しなくなるので、二度当たることはない。 */
+  const RECLASS_2026_09 = [
+    ['b1', 'ピーター・リンチ', [null, [], null], ['business', ['business-invest'], null]],
+    ['b10', '一次元の挿し木', ['novel', ['novel-mystery', 'm_mts1joiq2c2ze'], 'long'], ['novel', ['novel-mystery', 'novel-suspense'], 'long']],
+    ['b11', '限りある時間', ['selfhelp', [], null], ['selfhelp', ['selfhelp-time', 'selfhelp-life'], null]],
+    ['b12', 'アルジャーノン', ['novel', ['m_mts1joiq2c2ze', 'm_mts1jqoj9s01o', 'm_mts1jscq5e14r', 'm_mu0hi4izlu8gc', 'm_mu0hidj49xz9o'], 'long'], ['novel', ['novel-sf', 'novel-human', 'novel-overseas'], 'long']],
+    ['b13', '夏帆', ['novel', ['m_mts1j1olbvfga'], 'long'], ['novel', ['novel-literary'], 'single']],
+    ['b14', 'コンビニ人間', ['novel', ['m_mts1i4l0wqpwf', 'm_mu0hgfejnjknn'], 'long'], ['novel', ['novel-literary', 'novel-human'], 'long']],
+    ['b15', '熟睡者', ['business', [], null], ['business', ['business-health'], null]],
+    ['b16', 'スター', ['novel', ['novel-youth', 'm_mts1b7nnju5q4', 'm_mts1hj6l9sogi'], 'long'], ['novel', ['novel-youth', 'novel-human', 'novel-work'], 'long']],
+    ['b17', '汝、星のごとく', ['novel', ['novel-romance', 'novel-youth', 'm_mts1ex00clemj'], 'long'], ['novel', ['novel-romance', 'novel-human', 'novel-family'], 'long']],
+    ['b18', '本日は、お日柄もよく', ['novel', ['novel-youth', 'm_mts1ex00clemj', 'm_mts1f0r7wflzp'], 'long'], ['novel', ['novel-work', 'novel-human', 'novel-youth'], 'long']],
+    ['b19', '13歳からの地政学', ['c_mtwm237tfn1y3', [], null], ['liberal', ['liberal-politics'], null]],
+    ['b2', '傲慢と善良', ['novel', ['novel-romance', 'novel-mystery'], 'long'], ['novel', ['novel-romance', 'novel-mystery', 'novel-human'], 'long']],
+    ['b20', 'なぜあなたの感想は', ['business', ['m_mtwjwvhgf8ql6'], null], ['business', ['business-writing'], null]],
+    ['b21', '白鳥とコウモリ', ['novel', ['novel-mystery'], 'long'], ['novel', ['novel-mystery', 'novel-social'], 'long']],
+    ['b22', '白鳥とコウモリ', ['novel', ['novel-mystery'], 'long'], ['novel', ['novel-mystery', 'novel-social'], 'long']],
+    ['b24', 'デモクラシー', ['novel', ['m_mts1apds2jm14', 'm_mtz5n9gqscffe', 'm_mtz7ahokg4ky6'], 'long'], ['novel', ['novel-social'], 'long']],
+    ['b25', '屁理屈と哲学', ['c_mtwm237tfn1y3', ['m_mtwm37yijwgoj'], null], ['liberal', ['liberal-philosophy'], null]],
+    ['b26', 'ツミデミック', ['novel', ['m_mtz8bmkiria8x', 'novel-mystery', 'm_mtz8c10qt6tiv'], 'short'], ['novel', ['novel-suspense', 'novel-mystery'], 'short']],
+    ['b27', '盲目的な恋と友情', ['novel', [], 'long'], ['novel', ['novel-romance', 'novel-suspense'], 'long']],
+    ['b28', '君が手にするはずだった黄金', ['novel', [], null], ['novel', ['novel-literary'], 'short']],
+    ['b29', '15歳のテロリスト', ['novel', [], null], ['novel', ['novel-youth', 'novel-social', 'novel-suspense'], 'long']],
+    ['b3', '賢明なる個人投資家', ['business', ['practical-invest'], null], ['business', ['business-invest'], null]],
+    ['b30', '教養としてのコーヒー', ['practical', ['m_mu0k7rekpbina'], null], ['liberal', ['liberal-food'], null]],
+    ['b31', '宇宙一わかる', ['c_mtwm237tfn1y3', ['m_mu0kqajw7l2q7'], null], ['liberal', ['liberal-science'], null]],
+    ['b32', '金融工学の狼', ['novel', [], null], ['novel', ['novel-economy'], 'long']],
+    ['b4', 'ママ投資家', ['business', ['practical-invest'], null], ['business', ['business-invest'], null]],
+    ['b5', '誰でもわかる', ['business', [], null], ['business', ['business-hobby'], null]],
+    ['b9', '逆ソクラテス', ['novel', ['novel-mystery', 'novel-youth'], 'short'], ['novel', ['novel-youth', 'novel-mystery', 'novel-human'], 'short']]
+  ];
+  function applyReclass(b){
+    const hit = RECLASS_2026_09.find(r => r[0] === b.id && (b.title || '').replace(/\s/g, '').startsWith(r[1]));
+    if(!hit) return false;
+    const before = hit[2], after = hit[3];
+    const minors = b.minorCategories || [];
+    const sameMinors = minors.length === before[1].length && before[1].every(id => minors.includes(id));
+    if((b.majorCategory || null) !== before[0] || !sameMinors || (b.style || null) !== before[2]) return false;
+    b.majorCategory = after[0];
+    b.minorCategories = after[1].slice();
+    b.style = after[2];
+    return true;
+  }
+  // 本に付いた「m:ラベル」「c:ラベル」のidが、この端末の一覧に無ければ足す。
+  // 同じ名前（または似ている名前）の小分類が既にあれば、本の方をそちらに付け替える
+  // （付け替えたときは true を返し、クラウドにも書き戻す）
+  function ensureCategoriesForBook(b){
+    if(!b.majorCategory) return false;
+    let major = findMajor(b.majorCategory);
+    if(!major && String(b.majorCategory).startsWith('c:')){
+      major = { id: b.majorCategory, label: b.majorCategory.slice(2), minors: [] };
+      categories.push(major);
+      categoriesChangedDuringMigration = true;
+    }
+    if(!major) return false;
+    let remapped = false;
+    const ids = (b.minorCategories || []).map(id => {
+      if(!String(id).startsWith('m:') || major.minors.some(m => m.id === id)) return id;
+      const same = findMinorByLabel(major, id.slice(2));
+      if(same){ remapped = true; return same.id; }
+      major.minors.push({ id: id, label: id.slice(2) });
+      categoriesChangedDuringMigration = true;
+      return id;
+    });
+    if(remapped) b.minorCategories = Array.from(new Set(ids));
+    return remapped;
+  }
   const emoOptions = ['共感','気づき','違和感','感動','疑問','学び'];
   const SORT_OPTIONS = [
     ['newest', '新しい順'], ['oldest', '古い順'],
@@ -1364,7 +1505,7 @@
     const major = findMajor(majorId);
     let minor = major.minors.find(m => m.label === label);
     if(!minor){
-      minor = { id: genCatId('m'), label: label };
+      minor = { id: 'm:' + label, label: label };
       major.minors.push(minor);
       categoriesChangedDuringMigration = true;
     }
@@ -1382,7 +1523,7 @@
       title: raw.title || '(無題)',
       author: normalizeAuthorName(raw.author),
       publisher: raw.publisher || '',
-      status: (raw.status === 'reading' || raw.status === 'done') ? raw.status : 'reading',
+      status: readStoredStatus(raw),
       startDate: raw.startDate || '',
       endDate: raw.endDate || '',
       kikkake: raw.kikkake || '',
@@ -1410,7 +1551,10 @@
       })),
       createdAt: raw.createdAt || null
     };
+    // 見直し表は「見直し前の分類」と比べるので、移し替えより先に当てる
+    if(applyReclass(b)) changed = true;
     if(applyCategoryMoves(b)) changed = true;
+    if(ensureCategoriesForBook(b)) changed = true;
     if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
     if((raw.author || '') !== b.author){ changed = true; }   // 空白を詰めた分はクラウドにも反映する
     if(!b.majorCategory && Array.isArray(raw.tags) && raw.tags.length){
@@ -1457,7 +1601,7 @@
      届いた時点で正しく移る。
      移行は一度だけ走り、あとからユーザーが消した分類は復活しない。 */
   const CAT_SCHEMA_KEY = 'reading-log-cat-schema';
-  const CAT_SCHEMA_VERSION = 4;
+  const CAT_SCHEMA_VERSION = 5;
   const CAT_MOVES_STORAGE_KEY = 'reading-log-cat-moves';
   function loadCategoryMoves(){
     try{
@@ -1471,23 +1615,26 @@
   // 対応表は古い順に並んでいるので、順番に当てれば「v3で移した先を
   // v4でさらにまとめた」ような連続した移動もたどれる
   function applyCategoryMoves(b){
-    let moved = false;
+    const signature = () => JSON.stringify([b.majorCategory, b.minorCategories, b.format, b.style]);
+    const before = signature();
     for(const mv of categoryMoves){
       if(b.majorCategory !== mv.major) continue;
       if(mv.minor && !(b.minorCategories || []).includes(mv.minor)) continue;
       b.majorCategory = mv.to;
       if(mv.minorMap){
-        // 大分類ごとまとめたときは、同じ名前の小分類へ付け替える
-        b.minorCategories = (b.minorCategories || []).map(id => mv.minorMap[id] || id).filter(id => !!findMinor(mv.to, id));
+        // 同じ名前の小分類へ付け替える。この端末が知らない小分類（他の端末で
+        // 足したもの）は消さずに残す（消すとクラウドにも書き戻されてしまう）
+        b.minorCategories = Array.from(new Set((b.minorCategories || []).map(id => mv.minorMap[id] || id)));
       } else if(mv.minor){
         // 移動先に無い小分類（実用書の「投資」など）は外れる
         b.minorCategories = (b.minorCategories || []).filter(id => !!findMinor(mv.to, id));
       }
       if(mv.format && !b.format) b.format = mv.format;
       if(mv.style && !b.style) b.style = mv.style;
-      moved = true;
     }
-    return moved;
+    // 実際に変わったときだけ true（同じ大分類の中での付け替えは毎回当たるので、
+    // 変化なしで true を返すと同期のたびに書き戻しが起きてしまう）
+    return signature() !== before;
   }
   function migrateCategories(){
     let version = 0;
@@ -1560,6 +1707,40 @@
       mergeInto(byLabel('ビジネス書'), bizPractical);
       mergeInto(byLabel('実用書'), bizPractical);
       mergeInto(byLabel('エッセイ'), liberal, { style: 'essay' });
+    }
+
+    if(version < 5){
+      // v5：4つの大分類を固定id（novel/liberal/business/selfhelp）に揃え、
+      // 似ている小分類をまとめる。端末ごとにランダムidだった大分類・小分類は
+      // 移し替え表で固定idへ付け替える。一覧に無いユーザー独自の分類は残す。
+      const matched = new Set();
+      const rebuilt = defaultCategories().map(major => {
+        categories.forEach(old => {
+          const oldLabel = MAJOR_ALIASES[old.label] || old.label;
+          if(normalize(oldLabel) !== normalize(major.label)) return;
+          matched.add(old);
+          if(old.hasCharacters !== undefined) major.hasCharacters = old.hasCharacters;
+          const minorMap = {};
+          (old.minors || []).forEach(minor => {
+            const same = findMinorByLabel(major, minor.label);
+            if(same){
+              if(same.id !== minor.id) minorMap[minor.id] = same.id;
+            } else if(!major.minors.some(m => m.id === minor.id)){
+              major.minors.push({ id: minor.id, label: minor.label });
+            }
+          });
+          if(old.id !== major.id || Object.keys(minorMap).length){
+            categoryMoves.push({ major: old.id, minor: null, to: major.id, minorMap: minorMap });
+          }
+        });
+        return major;
+      });
+      categories.forEach(old => {
+        if(matched.has(old)) return;
+        if(rebuilt.some(c => c.id === old.id)) old.id = 'c:' + old.label;
+        rebuilt.push(old);
+      });
+      categories = rebuilt;
     }
 
     // 並び順を揃える（ユーザーが足した大分類はその後ろに元の順で並ぶ）
@@ -1758,9 +1939,9 @@
     }
     return b.createdAt || 0;
   }
-  // 読了を先に、読書中を後にまとめる（並び替えはそれぞれのまとまりの中で効く）
+  // 読了 → 読書中 → 積読 の順にまとめる（並び替えはそれぞれのまとまりの中で効く）
   function statusRank(b){
-    return b.status === 'done' ? 0 : 1;
+    return b.status === 'done' ? 0 : b.status === 'reading' ? 1 : 2;
   }
   function sortBooks(list){
     const arr = list.slice();
@@ -1996,9 +2177,11 @@
       .map(name => ({ name: name, count: counts[name] }))
       .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'ja'));
   }
-  function buildDonutCard(label, entries, centerText, emptyMessage, maxSegments){
+  function buildDonutCard(label, entries, centerText, emptyMessage, maxSegments, headHTML, noteHTML){
+    headHTML = headHTML || '';
+    noteHTML = noteHTML || '';
     if(entries.length === 0){
-      return '<div class="stat-card"><div class="stat-label">' + label + '</div>' +
+      return '<div class="stat-card"><div class="stat-label">' + label + '</div>' + headHTML +
         '<p class="stat-empty">まだ記録がありません<span>' + emptyMessage + '</span></p></div>';
     }
     const limit = maxSegments || 5;
@@ -2008,7 +2191,7 @@
       top.push({ name: 'その他', count: rest.reduce((a, e) => a + e.count, 0) });
     }
     const total = entries.reduce((a, e) => a + e.count, 0);
-    return '<div class="stat-card"><div class="stat-label">' + label + '</div>' +
+    return '<div class="stat-card"><div class="stat-label">' + label + '</div>' + headHTML +
       '<div class="donut-wrap" style="margin-top:10px;">' +
         donutSVG(top, total, centerText) +
         '<div class="donut-legend">' +
@@ -2020,7 +2203,75 @@
             '</div>'
           ).join('') +
         '</div>' +
-      '</div></div>';
+      '</div>' + noteHTML + '</div>';
+  }
+  /* ---------- ジャンル（小分類）の統計 ----------
+     大分類をタブで切り替えて、その中の小分類の内訳を見せる。
+     小分類は1冊に複数付けられるので、それぞれに1冊ずつ数える。 */
+  let statsGenreMajor = null;
+  function minorLabelsOf(b){
+    return (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean).map(m => m.label);
+  }
+  function buildGenreCard(target){
+    const label = 'ジャンル別（小分類）';
+    const majors = categories.filter(c => target.some(b => b.majorCategory === c.id));
+    if(majors.length === 0){
+      return buildDonutCard(label, [], '', '大分類・小分類を設定すると、ジャンルごとの内訳が表示されます');
+    }
+    if(!majors.some(m => m.id === statsGenreMajor)){
+      const novel = majors.find(isNovelMajor);
+      statsGenreMajor = (novel || majors[0]).id;
+    }
+    const inMajor = target.filter(b => b.majorCategory === statsGenreMajor);
+    const counts = {};
+    inMajor.forEach(b => {
+      const labels = minorLabelsOf(b);
+      (labels.length ? labels : ['小分類なし']).forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    });
+    const entries = Object.keys(counts).map(name => ({ name: name, count: counts[name] }))
+      .sort((a, b) => (a.name === '小分類なし') - (b.name === '小分類なし') || b.count - a.count || a.name.localeCompare(b.name, 'ja'));
+    const tabs = '<div class="stats-chip-row">' + majors.map(m =>
+      '<span class="filter-chip' + (m.id === statsGenreMajor ? ' active' : '') + '" data-genre-major="' + escapeHTML(m.id) + '">' +
+        escapeHTML(m.label) + '</span>'
+    ).join('') + '</div>';
+    return buildDonutCard(label, entries, inMajor.length + '冊', '', 6, tabs,
+      '<p class="stat-hint">小分類を複数付けた本は、それぞれのジャンルに数えています。</p>');
+  }
+  // ジャンルごとの平均評価（評価を付けた本だけ）。好きなジャンルが見えるように高い順に並べる
+  function buildGenreRatingCard(target){
+    const agg = {};
+    target.filter(b => b.rating > 0).forEach(b => {
+      minorLabelsOf(b).forEach(l => {
+        if(!agg[l]) agg[l] = { sum: 0, n: 0 };
+        agg[l].sum += b.rating;
+        agg[l].n++;
+      });
+    });
+    const rows = Object.keys(agg).map(l => ({ name: l, avg: agg[l].sum / agg[l].n, n: agg[l].n }))
+      .sort((a, b) => b.avg - a.avg || b.n - a.n).slice(0, 8);
+    let body;
+    if(rows.length === 0){
+      body = '<p class="stat-empty">まだ記録がありません<span>小分類の付いた本に評価をつけると表示されます</span></p>';
+    } else {
+      body = rows.map(r =>
+        '<div class="rate-row">' +
+          '<span class="rate-name">' + escapeHTML(r.name) + '</span>' +
+          '<span class="goal-bar"><span class="goal-fill" style="width:' + Math.round(r.avg / 5 * 100) + '%;"></span></span>' +
+          '<span class="goal-count">★' + r.avg.toFixed(1) + '（' + r.n + '冊）</span>' +
+        '</div>'
+      ).join('');
+    }
+    return '<div class="stat-card"><div class="stat-label">ジャンル別の評価</div>' + body + '</div>';
+  }
+  // 本棚全体の状況（年や期間に関係なく、今の冊数）
+  function buildShelfStatusRow(){
+    const cols = [['読書中', 'reading'], ['積読', 'tsundoku'], ['読了', 'done']];
+    return '<div class="section-heading">本棚の状況</div><div class="status-cols">' +
+      cols.map(([label, key]) =>
+        '<div class="status-col"><div class="stat-label">' + label + '</div>' +
+        '<div class="stat-value"><span class="stat-num">' + books.filter(b => b.status === key).length + '</span> <span class="stat-unit">冊</span></div></div>'
+      ).join('') +
+      '</div>';
   }
   // 大分類は今後増えても、実際に使われているものが自動で並ぶ
   function buildMajorCategoryCard(target){
@@ -2086,10 +2337,21 @@
       buildSummaryCard(target) +
       buildMonthlyCard() +
       buildCurrentStatusRow() +
+      buildShelfStatusRow() +
       buildGoalCard() +
+      '<div class="section-heading">ジャンル</div>' +
       buildMajorCategoryCard(target) +
+      buildGenreCard(target) +
+      buildGenreRatingCard(target) +
       buildAuthorCard(target) +
       buildInsightCard();
+
+    body.querySelectorAll('[data-genre-major]').forEach(chip => {
+      chip.addEventListener('click', () => {
+        statsGenreMajor = chip.dataset.genreMajor;
+        renderStats();
+      });
+    });
 
     body.querySelectorAll('.stat-goal-input').forEach(input => {
       input.addEventListener('change', () => {
@@ -2414,7 +2676,9 @@
       chip.textContent = major.label;
       chip.addEventListener('click', () => {
         selectedMajorId = (selectedMajorId === major.id) ? null : major.id;
-        selectedMinorIds = [];   // 大分類を変えたら小分類はリセットする（判型・書き方は大分類と無関係なので残す）
+        selectedMinorIds = [];   // 大分類を変えたら小分類はリセットする（判型は大分類と無関係なので残す）
+        // 書き方は、新しい大分類で選べないもの（教養の本の「長編」など）だけ外す
+        if(selectedStyle && !allowedStyles(selectedMajorId).some(s => s[0] === selectedStyle)) selectedStyle = null;
         renderMajorChips();
         renderMinorChips();
       });
@@ -2468,7 +2732,7 @@
       });
     };
     renderRow('formatChipRow', FORMATS, selectedFormat, v => { selectedFormat = v; });
-    renderRow('styleChipRow', STYLES, selectedStyle, v => { selectedStyle = v; });
+    renderRow('styleChipRow', allowedStyles(selectedMajorId), selectedStyle, v => { selectedStyle = v; });
     updateStoryFieldVisibility();
   }
   document.getElementById('newMajorInput').addEventListener('keydown', e => {
@@ -2478,12 +2742,13 @@
     if(!label) return;
     let major = categories.find(c => normalize(c.label) === normalize(label));
     if(!major){
-      major = { id: genCatId('c'), label: label, minors: [] };
+      major = { id: 'c:' + label, label: label, minors: [] };
       categories.push(major);
       saveCategories();
       cloudSaveSettings();
     }
     selectedMajorId = major.id;
+    if(selectedStyle && !allowedStyles(selectedMajorId).some(s => s[0] === selectedStyle)) selectedStyle = null;
     selectedMinorIds = [];
     e.target.value = '';
     renderMajorChips();
@@ -2496,10 +2761,9 @@
     const label = e.target.value.trim();
     if(!label) return;
     const major = findMajor(selectedMajorId);
-    let minor = major.minors.find(m => normalize(m.label) === normalize(label));
-    if(!minor){
-      minor = { id: genCatId('m'), label: label };
-      major.minors.push(minor);
+    const result = ensureMinor(major, label);   // 似ている小分類があればそちらを選ぶ
+    const minor = result.minor;
+    if(result.added){
       saveCategories();
       cloudSaveSettings();
     }
@@ -2559,7 +2823,7 @@
   }
   function applyStatus(status){
     currentStatus = status;
-    if(status === 'reading'){
+    if(status === 'reading' || status === 'tsundoku'){
       endDateInput.disabled = true;
       endDateInput.value = '';
       endDateLabel.innerHTML = '読み終わった日<span class="opt">読了後に入力できます</span>';
@@ -2985,7 +3249,7 @@
       majorCategory: selectedMajorId,
       minorCategories: selectedMinorIds.slice(),
       format: selectedFormat,
-      style: selectedStyle,
+      style: allowedStyles(selectedMajorId).some(s => s[0] === selectedStyle) ? selectedStyle : null,
       status: currentStatus,
       startDate: startDateInput.value,
       endDate: endDateInput.disabled ? '' : endDateInput.value,
@@ -3192,7 +3456,7 @@
   function closeDataMenu(){ dataMenuOverlay.classList.remove('show'); }
 
   function exportBooks(){
-    const json = JSON.stringify(books, null, 2);
+    const json = JSON.stringify(books.map(toStoredBook), null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -3251,7 +3515,7 @@
     const note = document.createElement('p');
     note.className = 'field-note';
     note.style.cssText = 'margin:0 2px 16px;';
-    note.textContent = '「人物メモあり」にすると、その大分類の本で感想の下に「印象に残った人物」を書けるようになります。判型（新書・単行本・文庫）と書き方（長編・短編集・エッセイ）はどの大分類でも選べます。';
+    note.textContent = '「人物メモあり」にすると、その大分類の本で感想の下に「印象に残った人物」を書けるようになります。判型（新書・単行本・文庫）はどの大分類でも、書き方は小説なら長編・短編・短編集、それ以外ならエッセイを選べます。似た名前の小分類（例：睡眠と健康）は1つにまとまります。';
     wrap.appendChild(note);
     categories.forEach(major => {
       const block = document.createElement('div');
@@ -3366,7 +3630,7 @@
   ========================================================= */
   function cloudSetBook(book){
     if(!currentUser || !db) return;
-    db.collection('users').doc(currentUser.uid).collection('books').doc(book.id).set(book)
+    db.collection('users').doc(currentUser.uid).collection('books').doc(book.id).set(toStoredBook(book))
       .catch(err => { console.warn('クラウドへの保存に失敗しました', err); showSyncBanner('クラウドへの保存に失敗しました。電波の良い場所でもう一度お試しください。', true); });
   }
   function cloudDeleteBook(id){
@@ -3381,7 +3645,7 @@
       const batch = db.batch();
       // 設定ドキュメントは本ではないので消さない
       snapshot.docs.forEach(doc => { if(doc.id !== SETTINGS_DOC_ID) batch.delete(doc.ref); });
-      newBooks.forEach(b => batch.set(booksRef.doc(b.id), b));
+      newBooks.forEach(b => batch.set(booksRef.doc(b.id), toStoredBook(b)));
       return batch.commit();
     }).catch(err => console.warn('クラウドへの一括反映に失敗しました', err));
   }
@@ -3450,7 +3714,7 @@
       if(cloudBookCount === 0 && books.length > 0){
         if(confirm('ローカルにある' + books.length + '冊の記録をクラウドにアップロードしますか？\n（他の端末で既にこのアカウントを使っている場合は「キャンセル」してください）')){
           const batch = db.batch();
-          books.forEach(b => batch.set(booksRef.doc(b.id), b));
+          books.forEach(b => batch.set(booksRef.doc(b.id), toStoredBook(b)));
           batch.commit().catch(err => console.warn('アップロードに失敗しました', err));
         }
       }
@@ -3878,12 +4142,72 @@
     if(/文庫/.test(series) || (c.length === 4 && c[1] === '1')) return 'bunko';
     return 'tankobon';
   }
-  // 書き方：エッセイは分類から、短編集はタイトル等の「短編」から推定する。
-  // 長編かどうかは書誌からは分からないので入れない
-  function guessStyle(book, guess){
+  // 書き方：エッセイは分類から、短編集はタイトル・シリーズ・紹介文の「短編」などから推定する。
+  // 小説でそれらが見当たらなければ長編とする（書誌に長編かどうかの項目は無いので推定）
+  function guessStyle(book, guess, major){
+    const text = [book.title, book.series, book.volume, book.description].join('\n');
+    if(isNovelMajor(major)){
+      return /短編|短篇|作品集|傑作選|アンソロジー/.test(text) ? 'short' : 'long';
+    }
     if(guess && guess.style) return guess.style;
-    if(/短編|短篇/.test([book.title, book.series, book.volume].join(''))) return 'short';
+    if(/エッセイ|随筆/.test(text)) return 'essay';
     return null;
+  }
+
+  /* ---------- 小説のジャンル ----------
+     書誌の分類(NDC 913.6 など)では「日本の小説」までしか分からないので、
+     ①同じ著者の登録済みの本に付けた小分類 ②紹介文・タイトルの言葉 から推定する。
+     違っていれば登録画面で外せる。 */
+  const NOVEL_GENRE_KEYWORDS = [
+    ['ミステリー', /ミステリ|推理|探偵|殺人|事件|謎解き|トリック|犯人|刑事|密室/],
+    ['サスペンス・犯罪', /サスペンス|犯罪|誘拐|逃亡|復讐|テロ|詐欺/],
+    ['社会派', /社会派|政治|選挙|格差|差別|貧困|報道|権力/],
+    ['恋愛', /恋愛|恋人|初恋|ラブストーリー|婚約|婚活/],
+    ['青春', /青春|高校生|中学生|部活|同級生|十代/],
+    ['家族', /家族|親子|兄弟|姉妹|夫婦/],
+    ['お仕事', /お仕事|職場|業界|新入社員/],
+    ['SF', /SF|宇宙|近未来|人工知能|ロボット|タイムトラベル|タイムリープ|クローン/],
+    ['ファンタジー', /ファンタジー|魔法|異世界|王国|ドラゴン|妖怪/],
+    ['歴史・時代', /時代小説|歴史小説|江戸|戦国|幕末|武士|侍/],
+    ['ホラー', /ホラー|怪談|幽霊|呪い|怪異/],
+    ['経済・金融', /経済小説|金融|銀行|ファンド|企業買収/],
+    ['純文学', /芥川賞|純文学/],
+    ['ヒューマンドラマ', /感動|人間ドラマ|生きる意味|再生の物語/]
+  ];
+  // 同じ著者の登録済みの本から、いちばん多い大分類とその中の小分類
+  function authorHistory(book){
+    const names = (book.authors || []).map(normalizeAuthorName).filter(Boolean);
+    const same = names.length ? books.filter(b => b.majorCategory && names.some(n => normalizeAuthorName(b.author).includes(n))) : [];
+    if(!same.length) return { majorLabel: null, minorLabels: [] };
+    const majorCounts = countEntries(same, b => b.majorCategory);
+    const topMajor = findMajor(majorCounts[0].name);
+    const minorCounts = {};
+    same.filter(b => b.majorCategory === majorCounts[0].name).forEach(b => {
+      minorLabelsOf(b).forEach(l => { minorCounts[l] = (minorCounts[l] || 0) + 1; });
+    });
+    const minorLabels = Object.keys(minorCounts).sort((a, b) => minorCounts[b] - minorCounts[a]).slice(0, 2);
+    return { majorLabel: topMajor ? topMajor.label : null, minorLabels: minorLabels };
+  }
+  function guessNovelGenres(book, history){
+    const text = [book.title, book.series, book.description].join('\n');
+    const fromText = NOVEL_GENRE_KEYWORDS.filter(k => k[1].test(text)).map(k => k[0]);
+    return history.minorLabels.concat(fromText);
+  }
+  // 紹介文（openBDの内容紹介 → Google Books の説明）。ジャンルと書き方の推定にだけ使う
+  async function fetchDescription(isbn){
+    const texts = [];
+    const withTimeout = p => Promise.race([p, new Promise(resolve => setTimeout(() => resolve(null), 6000))]);
+    await Promise.all([
+      withTimeout(fetch('https://api.openbd.jp/v1/get?isbn=' + isbn).then(r => r.ok ? r.json() : null).then(data => {
+        const d = data && data[0];
+        const list = (d && d.onix && d.onix.CollateralDetail && d.onix.CollateralDetail.TextContent) || [];
+        list.forEach(t => { if(t.Text) texts.push(t.Text); });
+      })).catch(() => {}),
+      withTimeout(fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn).then(r => r.ok ? r.json() : null).then(data => {
+        ((data && data.items) || []).forEach(v => { if(v.volumeInfo && v.volumeInfo.description) texts.push(v.volumeInfo.description); });
+      })).catch(() => {})
+    ]);
+    return texts.join('\n');
   }
 
   /* ---------- 表紙 ---------- */
@@ -3948,35 +4272,48 @@
     autoResizeTitle();
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
+    let guess = guessCategory(book);
+    const history = authorHistory(book);
+    if(!guess && history.majorLabel) guess = { major: history.majorLabel };   // 書誌で分からなければ、同じ著者の本に合わせる
+    // 小説（またはまだ分からない本）は、ジャンル・書き方を決めるために紹介文も取りに行く
+    if(book.isbn && !book.description && (!guess || guess.major === '小説')){
+      setLookupNote('「' + book.title + '」のジャンルを調べています…', true);
+      book.description = await fetchDescription(book.isbn);
+      if(token !== lookupToken) return;
+    }
     const categoryReplaceable = (!selectedMajorId && !selectedFormat && !selectedStyle) || categoryKey() === autoFilled.category;
     let catText = '';
-    let addedMinorLabel = '';
+    const addedMinorLabels = [];
     if(categoryReplaceable){
-      const guess = guessCategory(book);
-      const major = guess ? categories.find(c => c.label === guess.major) : null;
-      let minor = null;
-      if(major && guess.minor){
-        minor = major.minors.find(m => normalize(m.label) === normalize(guess.minor)) || null;
-        if(!minor){
-          // 小分類に無いジャンルは自動で追加する（違っていれば編集画面で直してもらう）
-          minor = { id: genCatId('m'), label: guess.minor };
-          major.minors.push(minor);
-          saveCategories();
-          cloudSaveSettings();
-          addedMinorLabel = minor.label;
-        }
+      const major = guess ? categories.find(c => normalize(c.label) === normalize(guess.major)) : null;
+      const minors = [];
+      if(major){
+        const labels = [];
+        if(guess.minor) labels.push(guess.minor);
+        if(isNovelMajor(major)) guessNovelGenres(book, history).forEach(l => labels.push(l));
+        else history.minorLabels.forEach(l => { if(major.label === history.majorLabel && !guess.minor) labels.push(l); });
+        labels.forEach(label => {
+          if(minors.length >= 3) return;
+          // 小分類に無いジャンルは自動で追加する（違っていれば登録画面で外してもらう）
+          const result = ensureMinor(major, label);
+          if(minors.includes(result.minor)) return;
+          if(result.added) addedMinorLabels.push(result.minor.label);
+          minors.push(result.minor);
+        });
+        if(addedMinorLabels.length){ saveCategories(); cloudSaveSettings(); }
       }
       selectedMajorId = major ? major.id : null;
-      selectedMinorIds = minor ? [minor.id] : [];
+      selectedMinorIds = minors.map(m => m.id);
       selectedFormat = guessFormat(book);
-      selectedStyle = guessStyle(book, guess);
+      selectedStyle = guessStyle(book, guess, major);
       renderMajorChips();
       renderMinorChips();
       autoFilled.category = categoryKey();
-      catText = [major && major.label, minor && minor.label, formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／');
+      catText = [major && major.label, minors.map(m => m.label).join('・'), formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／');
     }
     const msgParts = [];
-    if(catText) msgParts.push('分類：' + catText + (addedMinorLabel ? '（小分類「' + addedMinorLabel + '」を新しく追加）' : ''));
+    if(catText) msgParts.push('分類：' + catText + (addedMinorLabels.length ? '（小分類「' + addedMinorLabels.join('」「') + '」を新しく追加）' : ''));
+    if(categoryReplaceable && selectedMajorId && isNovelMajor(findMajor(selectedMajorId))) msgParts.push('ジャンルと書き方は推定なので、違っていたら直してください');
     if(!selectedMajorId) msgParts.push('大分類は選んでください');
     const baseMsg = '「' + book.title + '」の情報を入れました。' + msgParts.map(p => p + '。').join('');
 
