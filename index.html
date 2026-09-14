@@ -756,8 +756,12 @@
         <div class="filter-tabs" id="minorFilterTabs"></div>
       </div>
       <div class="cat-filter-row" id="formatFilterRow">
-        <p class="cat-filter-label">判型・書き方</p>
+        <p class="cat-filter-label">判型</p>
         <div class="filter-tabs" id="formatFilterTabs"></div>
+      </div>
+      <div class="cat-filter-row" id="styleFilterRow">
+        <p class="cat-filter-label">書き方</p>
+        <div class="filter-tabs" id="styleFilterTabs"></div>
       </div>
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
@@ -916,7 +920,7 @@
         <div class="tag-input-wrap" style="gap:8px;">
           <input type="text" id="newMajorInput" placeholder="新しい大分類を追加（例：小説）" style="flex:1;">
         </div>
-        <p class="field-note">タップして選択します。もう一度タップすると選択解除できます。</p>
+        <p class="field-note">タップして選択します。もう一度タップすると選択解除できます。<br>線引き：知識やしくみを学ぶ本は教養、手法・ノウハウが中心ならビジネス・実用、考え方・習慣が中心なら自己啓発。</p>
 
         <label class="field-label">小分類<span class="opt">任意・複数選択可</span></label>
         <div class="chip-row" id="minorChipRow"></div>
@@ -930,7 +934,7 @@
 
         <label class="field-label">書き方<span class="opt">任意</span></label>
         <div class="status-row" id="styleChipRow"></div>
-        <p class="field-note">判型は本の形です。書き方は、小説なら長編・短編・短編集、それ以外の本ならエッセイかどうかを選べます。短編集を選ぶと、感想の下に各話のメモ欄が出ます。</p>
+        <p class="field-note">判型は本の形、書き方は中身の組み立てです。小説は長編・短編・短編集、それ以外の本は「一冊一テーマ」（一冊通して一つの話）・「単元ごと」（数ページで一つの項目）・「エッセイ」から選べます。短編集を選ぶと、感想の下に各話のメモ欄が出ます。</p>
       </div>
 
       <hr class="divider">
@@ -1271,16 +1275,15 @@
         ['economy', '経済・金融'], ['overseas', '海外文学']
       ])},
       { id:'liberal', label:'教養', minors: minors('liberal', [
-        ['philosophy', '哲学'], ['psychology', '心理学'], ['history', '歴史'], ['politics', '政治・国際'],
-        ['society', '社会'], ['economy', '経済'], ['science', '科学'], ['tech', 'IT・技術'],
-        ['art', '芸術・文化'], ['language', '言葉'], ['food', '食']
+        ['philosophy', '哲学・思想'], ['psychology', '心理学'], ['history', '歴史・伝記'], ['politics', '政治・国際'],
+        ['society', '社会'], ['economy', '経済'], ['science', '科学・技術'], ['art', '芸術・文化'], ['language', '言葉']
       ])},
       { id:'business', label:'ビジネス・実用', minors: minors('business', [
-        ['invest', '投資・お金'], ['work', '仕事術'], ['management', '経営・マーケティング'], ['writing', '文章・思考'],
-        ['health', '健康・睡眠'], ['hobby', '音楽・趣味'], ['life', '料理・暮らし']
+        ['invest', '投資・お金'], ['work', '仕事・スキル'], ['management', '経営・マーケティング'],
+        ['health', '健康・からだ'], ['hobby', '音楽・趣味'], ['life', '料理・暮らし']
       ])},
       { id:'selfhelp', label:'自己啓発', minors: minors('selfhelp', [
-        ['time', '時間術'], ['life', '生き方'], ['habit', '習慣'], ['mind', 'メンタル']
+        ['life', '生き方・考え方'], ['time', '習慣・時間'], ['mind', 'メンタル'], ['relation', '人間関係']
       ])}
     ];
   }
@@ -1289,11 +1292,18 @@
   const MINOR_ALIASES = {
     '小説': { 'サスペンス': 'サスペンス・犯罪', '犯罪': 'サスペンス・犯罪', '心理': 'サスペンス・犯罪', '政治': '社会派', '社会': '社会派',
       '時代': '歴史・時代', '歴史': '歴史・時代', '仕事': 'お仕事', '経済': '経済・金融', '金融': '経済・金融', '海外': '海外文学' },
-    '教養': { '政治': '政治・国際', '国際': '政治・国際', '地政学': '政治・国際', '芸術': '芸術・文化', '文化': '芸術・文化',
-      '言語学': '言葉', '言語': '言葉', 'IT': 'IT・技術', '技術': 'IT・技術', '数学': '科学', '食文化': '食' },
+    '教養': { '哲学': '哲学・思想', '思想': '哲学・思想', '宗教': '哲学・思想', '歴史': '歴史・伝記', '伝記': '歴史・伝記', '自伝': '歴史・伝記',
+      '政治': '政治・国際', '国際': '政治・国際', '地政学': '政治・国際', '法律': '社会', '教育': '社会', '地理・旅行': '社会',
+      '科学': '科学・技術', '技術': '科学・技術', 'IT': '科学・技術', 'IT・技術': '科学・技術', '数学': '科学・技術', '医学': '科学・技術',
+      '芸術': '芸術・文化', '文化': '芸術・文化', '食': '芸術・文化', '食文化': '芸術・文化', '言語学': '言葉', '言語': '言葉' },
     'ビジネス・実用': { '投資': '投資・お金', 'お金': '投資・お金', '経営': '経営・マーケティング', 'マーケティング': '経営・マーケティング',
-      'キャリア': '仕事術', '健康': '健康・睡眠', '睡眠': '健康・睡眠', '音楽': '音楽・趣味', '趣味': '音楽・趣味', 'スポーツ': '音楽・趣味',
-      '料理': '料理・暮らし', '暮らし': '料理・暮らし', '子育て': '料理・暮らし', '文章': '文章・思考', '思考': '文章・思考' }
+      '仕事術': '仕事・スキル', 'キャリア': '仕事・スキル', '就活': '仕事・スキル', '文章': '仕事・スキル', '思考': '仕事・スキル',
+      '文章・思考': '仕事・スキル', '勉強法': '仕事・スキル', '話し方': '仕事・スキル',
+      '健康': '健康・からだ', '睡眠': '健康・からだ', '健康・睡眠': '健康・からだ', '筋トレ': '健康・からだ', '運動': '健康・からだ',
+      'ダイエット': '健康・からだ', 'スポーツ': '健康・からだ', '音楽': '音楽・趣味', '趣味': '音楽・趣味',
+      '料理': '料理・暮らし', '暮らし': '料理・暮らし', '子育て': '料理・暮らし' },
+    '自己啓発': { '生き方': '生き方・考え方', '考え方': '生き方・考え方', 'マインド': '生き方・考え方', '時間術': '習慣・時間',
+      '習慣': '習慣・時間', '時間': '習慣・時間', '心': 'メンタル', '対人': '人間関係', '対人関係': '人間関係' }
   };
   function canonicalMinorLabel(major, label){
     const aliases = MINOR_ALIASES[major.label];
@@ -1357,12 +1367,14 @@
      どちらもミステリーや投資のようなジャンルではなく本の形・スタイルなので、
      大分類・小分類とは別の欄として、どの大分類の本でも選べるようにしている。 */
   const FORMATS = [['shinsho', '新書'], ['tankobon', '単行本'], ['bunko', '文庫']];
-  const STYLES = [['long', '長編'], ['single', '短編'], ['short', '短編集'], ['essay', 'エッセイ']];
-  // 長編・短編は小説にしか意味が無いので、小説以外の本ではエッセイだけを出す
+  // 小説は長編／短編／短編集。それ以外の本は、一冊通して一つのテーマか、
+  // 数ページで一つの単元が読み切りになっているか、エッセイか
+  const NOVEL_STYLES = ['long', 'single', 'short'];
+  const STYLES = [['long', '長編'], ['single', '短編'], ['short', '短編集'], ['theme', '一冊一テーマ'], ['unit', '単元ごと'], ['essay', 'エッセイ']];
   function allowedStyles(majorId){
     const major = majorId ? findMajor(majorId) : null;
     if(!major) return STYLES;
-    return isNovelMajor(major) ? STYLES.filter(s => s[0] !== 'essay') : STYLES.filter(s => s[0] === 'essay');
+    return isNovelMajor(major) ? STYLES.filter(s => NOVEL_STYLES.includes(s[0])) : STYLES.filter(s => !NOVEL_STYLES.includes(s[0]));
   }
   function formatLabel(value){
     const found = FORMATS.find(f => f[0] === value);
@@ -1371,10 +1383,6 @@
   function styleLabel(value){
     const found = STYLES.find(s => s[0] === value);
     return found ? found[1] : '';
-  }
-  // 一覧の「判型・書き方」の絞り込み（値は判型と書き方で重ならない）
-  function matchesFormatFilter(b, value){
-    return b.format === value || b.style === value;
   }
   // 「印象に残った人物」を書く欄を出す大分類か（既定は小説）
   function majorHasCharacters(majorId){
@@ -1438,8 +1446,23 @@
     ['b5', '誰でもわかる', ['business', [], null], ['business', ['business-hobby'], null]],
     ['b9', '逆ソクラテス', ['novel', ['novel-mystery', 'novel-youth'], 'short'], ['novel', ['novel-youth', 'novel-mystery', 'novel-human'], 'short']]
   ];
-  function applyReclass(b){
-    const hit = RECLASS_2026_09.find(r => r[0] === b.id && (b.title || '').replace(/\s/g, '').startsWith(r[1]));
+  /* 2回目の見直し（同日）：教養／ビジネス・実用／自己啓発の線引きと、
+     小説以外の書き方（一冊一テーマ／単元ごと）。見直し前＝1回目の見直し後。 */
+  const RECLASS_2026_09_B = [
+    ['b1', 'ピーター・リンチ', ['business', ['business-invest'], null], ['business', ['business-invest'], 'theme']],
+    ['b11', '限りある時間', ['selfhelp', ['selfhelp-time', 'selfhelp-life'], null], ['selfhelp', ['selfhelp-life'], 'theme']],
+    ['b15', '熟睡者', ['business', ['business-health'], null], ['business', ['business-health'], 'theme']],
+    ['b19', '13歳からの地政学', ['liberal', ['liberal-politics'], null], ['liberal', ['liberal-politics'], 'theme']],
+    ['b20', 'なぜあなたの感想は', ['business', ['business-writing'], null], ['business', ['business-work'], 'theme']],
+    ['b3', '賢明なる個人投資家', ['business', ['business-invest'], null], ['business', ['business-invest'], 'theme']],
+    ['b30', '教養としてのコーヒー', ['liberal', ['liberal-food'], null], ['liberal', ['liberal-art'], 'theme']],
+    ['b31', '宇宙一わかる', ['liberal', ['liberal-science'], null], ['liberal', ['liberal-science'], 'unit']],
+    ['b33', '就活のまえに', [null, [], null], ['business', ['business-work'], 'theme']],
+    ['b4', 'ママ投資家', ['business', ['business-invest'], null], ['business', ['business-invest'], 'theme']],
+    ['b5', '誰でもわかる', ['business', ['business-hobby'], null], ['business', ['business-hobby'], 'unit']]
+  ];
+  function applyReclassTable(table, b){
+    const hit = table.find(r => r[0] === b.id && (b.title || '').replace(/\s/g, '').startsWith(r[1]));
     if(!hit) return false;
     const before = hit[2], after = hit[3];
     const minors = b.minorCategories || [];
@@ -1448,6 +1471,23 @@
     b.majorCategory = after[0];
     b.minorCategories = after[1].slice();
     b.style = after[2];
+    return true;
+  }
+  // 古い順に当てる（1回目の見直し前のまま残っていた本も、2回目までたどれる）
+  function applyReclass(b){
+    let changed = false;
+    [RECLASS_2026_09, RECLASS_2026_09_B].forEach(table => { if(applyReclassTable(table, b)) changed = true; });
+    return changed;
+  }
+  // v6でまとめた固定idの小分類は、どの端末でも同じ付け替えをする
+  const MINOR_ID_MERGES = {
+    'liberal-tech': 'liberal-science', 'liberal-food': 'liberal-art',
+    'business-writing': 'business-work', 'selfhelp-habit': 'selfhelp-time'
+  };
+  function mergeCanonicalMinorIds(b){
+    const ids = b.minorCategories || [];
+    if(!ids.some(id => MINOR_ID_MERGES[id])) return false;
+    b.minorCategories = Array.from(new Set(ids.map(id => MINOR_ID_MERGES[id] || id)));
     return true;
   }
   // 本に付いた「m:ラベル」「c:ラベル」のidが、この端末の一覧に無ければ足す。
@@ -1554,6 +1594,7 @@
     // 見直し表は「見直し前の分類」と比べるので、移し替えより先に当てる
     if(applyReclass(b)) changed = true;
     if(applyCategoryMoves(b)) changed = true;
+    if(mergeCanonicalMinorIds(b)) changed = true;
     if(ensureCategoriesForBook(b)) changed = true;
     if(raw.status && raw.status !== 'reading' && raw.status !== 'done'){ changed = true; }
     if((raw.author || '') !== b.author){ changed = true; }   // 空白を詰めた分はクラウドにも反映する
@@ -1601,7 +1642,7 @@
      届いた時点で正しく移る。
      移行は一度だけ走り、あとからユーザーが消した分類は復活しない。 */
   const CAT_SCHEMA_KEY = 'reading-log-cat-schema';
-  const CAT_SCHEMA_VERSION = 5;
+  const CAT_SCHEMA_VERSION = 6;
   const CAT_MOVES_STORAGE_KEY = 'reading-log-cat-moves';
   function loadCategoryMoves(){
     try{
@@ -1709,7 +1750,8 @@
       mergeInto(byLabel('エッセイ'), liberal, { style: 'essay' });
     }
 
-    if(version < 5){
+    // v6：同じ作り直しで、似ている小分類をさらにまとめた（IT・技術→科学・技術 など）
+    if(version < 6){
       // v5：4つの大分類を固定id（novel/liberal/business/selfhelp）に揃え、
       // 似ている小分類をまとめる。端末ごとにランダムidだった大分類・小分類は
       // 移し替え表で固定idへ付け替える。一覧に無いユーザー独自の分類は残す。
@@ -1768,7 +1810,8 @@
   let statusFilter = null;   // null（指定なし）/ 'reading' / 'done'
   let majorFilter = null;    // 大分類のid
   let minorFilter = null;    // 小分類のid
-  let formatFilter = null;   // 判型（'shinsho' / 'tankobon'）
+  let formatFilter = null;   // 判型（'shinsho' / 'tankobon' / 'bunko'）
+  let styleFilter = null;    // 書き方（'long' / 'theme' など）
   let searchQuery = '';
   let statsYear = new Date().getFullYear();
   let statsRange = 'year';              // 'year' / 'total'
@@ -1912,22 +1955,29 @@
     });
     document.getElementById('minorFilterRow').classList.toggle('show', !!majorFilter && usedMinors.length > 0);
 
-    /* 判型は一番下の枝。最初の画面では出さず、読了／読書中 → 大分類と
-       選んで、その中に判型が付いた本があるときだけ出す。 */
-    const formatBase = booksInMinor();
-    if(!majorFilter) formatFilter = null;
-    if(formatFilter && !formatBase.some(b => matchesFormatFilter(b, formatFilter))) formatFilter = null;
-    const usedFormats = FORMATS.concat(STYLES).filter(f => formatBase.some(b => matchesFormatFilter(b, f[0])));
-    const formatTabsEl = document.getElementById('formatFilterTabs');
-    formatTabsEl.innerHTML = '';
-    usedFormats.forEach(f => {
-      const chip = document.createElement('div');
-      chip.className = 'filter-chip' + (formatFilter === f[0] ? ' active' : '');
-      chip.dataset.format = f[0];
-      chip.textContent = chipLabel(f[1], formatBase.filter(b => matchesFormatFilter(b, f[0])).length);
-      formatTabsEl.appendChild(chip);
+    /* 判型と書き方は一番下の枝で、別々の行に出す。最初の画面では出さず、
+       ステータス → 大分類と選んで、その中に付いた本があるときだけ出す。
+       判型と書き方は重ねて絞り込める。 */
+    const shapeBase = booksInMinor();
+    if(!majorFilter){ formatFilter = null; styleFilter = null; }
+    if(formatFilter && !shapeBase.some(b => b.format === formatFilter)) formatFilter = null;
+    if(styleFilter && !shapeBase.some(b => b.style === styleFilter)) styleFilter = null;
+    [
+      ['formatFilterRow', 'formatFilterTabs', FORMATS, 'format', formatFilter],
+      ['styleFilterRow', 'styleFilterTabs', STYLES, 'style', styleFilter]
+    ].forEach(([rowId, tabsId, options, field, current]) => {
+      const used = options.filter(o => shapeBase.some(b => b[field] === o[0]));
+      const tabsEl = document.getElementById(tabsId);
+      tabsEl.innerHTML = '';
+      used.forEach(o => {
+        const chip = document.createElement('div');
+        chip.className = 'filter-chip' + (current === o[0] ? ' active' : '');
+        chip.dataset.value = o[0];
+        chip.textContent = chipLabel(o[1], shapeBase.filter(b => b[field] === o[0]).length);
+        tabsEl.appendChild(chip);
+      });
+      document.getElementById(rowId).classList.toggle('show', !!majorFilter && used.length > 0);
     });
-    document.getElementById('formatFilterRow').classList.toggle('show', !!majorFilter && usedFormats.length > 0);
   }
   /* 並び替えの基準日は読了日。読了日が無い本（読書中）は読み始めた日、
      どちらも無ければ登録した日時で比べる。 */
@@ -1968,7 +2018,8 @@
     if(statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
     if(majorFilter) filtered = filtered.filter(b => b.majorCategory === majorFilter);
     if(minorFilter) filtered = filtered.filter(b => (b.minorCategories || []).includes(minorFilter));
-    if(formatFilter) filtered = filtered.filter(b => matchesFormatFilter(b, formatFilter));
+    if(formatFilter) filtered = filtered.filter(b => b.format === formatFilter);
+    if(styleFilter) filtered = filtered.filter(b => b.style === styleFilter);
     filtered = sortBooks(filtered);
     wrap.innerHTML = '';
     if(filtered.length === 0){
@@ -2431,14 +2482,18 @@
     let html = '';
 
     const detailMajor = b.majorCategory ? findMajor(b.majorCategory) : null;
-    const shapeLabels = [formatLabel(b.format), styleLabel(b.style)].filter(Boolean);
-    if(detailMajor || shapeLabels.length){
-      const minors = detailMajor ? (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean) : [];
-      const cardLabel = [detailMajor && '大分類・小分類', shapeLabels.length && '判型・書き方'].filter(Boolean).join('／');
-      html += '<div class="info-card"><div class="ic-label">' + cardLabel + '</div><div class="chip-row" style="margin:0;">' +
-        (detailMajor ? '<span class="chip" style="padding:6px 14px;">' + escapeHTML(detailMajor.label) + '</span>' : '') +
+    if(detailMajor){
+      const minors = (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean);
+      html += '<div class="info-card"><div class="ic-label">大分類・小分類</div><div class="chip-row" style="margin:0;">' +
+        '<span class="chip" style="padding:6px 14px;">' + escapeHTML(detailMajor.label) + '</span>' +
         minors.map(m => '<span class="chip" style="padding:6px 14px;background:var(--accent-tint);border-color:var(--accent-tint);color:var(--accent-deep);">' + escapeHTML(m.label) + '</span>').join('') +
-        shapeLabels.map(l => '<span class="chip" style="padding:6px 14px;background:transparent;border-color:var(--accent);color:var(--accent);">' + escapeHTML(l) + '</span>').join('') +
+        '</div></div>';
+    }
+    // 判型（本の形）と書き方（中身の組み立て）は別々に並べる
+    if(b.format || b.style){
+      html += '<div class="info-card"><div class="date-row">' +
+        '<div class="d-item"><div class="d-label">判型</div><div>' + escapeHTML(formatLabel(b.format) || '—') + '</div></div>' +
+        '<div class="d-item"><div class="d-label">書き方</div><div>' + escapeHTML(styleLabel(b.style) || '—') + '</div></div>' +
         '</div></div>';
     }
     if(b.startDate || b.endDate){
@@ -2699,14 +2754,18 @@
       return;
     }
     input.disabled = false;
-    note.textContent = '複数選択できます。候補になければ入力してEnterで新規追加できます。';
+    // 小説はジャンルを複数付けられる。それ以外の本は「1冊1ジャンル」で、いちばん中心のテーマを1つ選ぶ
+    const multi = isNovelMajor(major);
+    note.textContent = (multi ? '複数選択できます。' : '1冊に1つ、いちばん中心のテーマを選びます。') + '候補になければ入力してEnterで新規追加できます。';
     major.minors.forEach(minor => {
       const chip = document.createElement('div');
       chip.className = 'status-chip' + (selectedMinorIds.includes(minor.id) ? ' active' : '');
       chip.textContent = minor.label;
       chip.addEventListener('click', () => {
         const idx = selectedMinorIds.indexOf(minor.id);
-        if(idx >= 0){ selectedMinorIds.splice(idx, 1); } else { selectedMinorIds.push(minor.id); }
+        if(idx >= 0){ selectedMinorIds.splice(idx, 1); }
+        else if(multi){ selectedMinorIds.push(minor.id); }
+        else { selectedMinorIds = [minor.id]; }
         renderMinorChips();
       });
       row.appendChild(chip);
@@ -2767,7 +2826,8 @@
       saveCategories();
       cloudSaveSettings();
     }
-    if(!selectedMinorIds.includes(minor.id)) selectedMinorIds.push(minor.id);
+    if(!isNovelMajor(major)) selectedMinorIds = [minor.id];
+    else if(!selectedMinorIds.includes(minor.id)) selectedMinorIds.push(minor.id);
     e.target.value = '';
     renderMinorChips();
   });
@@ -3367,8 +3427,15 @@
   document.getElementById('formatFilterTabs').addEventListener('click', e => {
     const chip = e.target.closest('.filter-chip');
     if(!chip) return;
-    const value = chip.dataset.format;
+    const value = chip.dataset.value;
     formatFilter = (formatFilter === value) ? null : value;
+    renderList();
+  });
+  document.getElementById('styleFilterTabs').addEventListener('click', e => {
+    const chip = e.target.closest('.filter-chip');
+    if(!chip) return;
+    const value = chip.dataset.value;
+    styleFilter = (styleFilter === value) ? null : value;
     renderList();
   });
   document.getElementById('searchInput').addEventListener('input', e => {
@@ -3515,7 +3582,7 @@
     const note = document.createElement('p');
     note.className = 'field-note';
     note.style.cssText = 'margin:0 2px 16px;';
-    note.textContent = '「人物メモあり」にすると、その大分類の本で感想の下に「印象に残った人物」を書けるようになります。判型（新書・単行本・文庫）はどの大分類でも、書き方は小説なら長編・短編・短編集、それ以外ならエッセイを選べます。似た名前の小分類（例：睡眠と健康）は1つにまとまります。';
+    note.textContent = '「人物メモあり」にすると、その大分類の本で感想の下に「印象に残った人物」を書けるようになります。判型（新書・単行本・文庫）と書き方は別々の欄で、書き方は小説なら長編・短編・短編集、それ以外なら一冊一テーマ・単元ごと・エッセイです。線引き：知識やしくみを学ぶ本は教養、手法・ノウハウが中心ならビジネス・実用、考え方・習慣が中心なら自己啓発（小説以外は1冊1つの小分類）。似た名前の小分類（例：睡眠と筋トレ→健康・からだ）は1つにまとまります。';
     wrap.appendChild(note);
     categories.forEach(major => {
       const block = document.createElement('div');
@@ -4132,7 +4199,91 @@
     return null;
   }
   function guessCategory(book){
-    return (book.ndc && guessFromNdc(book.ndc)) || (book.ccode && guessFromCcode(book.ccode)) || null;
+    const base = (book.ndc && guessFromNdc(book.ndc)) || (book.ccode && guessFromCcode(book.ccode)) || null;
+    if(base && base.major === '小説') return base;
+    const refined = refineNonFiction(book, base);
+    if(refined && base && base.style && !refined.style) refined.style = base.style;
+    return refined;
+  }
+
+  /* ---------- 教養／ビジネス・実用／自己啓発の線引き ----------
+     ① 迷いやすい本は下の辞書で決める
+        ・心理学の入門・解説 → 教養／対人関係などに応用 → 自己啓発
+        ・統計学・経済学の教科書 → 教養／仕事で使う実務書 → ビジネス・実用
+        ・伝記・自伝 → 教養（本人の成功法則を体系化した本なら自己啓発）
+     ② 複合本（筋トレ×自己啓発、投資×マインドなど）は「行動に直結する具体度」で
+        1つに決める。手法・ノウハウの言葉が多ければビジネス・実用、
+        マインド・習慣の言葉が主なら自己啓発。両方には入れない。
+     ③ 言葉で決まらなければ、書誌の分類（NDC・Cコード）に従う。 */
+  const HOWTO_WORDS = /投資|株式|株で|資産|お金|節約|税金|NISA|iDeCo|仕事術|仕事で使|実務|実践|手法|テクニック|ノウハウ|スキル|図解|やり方|方法|コツ|勉強法|話し方|伝え方|書き方|文章術|プレゼン|営業|マーケティング|経営|Excel|エクセル|転職|就活|面接|キャリア|レシピ|料理|筋トレ|トレーニング|ダイエット|睡眠|理論/g;
+  const MIND_WORDS = /習慣|生き方|人生|幸せ|幸福|メンタル|マインド|自己肯定感|考え方|心の|心が|悩み|不安|前向き|ポジティブ|モチベーション|自分を変え|なりたい自分|成功法則|引き寄せ|折れない|嫌われる|人間関係|自信|勇気/g;
+  const LIBERAL_WORDS = /とは何か|歴史|教養|哲学|思想|科学|宇宙|地政学|経済学|統計学|社会学|講義|学問/g;
+  function howtoMinor(text){
+    if(/投資|株|資産|お金|節約|税金|NISA|iDeCo|FIRE|貯/.test(text)) return '投資・お金';
+    if(/睡眠|健康|筋トレ|トレーニング|ダイエット|運動|からだ|食事法/.test(text)) return '健康・からだ';
+    if(/料理|レシピ|暮らし|家事|片づけ|子育て/.test(text)) return '料理・暮らし';
+    if(/音楽|楽器|ギター|ピアノ|作曲|趣味|カメラ/.test(text)) return '音楽・趣味';
+    if(/経営|マーケティング|営業|起業|戦略|ブランド/.test(text)) return '経営・マーケティング';
+    return '仕事・スキル';
+  }
+  function mindMinor(text){
+    if(/人間関係|対人|好かれ|人付き合い|コミュニケーション/.test(text)) return '人間関係';
+    if(/習慣|時間|継続|続ける/.test(text)) return '習慣・時間';
+    if(/メンタル|不安|ストレス|心が|折れない|自己肯定感|自信/.test(text)) return 'メンタル';
+    return '生き方・考え方';
+  }
+  function liberalMinor(text){
+    if(/哲学|思想|宗教/.test(text)) return '哲学・思想';
+    if(/心理/.test(text)) return '心理学';
+    if(/伝記|自伝|歴史/.test(text)) return '歴史・伝記';
+    if(/政治|国際|地政学|外交|戦争/.test(text)) return '政治・国際';
+    if(/経済/.test(text)) return '経済';
+    if(/科学|宇宙|生物|物理|数学|人工知能|AI|技術|医学/.test(text)) return '科学・技術';
+    if(/芸術|美術|映画|文化|コーヒー|食/.test(text)) return '芸術・文化';
+    if(/言葉|日本語|言語/.test(text)) return '言葉';
+    if(/社会/.test(text)) return '社会';
+    return undefined;
+  }
+  function refineNonFiction(book, base){
+    const text = [book.title, book.series, book.description].join('\n');
+    const has = re => re.test(text);
+    const count = re => (text.match(re) || []).length;
+    const ndc = Math.floor(parseFloat(book.ndc));
+    // ① 辞書
+    if((ndc >= 280 && ndc < 290) || has(/伝記|自伝|評伝|半生/)){
+      if(has(/成功法則|成功哲学|の教え|流仕事術|ルール|習慣/)) return { major: '自己啓発', minor: '生き方・考え方' };
+      return { major: '教養', minor: '歴史・伝記' };
+    }
+    if((ndc >= 140 && ndc < 150) || has(/心理学/)){
+      // 入門書・解説書は教養。対人関係の変え方や、生き方・勇気のような心の持ち方に応用した本は自己啓発
+      if(has(/人間関係|対人|好かれ|人付き合い|相手を動かす|変え方/)) return { major: '自己啓発', minor: '人間関係' };
+      if(!has(/入門|解説|とは何か|講義|基礎|教科書|はじめての|図解/) && count(MIND_WORDS) >= 1) return { major: '自己啓発', minor: mindMinor(text) };
+      return { major: '教養', minor: '心理学' };
+    }
+    if(has(/統計学|データ分析|経済学/)){
+      if(has(/仕事|ビジネス|実務|使える|使う|現場|武器/)) return { major: 'ビジネス・実用', minor: '仕事・スキル' };
+      return { major: '教養', minor: has(/経済学/) ? '経済' : '科学・技術' };
+    }
+    // ② 具体度
+    const howto = count(HOWTO_WORDS), mind = count(MIND_WORDS), liberal = count(LIBERAL_WORDS);
+    const baseMajor = base ? base.major : null;
+    if(baseMajor === '教養'){
+      // 教養に分類される本でも、中身がはっきり手法寄り・マインド寄りなら移す
+      if(mind >= 2 && mind > howto && mind > liberal) return { major: '自己啓発', minor: mindMinor(text) };
+      if(howto >= 2 && howto > mind && howto > liberal) return { major: 'ビジネス・実用', minor: howtoMinor(text) };
+      return { major: '教養', minor: base.minor || liberalMinor(text), style: base.style };
+    }
+    if(baseMajor === 'ビジネス・実用' || baseMajor === '自己啓発' || howto + mind > 0){
+      let major;
+      if(howto > mind) major = 'ビジネス・実用';
+      else if(mind > howto) major = '自己啓発';
+      else major = baseMajor || '自己啓発';
+      if(major === 'ビジネス・実用') return { major: major, minor: (baseMajor === major && base.minor) || howtoMinor(text) };
+      return { major: major, minor: mindMinor(text) };
+    }
+    // ③ 言葉で決まらないとき
+    if(liberal > 0) return { major: '教養', minor: liberalMinor(text) };
+    return base;
   }
   // 判型：シリーズ名の「新書」「文庫」か、Cコード2桁目(1文庫 2新書)で決める。どちらでもなければ単行本
   function guessFormat(book){
@@ -4149,9 +4300,12 @@
     if(isNovelMajor(major)){
       return /短編|短篇|作品集|傑作選|アンソロジー/.test(text) ? 'short' : 'long';
     }
+    if(!major) return null;
     if(guess && guess.style) return guess.style;
-    if(/エッセイ|随筆/.test(text)) return 'essay';
-    return null;
+    if(/エッセイ|随筆|コラム集/.test(text)) return 'essay';
+    // 図解・事典・「〇〇の習慣」のように、数ページで1項目が読み切りになっている本
+    if(/図解|事典|大全|辞典|図鑑|Q&A|Q＆A|一問一答|見開き|1日1|[0-9０-９]+の(習慣|ルール|法則|方法|コツ|言葉|教え|ヒント|問い|考え方)/.test(text)) return 'unit';
+    return 'theme';
   }
 
   /* ---------- 小説のジャンル ----------
@@ -4272,15 +4426,15 @@
     autoResizeTitle();
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
-    let guess = guessCategory(book);
-    const history = authorHistory(book);
-    if(!guess && history.majorLabel) guess = { major: history.majorLabel };   // 書誌で分からなければ、同じ著者の本に合わせる
-    // 小説（またはまだ分からない本）は、ジャンル・書き方を決めるために紹介文も取りに行く
-    if(book.isbn && !book.description && (!guess || guess.major === '小説')){
+    // ジャンル・線引き・書き方を決めるために紹介文も取りに行く
+    if(book.isbn && !book.description){
       setLookupNote('「' + book.title + '」のジャンルを調べています…', true);
       book.description = await fetchDescription(book.isbn);
       if(token !== lookupToken) return;
     }
+    let guess = guessCategory(book);
+    const history = authorHistory(book);
+    if(!guess && history.majorLabel) guess = { major: history.majorLabel };   // 書誌で分からなければ、同じ著者の本に合わせる
     const categoryReplaceable = (!selectedMajorId && !selectedFormat && !selectedStyle) || categoryKey() === autoFilled.category;
     let catText = '';
     const addedMinorLabels = [];
@@ -4293,7 +4447,7 @@
         if(isNovelMajor(major)) guessNovelGenres(book, history).forEach(l => labels.push(l));
         else history.minorLabels.forEach(l => { if(major.label === history.majorLabel && !guess.minor) labels.push(l); });
         labels.forEach(label => {
-          if(minors.length >= 3) return;
+          if(minors.length >= (isNovelMajor(major) ? 3 : 1)) return;   // 小説以外は1冊1ジャンル
           // 小分類に無いジャンルは自動で追加する（違っていれば登録画面で外してもらう）
           const result = ensureMinor(major, label);
           if(minors.includes(result.minor)) return;
@@ -4313,7 +4467,7 @@
     }
     const msgParts = [];
     if(catText) msgParts.push('分類：' + catText + (addedMinorLabels.length ? '（小分類「' + addedMinorLabels.join('」「') + '」を新しく追加）' : ''));
-    if(categoryReplaceable && selectedMajorId && isNovelMajor(findMajor(selectedMajorId))) msgParts.push('ジャンルと書き方は推定なので、違っていたら直してください');
+    if(categoryReplaceable && selectedMajorId) msgParts.push('分類と書き方は推定なので、違っていたら直してください');
     if(!selectedMajorId) msgParts.push('大分類は選んでください');
     const baseMsg = '「' + book.title + '」の情報を入れました。' + msgParts.map(p => p + '。').join('');
 
