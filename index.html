@@ -514,10 +514,26 @@
     font-size:12px; color:var(--ink-soft); font-family:inherit; background:var(--surface-raised);
   }
   .impression-index-label{ font-size:14px; font-weight:600; color:var(--ink); }
-  .memo-del{ margin-left:auto; border:none; background:none; color:var(--ink-soft); font-size:13px; cursor:pointer; text-decoration:underline; }
+  .memo-del{ margin-left:auto; white-space:nowrap; border:none; background:none; color:var(--ink-soft); font-size:13px; cursor:pointer; text-decoration:underline; }
   .memo-card textarea, .memo-card input[type=text]{ background:var(--surface-raised); }
   .memo-quote-input{ resize:none; min-height:0; overflow:hidden; }
   .memo-card label.field-label{ color:var(--ink-soft); }
+  /* 見出しの右端に「日記へ」ボタンを置く行 */
+  .field-label-row{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .to-diary-btn{
+    flex-shrink:0; border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:4px 12px; font-size:12px; font-family:inherit; cursor:pointer;
+  }
+  .to-diary-btn:active{ background:var(--accent); color:#fff; }
+  .to-diary-btn.sent{ background:var(--accent-tint); border-color:transparent; color:var(--accent-deep); }
+  .app-toast{
+    position:fixed; left:50%; top:14px; transform:translateX(-50%) translateY(-8px);
+    background:var(--ink); color:#fff; font-size:13px; line-height:1.6; padding:10px 16px;
+    border-radius:var(--pill); max-width:86%; text-align:center;
+    opacity:0; pointer-events:none; z-index:60;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .app-toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
   .memo-quote{ font-size:15px; font-weight:400; line-height:1.75; color:var(--ink); margin:2px 0 10px; }
   .emo-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
   .emo-chip{
@@ -1120,6 +1136,8 @@
       <div class="modal-list" id="categoryEditList" style="padding:10px 18px 24px;"></div>
     </div>
   </div>
+
+  <div class="app-toast" id="appToast"></div>
 
   <!-- フルスクリーン編集(感想・引用・気づき・次にやりたいこと) -->
   <div class="fullscreen-editor" id="fullscreenEditor">
@@ -2931,7 +2949,10 @@
         '<input type="date" class="memo-date-input" value="' + escapeHTML(memo && memo.date || '') + '">' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
-      '<label class="field-label first">引用・気になった箇所</label>' +
+      '<div class="field-label-row">' +
+        '<label class="field-label first">引用・気になった箇所</label>' +
+        '<button class="to-diary-btn" type="button" data-to-diary="quote">日記へ</button>' +
+      '</div>' +
       '<textarea class="memo-quote-input" rows="1" placeholder="本文からの引用">' + escapeHTML(memo && memo.quote || '') + '</textarea>' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
       '<div class="emo-row">' +
@@ -2939,7 +2960,10 @@
       '</div>' +
       '<button class="memo-toggle" type="button"><span class="toggle-text">' + (expanded ? '閉じる' : '気づきを見る') + '</span><span class="toggle-icon">▾</span></button>' +
       '<div class="memo-collapsible">' +
-        '<label class="field-label first">気づきメモ</label>' +
+        '<div class="field-label-row">' +
+          '<label class="field-label first">気づきメモ</label>' +
+          '<button class="to-diary-btn" type="button" data-to-diary="insight">日記へ</button>' +
+        '</div>' +
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
@@ -2949,10 +2973,24 @@
     autoResizeTextarea(quoteInput);
     makeFieldOpenFullscreen(quoteInput, '引用・気になった箇所');
     makeFieldOpenFullscreen(card.querySelector('.memo-collapsible textarea'), '気づきメモ');
+    card.querySelectorAll('[data-to-diary]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const isQuote = btn.dataset.toDiary === 'quote';
+        const target = isQuote ? quoteInput : card.querySelector('.memo-collapsible textarea');
+        const page = card.querySelector('.page-field input').value.trim();
+        if(sendToDiary(target.value, isQuote ? '引用' : '気づき', page)){
+          btn.textContent = '送信済み';
+          btn.classList.add('sent');
+        }
+      });
+    });
     return card;
   }
   function addMemo(){
-    document.getElementById('memoList').appendChild(buildFormMemoCard(null, true));
+    // 高さは画面に入れてからでないと測れないので、追加してから測り直す
+    const card = buildFormMemoCard(null, true);
+    document.getElementById('memoList').appendChild(card);
+    autoResizeTextarea(card.querySelector('.memo-quote-input'));
   }
   function gatherMemos(){
     return Array.from(document.querySelectorAll('#memoList .memo-card')).map(card => ({
@@ -2962,6 +3000,60 @@
       emotions: Array.from(card.querySelectorAll('.emo-chip.active')).map(e => e.textContent.trim()),
       insight: card.querySelector('.memo-collapsible textarea').value.trim()
     }));
+  }
+
+  /* ---------- 思考メモ(日記)へ下書きを送る ----------
+     読書記録も思考メモも同じ github.io のページなので localStorage を共有できる。
+     ここでは受け取り箱に足すだけで、確認して消すのは思考メモ側の役目。
+     (ローカルのserve.ps1どうしはポートが違う＝別オリジンなので届かない) */
+  const DIARY_INBOX_KEY = 'shikou-memo:inbox';
+  let toastTimer = null;
+  function showToast(message){
+    const el = document.getElementById('appToast');
+    el.textContent = message;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
+  }
+  function readDiaryInbox(){
+    try{
+      const raw = localStorage.getItem(DIARY_INBOX_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed : [];
+    }catch(e){
+      return [];   // 壊れていたら空として扱う(送信自体は続ける)
+    }
+  }
+  function sendToDiary(text, fieldLabel, page){
+    const trimmed = (text || '').trim();
+    if(!trimmed){ showToast('先に書いてから送ってください'); return false; }
+    const list = readDiaryInbox();
+    // 同じ文面を二重に送らない(押し間違い対策)
+    if(list.some(d => d && d.text === trimmed && d.source && d.source.field === fieldLabel)){
+      showToast('この文章はもう送ってあります');
+      return true;
+    }
+    list.push({
+      id: 'rl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+      text: trimmed,
+      createdAt: new Date().toISOString(),
+      source: {
+        app: 'reading-log',
+        bookId: editingBookId || null,
+        title: document.getElementById('titleInput').value.trim(),
+        author: document.getElementById('authorInput').value.trim(),
+        page: page || '',
+        field: fieldLabel
+      }
+    });
+    try{
+      localStorage.setItem(DIARY_INBOX_KEY, JSON.stringify(list));
+    }catch(e){
+      showToast('思考メモに送れませんでした');
+      return false;
+    }
+    showToast('思考メモに下書きとして送りました');
+    return true;
   }
 
   /* ---------- 感想（読むたびに複数追加できる） ---------- */
@@ -3189,8 +3281,17 @@
   ========================================================= */
   const titleInputEl = document.getElementById('titleInput');
   function autoResizeTextarea(el){
+    if(!el) return;
     el.style.height = 'auto';
+    // 画面が非表示のうちは高さを測れず scrollHeight が 0 になる。
+    // そこで 0px を入れると入力欄が潰れて文字がずれるので、測れたときだけ設定する。
+    if(!el.scrollHeight) return;
     el.style.height = el.scrollHeight + 'px';
+  }
+  // フォームを表示した直後に、自動で伸びる入力欄の高さをまとめて測り直す
+  function resizeFormTextareas(){
+    autoResizeTitle();
+    document.querySelectorAll('#memoList .memo-quote-input').forEach(autoResizeTextarea);
   }
   function autoResizeTitle(){
     autoResizeTextarea(titleInputEl);
@@ -3327,13 +3428,13 @@
   function openFormNew(){
     resetForm();
     showScreen('Form');
-    autoResizeTitle();
+    resizeFormTextareas();
   }
   function openFormEdit(b){
     if(!b) return;
     loadFormFromBook(b);
     showScreen('Form');
-    autoResizeTitle();
+    resizeFormTextareas();
   }
   function formBack(){
     if(editingBookId){
