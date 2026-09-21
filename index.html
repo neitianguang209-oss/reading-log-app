@@ -570,6 +570,17 @@
   .memo-card.compact{ padding:12px 14px 11px; cursor:pointer; }
   .memo-top-compact{ display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
   .memo-date-badge{ font-size:11px; color:var(--ink-faint); }
+  /* 短編集：付箋がどの話のものか */
+  .memo-story-row{ margin:0 0 12px; }
+  .memo-story-select{
+    width:100%; border:1px solid var(--line); background:var(--surface-raised); color:var(--ink);
+    border-radius:var(--radius-sm); padding:10px 12px; font-size:14px; font-family:inherit;
+  }
+  .memo-story-tag{ font-size:11px; color:var(--accent-deep); margin:6px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .memo-group-heading{ grid-column:1 / -1; font-size:13px; font-weight:600; color:var(--ink-soft); margin:8px 2px -2px; }
+  .memo-group-heading:first-child{ margin-top:0; }
+  /* 自動保存の状態表示（フォーム右上） */
+  .autosave-status{ position:absolute; right:var(--side); bottom:14px; font-size:12px; color:var(--ink-faint); }
   .memo-card.compact .memo-quote{
     font-size:13px; line-height:1.6; margin:0 0 8px;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
@@ -868,6 +879,7 @@
         <p class="eyebrow">book log / entry form</p>
         <h1 id="formHeading">本を登録</h1>
       </div>
+      <span class="autosave-status" id="autosaveStatus"></span>
     </div>
 
     <div class="form">
@@ -1017,6 +1029,16 @@
 
       <hr class="divider">
 
+      <!-- 収録されている話（書き方が「短編集」のときに出る） -->
+      <div id="storyField" style="display:none;">
+        <div class="section">
+          <div class="section-label"><span class="txt">収録されている話</span><span class="sub">各話のあらすじと感想</span></div>
+          <div class="memo-list" id="storyList"></div>
+          <button class="add-memo-btn" onclick="addStory()" type="button">＋ 話を追加</button>
+        </div>
+        <hr class="divider">
+      </div>
+
       <!-- 付箋メモ -->
       <div class="section conditional" id="sec-memo">
         <div class="section-label"><span class="num">②</span><span class="txt">付箋メモ</span><span class="sub">ページ順</span></div>
@@ -1030,7 +1052,7 @@
       <div class="section conditional" id="sec-after">
         <div class="section-label"><span class="num">③</span><span class="txt">読んだ後</span></div>
 
-        <label class="field-label first">感想<span class="opt">読むたびに追加できます</span></label>
+        <label class="field-label first" id="impressionLabel">感想<span class="opt">読むたびに追加できます</span></label>
         <div class="memo-list" id="impressionList"></div>
         <button class="add-memo-btn" onclick="addImpression()" type="button">＋ 感想を追加</button>
 
@@ -1038,12 +1060,6 @@
           <label class="field-label">印象に残った人物<span class="opt">何人でも追加できます</span></label>
           <div class="memo-list" id="characterList"></div>
           <button class="add-memo-btn" onclick="addCharacter()" type="button">＋ 人物を追加</button>
-        </div>
-
-        <div id="storyField" style="display:none;">
-          <label class="field-label">収録されている話<span class="opt">短編集の各話メモ</span></label>
-          <div class="memo-list" id="storyList"></div>
-          <button class="add-memo-btn" onclick="addStory()" type="button">＋ 話を追加</button>
         </div>
 
         <label class="field-label">評価</label>
@@ -1057,7 +1073,7 @@
         <textarea id="nextActionInput" placeholder="読んで得た気づきをどう行動に移すか"></textarea>
       </div>
 
-      <p class="badge-note">入力した記録はこのブラウザ内（localStorage）に保存されます。<br>この端末・このブラウザでのみ参照でき、データ消去で失われます。</p>
+      <p class="badge-note">書いた内容は自動で保存されます（タイトルを入れた時点から）。<br>入力した記録はこのブラウザ内（localStorage）に保存されます。<br>この端末・このブラウザでのみ参照でき、データ消去で失われます。</p>
     </div>
 
     <div class="save-bar">
@@ -1588,7 +1604,8 @@
       connection: raw.connection || null,
       memos: (Array.isArray(raw.memos) ? raw.memos : []).map(m => ({
         page: m.page || '', date: m.date || '', quote: m.quote || '',
-        emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || ''
+        emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || '',
+        storyId: m.storyId || ''
       })),
       impressions: (Array.isArray(raw.impressions) && raw.impressions.length)
         ? raw.impressions
@@ -1602,13 +1619,16 @@
       format: FORMATS.some(f => f[0] === raw.format) ? raw.format : null,
       style: STYLES.some(s => s[0] === raw.style) ? raw.style : null,
       stories: (Array.isArray(raw.stories) ? raw.stories : []).map(s => ({
-        title: (s && s.title) || '', summary: (s && s.summary) || ''
+        id: (s && s.id) || '', title: (s && s.title) || '', summary: (s && s.summary) || '',
+        impression: (s && s.impression) || ''
       })),
       characters: (Array.isArray(raw.characters) ? raw.characters : []).map(c => ({
         name: (c && c.name) || '', profile: (c && c.profile) || '', reason: (c && c.reason) || ''
       })),
       createdAt: raw.createdAt || null
     };
+    // 付箋を各話に結びつけるための固定id。無ければ一度だけ振って保存し直す
+    b.stories.forEach(st => { if(!st.id){ st.id = genCatId('s'); changed = true; } });
     // 見直し表は「見直し前の分類」と比べるので、移し替えより先に当てる
     if(applyReclass(b)) changed = true;
     if(applyCategoryMoves(b)) changed = true;
@@ -1835,7 +1855,7 @@
   let statsRange = 'year';              // 'year' / 'total'
   let editingBookId = null;
   let currentDetailId = null;
-  let memoSortOrder = 'page';        // 'page'=ページ順 / 'written'=書いた順
+  let memoSortOrder = 'page';        // 'page'=ページ順 / 'written'=書いた順 / 'story'=話の順(短編集)
   let memoEmotionFilter = new Set(); // 選択中の感情タグ(空なら全件表示)
   let currentConnection = null;
 
@@ -2449,7 +2469,7 @@
     if(memoEmotionFilter.size > 0){
       list = list.filter(x => (x.m.emotions || []).some(e => memoEmotionFilter.has(e)));
     }
-    if(memoSortOrder === 'page'){
+    if(memoSortOrder === 'page' || memoSortOrder === 'story'){
       list.sort((a, b) => {
         const pa = parseInt(a.m.page, 10);
         const pb = parseInt(b.m.page, 10);
@@ -2461,8 +2481,12 @@
     }
     return list.map(x => x.m);
   }
-  function buildMemoToolbarHTML(){
-    const sortHTML = [['page','ページ順'], ['written','書いた順']].map(([key, label]) =>
+  function storyLabel(index, title){
+    return '第' + (index + 1) + '話' + (title ? ' ' + title : '');
+  }
+  function buildMemoToolbarHTML(hasStories){
+    const sortKeys = (hasStories ? [['story','話の順']] : []).concat([['page','ページ順'], ['written','書いた順']]);
+    const sortHTML = sortKeys.map(([key, label]) =>
       '<span class="filter-chip' + (memoSortOrder === key ? ' active' : '') + '" data-sort="' + key + '">' + label + '</span>'
     ).join('');
     const emoHTML = emoOptions.map(e =>
@@ -2475,7 +2499,17 @@
       '</div>'
     );
   }
-  function buildDetailMemoCard(memo){
+  // 話の順のときは見出しで分けるので、各カードに話の名前は出さない
+  function buildGroupedMemoHTML(memos, stories){
+    const validIds = new Set(stories.map(st => st.id));
+    const groups = stories.map((st, i) => ({ label: storyLabel(i, st.title), items: memos.filter(m => m.storyId === st.id) }));
+    groups.push({ label: '話の指定なし', items: memos.filter(m => !validIds.has(m.storyId)) });
+    return groups.filter(g => g.items.length).map(g =>
+      '<div class="memo-group-heading">' + escapeHTML(g.label) + '</div>' +
+      g.items.map(m => buildDetailMemoCard(m, '')).join('')
+    ).join('');
+  }
+  function buildDetailMemoCard(memo, storyText){
     const emosHTML = (memo.emotions && memo.emotions.length)
       ? memo.emotions.map(e => '<div class="emo-chip active" style="cursor:default;">' + escapeHTML(e) + '</div>').join('')
       : '<span class="no-emo">タグなし</span>';
@@ -2489,6 +2523,7 @@
           '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
           dateHTML +
         '</div>' +
+        (storyText ? '<div class="memo-story-tag">' + escapeHTML(storyText) + '</div>' : '') +
         '<div class="memo-quote">' + (memo.quote ? escapeHTML(memo.quote).replace(/\n/g, '<br>') : '（引用未入力）') + '</div>' +
         '<div class="emo-row">' + emosHTML + '</div>' +
         insightHTML +
@@ -2535,12 +2570,36 @@
         '<div class="t">' + escapeHTML(connTitle) + '</div><div class="a">' + escapeHTML(connAuthor || '') + '</div>' +
         '</div></div></div>';
     }
+    const stories = b.stories || [];
+    if(stories.length){
+      html += '<div class="info-card"><div class="ic-label">収録されている話</div>';
+      stories.forEach((st, i) => {
+        const memoCount = (b.memos || []).filter(m => m.storyId === st.id).length;
+        html += '<div class="character-entry">' +
+          '<div class="character-entry-name">' + escapeHTML(storyLabel(i, st.title)) + '</div>' +
+          (st.summary ? '<div class="character-entry-sub">どんな話か</div><div class="ic-text">' + escapeHTML(st.summary).replace(/\n/g, '<br>') + '</div>' : '') +
+          (st.impression ? '<div class="character-entry-sub">この話の感想</div><div class="ic-text">' + escapeHTML(st.impression).replace(/\n/g, '<br>') + '</div>' : '') +
+          (memoCount ? '<div class="character-entry-sub">付箋 ' + memoCount + '枚</div>' : '') +
+          '</div>';
+      });
+      html += '</div>';
+    }
     if(b.memos && b.memos.length){
       const visibleMemos = sortAndFilterMemos(b.memos);
+      const storyNameOf = m => {
+        const i = stories.findIndex(st => st.id === m.storyId);
+        return i >= 0 ? storyLabel(i, stories[i].title) : '';
+      };
+      let gridHTML = '';
+      if(memoSortOrder === 'story' && stories.length){
+        gridHTML = buildGroupedMemoHTML(visibleMemos, stories);
+      } else {
+        gridHTML = visibleMemos.map(m => buildDetailMemoCard(m, storyNameOf(m))).join('');
+      }
       html += '<div class="section-label" style="margin:4px 2px 10px;"><span class="txt">付箋メモ</span></div>' +
-        buildMemoToolbarHTML() +
+        buildMemoToolbarHTML(stories.length > 0) +
         (visibleMemos.length
-          ? '<div class="memo-grid">' + visibleMemos.map(buildDetailMemoCard).join('') + '</div>'
+          ? '<div class="memo-grid">' + gridHTML + '</div>'
           : '<p class="field-note" style="margin:0 2px 4px;">選択した感情タグに一致するメモはありません。</p>');
     }
     const impressionsToShow = (b.impressions && b.impressions.length)
@@ -2552,7 +2611,7 @@
         html += '<div class="ic-label">評価</div><div class="rating-row" id="detailRatingRow" style="margin-bottom:10px;"></div>';
       }
       if(impressionsToShow.length){
-        html += '<div class="ic-label">感想</div>';
+        html += '<div class="ic-label">' + (b.style === 'short' && stories.length ? '全体の感想' : '感想') + '</div>';
         impressionsToShow.forEach((imp, i) => {
           const label = (i + 1) + '回目の感想' + (imp.date ? '（' + formatDate(imp.date) + '）' : '');
           html += '<div class="impression-entry"><div class="impression-entry-label">' + escapeHTML(label) + '</div>' +
@@ -2572,16 +2631,6 @@
           '<div class="character-entry-name">' + escapeHTML(c.name || '（名前未記入）') + '</div>' +
           (c.profile ? '<div class="character-entry-sub">どんな人物か</div><div class="ic-text">' + escapeHTML(c.profile).replace(/\n/g, '<br>') + '</div>' : '') +
           (c.reason ? '<div class="character-entry-sub">印象に残った理由</div><div class="ic-text">' + escapeHTML(c.reason).replace(/\n/g, '<br>') + '</div>' : '') +
-          '</div>';
-      });
-      html += '</div>';
-    }
-    if(b.stories && b.stories.length){
-      html += '<div class="info-card"><div class="ic-label">収録されている話</div>';
-      b.stories.forEach((s, i) => {
-        html += '<div class="character-entry">' +
-          '<div class="character-entry-name">' + escapeHTML(s.title || ('第' + (i + 1) + '話')) + '</div>' +
-          (s.summary ? '<div class="ic-text">' + escapeHTML(s.summary).replace(/\n/g, '<br>') + '</div>' : '') +
           '</div>';
       });
       html += '</div>';
@@ -2626,7 +2675,8 @@
   }
   function renderDetail(b){
     currentDetailId = b.id;
-    memoSortOrder = 'page';
+    // 短編集は話ごとに分けて見せるのを既定にする
+    memoSortOrder = (b.stories && b.stories.length) ? 'story' : 'page';
     memoEmotionFilter = new Set();
     const coverEl = document.getElementById('detailCover');
     coverEl.innerHTML = b.cover
@@ -2949,6 +2999,9 @@
         '<input type="date" class="memo-date-input" value="' + escapeHTML(memo && memo.date || '') + '">' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
+      '<div class="memo-story-row" style="display:none;">' +
+        '<select class="memo-story-select" data-story-id="' + escapeHTML(memo && memo.storyId || '') + '"></select>' +
+      '</div>' +
       '<div class="field-label-row">' +
         '<label class="field-label first">引用・気になった箇所</label>' +
         '<button class="to-diary-btn" type="button" data-to-diary="quote">日記へ</button>' +
@@ -2967,6 +3020,8 @@
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
+    const storySelect = card.querySelector('.memo-story-select');
+    storySelect.addEventListener('change', () => { storySelect.dataset.storyId = storySelect.value; });
     attachMemoCardHandlers(card);
     const quoteInput = card.querySelector('.memo-quote-input');
     quoteInput.addEventListener('input', () => autoResizeTextarea(quoteInput));
@@ -2987,13 +3042,20 @@
     return card;
   }
   function addMemo(){
+    // 短編集は続けて同じ話の付箋を書くことが多いので、直前の付箋と同じ話を選んでおく
+    const prevSelects = document.querySelectorAll('#memoList .memo-story-select');
+    const prevStoryId = prevSelects.length ? prevSelects[prevSelects.length - 1].dataset.storyId : '';
     // 高さは画面に入れてからでないと測れないので、追加してから測り直す
-    const card = buildFormMemoCard(null, true);
+    const card = buildFormMemoCard({ storyId: prevStoryId }, true);
     document.getElementById('memoList').appendChild(card);
     autoResizeTextarea(card.querySelector('.memo-quote-input'));
+    refreshMemoStorySelects();
   }
   function gatherMemos(){
+    const storyIds = new Set(currentFormStories().map(st => st.id));
     return Array.from(document.querySelectorAll('#memoList .memo-card')).map(card => ({
+      // 削除した話を指したままの付箋は「話の指定なし」に戻す
+      storyId: storyIds.has(card.querySelector('.memo-story-select').dataset.storyId) ? card.querySelector('.memo-story-select').dataset.storyId : '',
       page: card.querySelector('.page-field input').value,
       date: card.querySelector('.memo-date-input').value,
       quote: card.querySelector('.memo-quote-input').value.trim(),
@@ -3146,10 +3208,34 @@
     const hasCards = document.querySelectorAll('#storyList .story-card').length > 0;
     document.getElementById('storyField').style.display =
       (selectedStyle === 'short' || hasCards) ? '' : 'none';
+    // 短編集では各話の感想と分けて、本全体の感想として書いてもらう
+    document.getElementById('impressionLabel').innerHTML = selectedStyle === 'short'
+      ? '全体の感想<span class="opt">本全体を通して感じたこと</span>'
+      : '感想<span class="opt">読むたびに追加できます</span>';
+  }
+  function currentFormStories(){
+    return Array.from(document.querySelectorAll('#storyList .story-card')).map((card, i) => ({
+      id: card.dataset.storyId,
+      label: storyLabel(i, card.querySelector('.story-title').value.trim())
+    }));
+  }
+  /* 付箋の「どの話か」の選択肢を、いまフォームにある話に合わせて作り直す。
+     選んだ話は data-story-id に持っておき、読み込み途中で一覧にまだ無い話でも
+     消さない(話は付箋より後に読み込まれるため)。 */
+  function refreshMemoStorySelects(){
+    const stories = currentFormStories();
+    document.querySelectorAll('#memoList .memo-story-select').forEach(sel => {
+      const chosen = sel.dataset.storyId || '';
+      sel.innerHTML = '<option value="">どの話の付箋か（未選択）</option>' +
+        stories.map(st => '<option value="' + escapeHTML(st.id) + '">' + escapeHTML(st.label) + '</option>').join('');
+      sel.value = stories.some(st => st.id === chosen) ? chosen : '';
+      sel.closest('.memo-story-row').style.display = stories.length ? '' : 'none';
+    });
   }
   function buildFormStoryCard(story){
     const card = document.createElement('div');
     card.className = 'memo-card story-card';
+    card.dataset.storyId = (story && story.id) || genCatId('s');
     card.innerHTML =
       '<div class="memo-top">' +
         '<span class="impression-index-label"></span>' +
@@ -3158,19 +3244,25 @@
       '<label class="field-label first">話のタイトル</label>' +
       '<input type="text" class="story-title" placeholder="例：夜の図書館" value="' + escapeHTML(story && story.title || '') + '">' +
       '<label class="field-label">どんな話か</label>' +
-      '<textarea class="story-summary" placeholder="例：閉館後の図書館に迷い込んだ少女が、本の登場人物と出会う話">' + escapeHTML(story && story.summary || '') + '</textarea>';
+      '<textarea class="story-summary" placeholder="例：閉館後の図書館に迷い込んだ少女が、本の登場人物と出会う話">' + escapeHTML(story && story.summary || '') + '</textarea>' +
+      '<label class="field-label">この話の感想</label>' +
+      '<textarea class="story-impression" placeholder="この話を読んで感じたこと">' + escapeHTML(story && story.impression || '') + '</textarea>';
     card.querySelector('.memo-del').addEventListener('click', () => {
       card.remove();
       renumberStories();
       updateStoryFieldVisibility();
     });
-    makeFieldOpenFullscreen(card.querySelector('.story-summary'), () => (card.querySelector('.story-title').value.trim() || '話') + '：どんな話か');
+    card.querySelector('.story-title').addEventListener('input', refreshMemoStorySelects);
+    const titleOf = () => card.querySelector('.story-title').value.trim() || '話';
+    makeFieldOpenFullscreen(card.querySelector('.story-summary'), () => titleOf() + '：どんな話か');
+    makeFieldOpenFullscreen(card.querySelector('.story-impression'), () => titleOf() + '：この話の感想');
     return card;
   }
   function renumberStories(){
     document.querySelectorAll('#storyList .story-card').forEach((card, i) => {
       card.querySelector('.impression-index-label').textContent = '第' + (i + 1) + '話';
     });
+    refreshMemoStorySelects();
   }
   function addStory(story){
     document.getElementById('storyList').appendChild(buildFormStoryCard(story));
@@ -3179,9 +3271,11 @@
   }
   function gatherStories(){
     return Array.from(document.querySelectorAll('#storyList .story-card')).map(card => ({
+      id: card.dataset.storyId,
       title: card.querySelector('.story-title').value.trim(),
-      summary: card.querySelector('.story-summary').value.trim()
-    })).filter(s => s.title || s.summary);
+      summary: card.querySelector('.story-summary').value.trim(),
+      impression: card.querySelector('.story-impression').value.trim()
+    })).filter(s => s.title || s.summary || s.impression);
   }
 
   /* =========================================================
@@ -3330,6 +3424,11 @@
     });
   }
   document.getElementById('fullscreenEditorDone').addEventListener('click', closeFullscreenEditor);
+  fullscreenEditorTextarea.addEventListener('input', () => {
+    if(!fullscreenEditorTarget) return;
+    fullscreenEditorTarget.value = fullscreenEditorTextarea.value;
+    scheduleAutosave();
+  });
   makeFieldOpenFullscreen(document.getElementById('nextActionInput'), '次にやりたいこと');
 
   /* =========================================================
@@ -3401,6 +3500,7 @@
     startDateInput.value = b.startDate || '';
     endDateInput.value = b.endDate || '';
     setStatusUI(b.status);
+    refreshMemoStorySelects();
   }
   function collectFormData(){
     return {
@@ -3429,14 +3529,17 @@
     resetForm();
     showScreen('Form');
     resizeFormTextareas();
+    startAutosaveSession();
   }
   function openFormEdit(b){
     if(!b) return;
     loadFormFromBook(b);
     showScreen('Form');
     resizeFormTextareas();
+    startAutosaveSession();
   }
   function formBack(){
+    autosaveNow();   // 保存ボタンを押さずに戻っても書いたものを残す
     if(editingBookId){
       openDetail(editingBookId);
     } else {
@@ -3456,29 +3559,102 @@
       return;
     }
     const data = collectFormData();
-    let savedId, savedBook;
-    if(editingBookId){
-      const idx = books.findIndex(b => b.id === editingBookId);
-      const coverColorIndex = books[idx].coverColorIndex;
-      const createdAt = books[idx].createdAt;
-      savedBook = Object.assign({}, data, { id: editingBookId, coverColorIndex: coverColorIndex, createdAt: createdAt });
-      books[idx] = savedBook;
-      savedId = editingBookId;
-    } else {
-      const id = uid();
-      const coverColorIndex = Math.floor(Math.random() * palette.length);
-      savedBook = Object.assign({}, data, { id: id, coverColorIndex: coverColorIndex, createdAt: Date.now() });
-      books.push(savedBook);
-      savedId = id;
-    }
-    saveBooks();   // ← ここでローカル永続化
-    cloudSetBook(savedBook);   // ← クラウドにも反映（他端末に同期）
+    clearTimeout(autosaveTimer);
+    const savedId = commitFormData(data).id;
+    lastAutosavedJSON = JSON.stringify(data);
     if(destination === 'detail'){
       openDetail(savedId);
     } else {
       goToList();
     }
   }
+  /* フォームの内容を本の記録に書き込む（保存ボタンと自動保存で共通）。
+     新しい本は最初の1回で登録し、editingBookId を立てて以後は同じ記録を上書きする。 */
+  function commitFormData(data){
+    let savedBook;
+    if(editingBookId){
+      const idx = books.findIndex(b => b.id === editingBookId);
+      const prev = idx >= 0 ? books[idx] : null;   // 他の端末で消された場合は作り直す
+      savedBook = Object.assign({}, data, {
+        id: editingBookId,
+        coverColorIndex: prev ? prev.coverColorIndex : Math.floor(Math.random() * palette.length),
+        createdAt: prev ? prev.createdAt : Date.now()
+      });
+      if(idx >= 0){ books[idx] = savedBook; } else { books.push(savedBook); }
+    } else {
+      savedBook = Object.assign({}, data, {
+        id: uid(),
+        coverColorIndex: Math.floor(Math.random() * palette.length),
+        createdAt: Date.now()
+      });
+      books.push(savedBook);
+      editingBookId = savedBook.id;
+    }
+    saveBooks();   // ← ここでローカル永続化
+    cloudSetBook(savedBook);   // ← クラウドにも反映（他端末に同期）
+    return savedBook;
+  }
+
+  /* ---------- 自動保存 ----------
+     保存ボタンを押さずに画面を閉じても書いたものが消えないよう、フォームを
+     触るたびに少し待ってから本の記録に書き込む。アプリを裏に回したとき・
+     閉じるとき・戻るボタンでは待たずにすぐ書き込む。
+     タイトルが空のうちは登録しない(空の記録を増やさないため)。 */
+  const AUTOSAVE_DELAY_MS = 1200;
+  let autosaveTimer = null;
+  let lastAutosavedJSON = '';
+  let autosaveStatusTimer = null;
+  function formIsOpen(){
+    return document.getElementById('screenForm').classList.contains('active');
+  }
+  function showAutosaveStatus(text, sticky){
+    const el = document.getElementById('autosaveStatus');
+    el.textContent = text;
+    clearTimeout(autosaveStatusTimer);
+    if(!sticky) autosaveStatusTimer = setTimeout(() => { el.textContent = ''; }, 2500);
+  }
+  // 開いた直後の内容を基準にし、何も変えていなければ書き込まない
+  function startAutosaveSession(){
+    clearTimeout(autosaveTimer);
+    lastAutosavedJSON = JSON.stringify(collectFormData());
+    showAutosaveStatus('', true);
+  }
+  function scheduleAutosave(){
+    if(!formIsOpen()) return;
+    clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(autosaveNow, AUTOSAVE_DELAY_MS);
+  }
+  // 保存ボタンと同じ日付の決まりを、画面に赤字を出さずに確かめる
+  function datesLookValid(data){
+    const today = todayStr();
+    if(data.startDate && data.startDate > today) return false;
+    if(data.endDate && data.endDate > today) return false;
+    if(data.startDate && data.endDate && data.endDate < data.startDate) return false;
+    return true;
+  }
+  function autosaveNow(){
+    clearTimeout(autosaveTimer);
+    autosaveTimer = null;
+    if(!formIsOpen()) return;
+    const data = collectFormData();
+    const json = JSON.stringify(data);
+    if(json === lastAutosavedJSON) return;
+    if(!data.title){ showAutosaveStatus('タイトルを入れると自動保存されます', true); return; }
+    if(!datesLookValid(data)){ showAutosaveStatus('日付を直すと自動保存されます', true); return; }
+    commitFormData(data);
+    lastAutosavedJSON = json;
+    showAutosaveStatus('自動保存しました');
+  }
+  (function(){
+    const formEl = document.getElementById('screenForm');
+    // チップ・星・削除ボタンなどは input を出さないので click も拾う
+    ['input', 'change', 'click', 'paste'].forEach(type => formEl.addEventListener(type, scheduleAutosave));
+    document.addEventListener('visibilitychange', () => {
+      if(document.visibilityState === 'hidden') autosaveNow();
+    });
+    window.addEventListener('pagehide', autosaveNow);
+  })();
+
   document.getElementById('saveDetailBtn').addEventListener('click', () => handleSave('detail'));
   document.getElementById('saveListBtn').addEventListener('click', () => handleSave('list'));
 
