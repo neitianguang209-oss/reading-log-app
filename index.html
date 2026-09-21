@@ -571,16 +571,32 @@
   .memo-top-compact{ display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap; }
   .memo-date-badge{ font-size:11px; color:var(--ink-faint); }
   /* 短編集：付箋がどの話のものか */
-  .memo-story-row{ margin:0 0 12px; }
-  .memo-story-select{
-    width:100%; border:1px solid var(--line); background:var(--surface-raised); color:var(--ink);
-    border-radius:var(--radius-sm); padding:10px 12px; font-size:14px; font-family:inherit;
+  .memo-story-row{ margin:0 0 14px; }
+  .memo-story-row .field-label{ margin-bottom:6px; }
+  .story-chip-row{ display:flex; flex-wrap:wrap; gap:6px; }
+  .story-chip{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:5px 12px; font-size:13px; font-family:inherit; cursor:pointer;
+    max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
+  .story-chip.active{ background:var(--accent); color:#fff; }
+  /* どの話の付箋かを選んだカードは左に線を引き、カード上部に話の名前を出す */
+  .memo-card.has-story{ box-shadow:inset 3px 0 0 var(--accent), var(--shadow); }
+  .memo-story-banner{ font-size:13px; font-weight:600; color:var(--accent-deep); margin:0 0 10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .memo-story-banner:empty{ display:none; }
+  /* 各話の評価（詳細画面は小さい星） */
+  .story-entry-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .story-entry-head .character-entry-name{ margin-bottom:0; }
+  .stars.mini{ gap:2px; pointer-events:none; }
+  .stars.mini .star, .stars.mini .star svg{ width:16px; height:16px; }
+  .stars.mini + .rating-label{ font-size:12px; margin-left:4px; }
+  .story-card .rating-row{ margin-top:2px; }
   .memo-story-tag{ font-size:11px; color:var(--accent-deep); margin:6px 0 0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .memo-group-heading{ grid-column:1 / -1; font-size:13px; font-weight:600; color:var(--ink-soft); margin:8px 2px -2px; }
   .memo-group-heading:first-child{ margin-top:0; }
   /* 自動保存の状態表示（フォーム右上） */
   .autosave-status{ position:absolute; right:var(--side); bottom:14px; font-size:12px; color:var(--ink-faint); }
+  .autosave-status.saved{ color:var(--accent-deep); }
   .memo-card.compact .memo-quote{
     font-size:13px; line-height:1.6; margin:0 0 8px;
     display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
@@ -1620,7 +1636,8 @@
       style: STYLES.some(s => s[0] === raw.style) ? raw.style : null,
       stories: (Array.isArray(raw.stories) ? raw.stories : []).map(s => ({
         id: (s && s.id) || '', title: (s && s.title) || '', summary: (s && s.summary) || '',
-        impression: (s && s.impression) || ''
+        impression: (s && s.impression) || '',
+        rating: (s && typeof s.rating === 'number') ? s.rating : 0
       })),
       characters: (Array.isArray(raw.characters) ? raw.characters : []).map(c => ({
         name: (c && c.name) || '', profile: (c && c.profile) || '', reason: (c && c.reason) || ''
@@ -1882,6 +1899,8 @@
   function uid(){ return 'b' + (nextIdNum++); }
 
   function showScreen(name){
+    // 編集画面から離れるときは、どんな経路でも(戻る・ログイン画面への切り替えなど)先に書き込む
+    if(name !== 'Form' && formIsOpen()) autosaveNow();
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
     const screenEl = document.getElementById('screen' + name);
     screenEl.classList.add('active');
@@ -2576,7 +2595,8 @@
       stories.forEach((st, i) => {
         const memoCount = (b.memos || []).filter(m => m.storyId === st.id).length;
         html += '<div class="character-entry">' +
-          '<div class="character-entry-name">' + escapeHTML(storyLabel(i, st.title)) + '</div>' +
+          '<div class="story-entry-head"><div class="character-entry-name">' + escapeHTML(storyLabel(i, st.title)) + '</div>' +
+          (st.rating > 0 ? miniStarsHTML(st.rating) : '') + '</div>' +
           (st.summary ? '<div class="character-entry-sub">どんな話か</div><div class="ic-text">' + escapeHTML(st.summary).replace(/\n/g, '<br>') + '</div>' : '') +
           (st.impression ? '<div class="character-entry-sub">この話の感想</div><div class="ic-text">' + escapeHTML(st.impression).replace(/\n/g, '<br>') + '</div>' : '') +
           (memoCount ? '<div class="character-entry-sub">付箋 ' + memoCount + '枚</div>' : '') +
@@ -2999,8 +3019,10 @@
         '<input type="date" class="memo-date-input" value="' + escapeHTML(memo && memo.date || '') + '">' +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
-      '<div class="memo-story-row" style="display:none;">' +
-        '<select class="memo-story-select" data-story-id="' + escapeHTML(memo && memo.storyId || '') + '"></select>' +
+      '<div class="memo-story-banner"></div>' +
+      '<div class="memo-story-row" style="display:none;" data-story-id="' + escapeHTML(memo && memo.storyId || '') + '">' +
+        '<label class="field-label first">どの話の付箋？</label>' +
+        '<div class="story-chip-row"></div>' +
       '</div>' +
       '<div class="field-label-row">' +
         '<label class="field-label first">引用・気になった箇所</label>' +
@@ -3020,14 +3042,25 @@
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
-    const storySelect = card.querySelector('.memo-story-select');
-    storySelect.addEventListener('change', () => { storySelect.dataset.storyId = storySelect.value; });
+    const storyRow = card.querySelector('.memo-story-row');
+    storyRow.addEventListener('click', e => {
+      const chip = e.target.closest('.story-chip');
+      if(!chip) return;
+      // もう一度押すと未選択に戻す
+      storyRow.dataset.storyId = storyRow.dataset.storyId === chip.dataset.storyId ? '' : chip.dataset.storyId;
+      refreshMemoStorySelects();
+    });
     attachMemoCardHandlers(card);
     const quoteInput = card.querySelector('.memo-quote-input');
     quoteInput.addEventListener('input', () => autoResizeTextarea(quoteInput));
     autoResizeTextarea(quoteInput);
-    makeFieldOpenFullscreen(quoteInput, '引用・気になった箇所');
-    makeFieldOpenFullscreen(card.querySelector('.memo-collapsible textarea'), '気づきメモ');
+    // 全画面で書いているときも、どの話の付箋か見出しで分かるようにする
+    const withStory = label => () => {
+      const banner = card.querySelector('.memo-story-banner').textContent;
+      return banner ? banner + '：' + label : label;
+    };
+    makeFieldOpenFullscreen(quoteInput, withStory('引用・気になった箇所'));
+    makeFieldOpenFullscreen(card.querySelector('.memo-collapsible textarea'), withStory('気づきメモ'));
     card.querySelectorAll('[data-to-diary]').forEach(btn => {
       btn.addEventListener('click', () => {
         const isQuote = btn.dataset.toDiary === 'quote';
@@ -3043,8 +3076,8 @@
   }
   function addMemo(){
     // 短編集は続けて同じ話の付箋を書くことが多いので、直前の付箋と同じ話を選んでおく
-    const prevSelects = document.querySelectorAll('#memoList .memo-story-select');
-    const prevStoryId = prevSelects.length ? prevSelects[prevSelects.length - 1].dataset.storyId : '';
+    const prevRows = document.querySelectorAll('#memoList .memo-story-row');
+    const prevStoryId = prevRows.length ? prevRows[prevRows.length - 1].dataset.storyId : '';
     // 高さは画面に入れてからでないと測れないので、追加してから測り直す
     const card = buildFormMemoCard({ storyId: prevStoryId }, true);
     document.getElementById('memoList').appendChild(card);
@@ -3055,7 +3088,7 @@
     const storyIds = new Set(currentFormStories().map(st => st.id));
     return Array.from(document.querySelectorAll('#memoList .memo-card')).map(card => ({
       // 削除した話を指したままの付箋は「話の指定なし」に戻す
-      storyId: storyIds.has(card.querySelector('.memo-story-select').dataset.storyId) ? card.querySelector('.memo-story-select').dataset.storyId : '',
+      storyId: storyIds.has(card.querySelector('.memo-story-row').dataset.storyId) ? card.querySelector('.memo-story-row').dataset.storyId : '',
       page: card.querySelector('.page-field input').value,
       date: card.querySelector('.memo-date-input').value,
       quote: card.querySelector('.memo-quote-input').value.trim(),
@@ -3224,12 +3257,16 @@
      消さない(話は付箋より後に読み込まれるため)。 */
   function refreshMemoStorySelects(){
     const stories = currentFormStories();
-    document.querySelectorAll('#memoList .memo-story-select').forEach(sel => {
-      const chosen = sel.dataset.storyId || '';
-      sel.innerHTML = '<option value="">どの話の付箋か（未選択）</option>' +
-        stories.map(st => '<option value="' + escapeHTML(st.id) + '">' + escapeHTML(st.label) + '</option>').join('');
-      sel.value = stories.some(st => st.id === chosen) ? chosen : '';
-      sel.closest('.memo-story-row').style.display = stories.length ? '' : 'none';
+    document.querySelectorAll('#memoList .memo-story-row').forEach(row => {
+      const chosen = stories.find(st => st.id === row.dataset.storyId);
+      row.querySelector('.story-chip-row').innerHTML = stories.map(st =>
+        '<button type="button" class="story-chip' + (chosen && chosen.id === st.id ? ' active' : '') + '" data-story-id="' + escapeHTML(st.id) + '">' +
+        escapeHTML(st.label) + '</button>'
+      ).join('');
+      row.style.display = stories.length ? '' : 'none';
+      const card = row.closest('.memo-card');
+      card.querySelector('.memo-story-banner').textContent = chosen ? chosen.label : '';
+      card.classList.toggle('has-story', !!chosen);
     });
   }
   function buildFormStoryCard(story){
@@ -3246,7 +3283,11 @@
       '<label class="field-label">どんな話か</label>' +
       '<textarea class="story-summary" placeholder="例：閉館後の図書館に迷い込んだ少女が、本の登場人物と出会う話">' + escapeHTML(story && story.summary || '') + '</textarea>' +
       '<label class="field-label">この話の感想</label>' +
-      '<textarea class="story-impression" placeholder="この話を読んで感じたこと">' + escapeHTML(story && story.impression || '') + '</textarea>';
+      '<textarea class="story-impression" placeholder="この話を読んで感じたこと">' + escapeHTML(story && story.impression || '') + '</textarea>' +
+      '<label class="field-label">この話の評価</label>' +
+      '<div class="rating-row"><div class="stars"></div><span class="rating-label"></span></div>';
+    card.dataset.rating = String((story && story.rating) || 0);
+    renderStoryStars(card);
     card.querySelector('.memo-del').addEventListener('click', () => {
       card.remove();
       renumberStories();
@@ -3257,6 +3298,32 @@
     makeFieldOpenFullscreen(card.querySelector('.story-summary'), () => titleOf() + '：どんな話か');
     makeFieldOpenFullscreen(card.querySelector('.story-impression'), () => titleOf() + '：この話の感想');
     return card;
+  }
+  // 本の評価と同じく、星の左半分/右半分で0.5刻み。同じ位置をもう一度押すと取り消し
+  function renderStoryStars(card){
+    const value = parseFloat(card.dataset.rating) || 0;
+    const wrap = card.querySelector('.rating-row .stars');
+    wrap.innerHTML = '';
+    for(let i = 0; i < 5; i++){
+      const starEl = document.createElement('div');
+      starEl.className = 'star';
+      starEl.innerHTML = starSVG(Math.max(0, Math.min(1, value - i)));
+      starEl.addEventListener('click', e => {
+        const rect = starEl.getBoundingClientRect();
+        const tapped = i + ((e.clientX - rect.left) < rect.width / 2 ? 0.5 : 1);
+        card.dataset.rating = String(value === tapped ? 0 : tapped);
+        renderStoryStars(card);
+      });
+      wrap.appendChild(starEl);
+    }
+    card.querySelector('.rating-row .rating-label').textContent = value.toFixed(1);
+  }
+  function miniStarsHTML(value){
+    let html = '<span class="rating-row"><span class="stars mini">';
+    for(let i = 0; i < 5; i++){
+      html += '<span class="star">' + starSVG(Math.max(0, Math.min(1, value - i))) + '</span>';
+    }
+    return html + '</span><span class="rating-label">' + value.toFixed(1) + '</span></span>';
   }
   function renumberStories(){
     document.querySelectorAll('#storyList .story-card').forEach((card, i) => {
@@ -3274,8 +3341,9 @@
       id: card.dataset.storyId,
       title: card.querySelector('.story-title').value.trim(),
       summary: card.querySelector('.story-summary').value.trim(),
-      impression: card.querySelector('.story-impression').value.trim()
-    })).filter(s => s.title || s.summary || s.impression);
+      impression: card.querySelector('.story-impression').value.trim(),
+      rating: parseFloat(card.dataset.rating) || 0
+    })).filter(s => s.title || s.summary || s.impression || s.rating > 0);
   }
 
   /* =========================================================
@@ -3607,9 +3675,10 @@
   function formIsOpen(){
     return document.getElementById('screenForm').classList.contains('active');
   }
-  function showAutosaveStatus(text, sticky){
+  function showAutosaveStatus(text, sticky, saved){
     const el = document.getElementById('autosaveStatus');
     el.textContent = text;
+    el.classList.toggle('saved', !!saved);
     clearTimeout(autosaveStatusTimer);
     if(!sticky) autosaveStatusTimer = setTimeout(() => { el.textContent = ''; }, 2500);
   }
@@ -3617,7 +3686,7 @@
   function startAutosaveSession(){
     clearTimeout(autosaveTimer);
     lastAutosavedJSON = JSON.stringify(collectFormData());
-    showAutosaveStatus('', true);
+    showAutosaveStatus('自動保存オン', true);
   }
   function scheduleAutosave(){
     if(!formIsOpen()) return;
@@ -3643,7 +3712,8 @@
     if(!datesLookValid(data)){ showAutosaveStatus('日付を直すと自動保存されます', true); return; }
     commitFormData(data);
     lastAutosavedJSON = json;
-    showAutosaveStatus('自動保存しました');
+    const now = new Date();
+    showAutosaveStatus('✓ ' + now.getHours() + ':' + String(now.getMinutes()).padStart(2, '0') + ' 自動保存済み', true, true);
   }
   (function(){
     const formEl = document.getElementById('screenForm');
