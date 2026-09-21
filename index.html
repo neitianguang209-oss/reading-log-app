@@ -4174,15 +4174,73 @@
   /* =========================================================
      13. ログイン・端末間同期（Firebase Authentication / Firestore）
   ========================================================= */
+  /* ---------- クラウドに届いていない変更の控え ----------
+     編集中に別アプリへ移ると、端末には保存されてもクラウドへの送信が終わる前に
+     iPhoneがアプリを止めることがある(電波が弱いときは特に)。その状態で次に
+     開くと、クラウドの古い内容で端末の新しい内容が上書きされてしまう。
+     そこで「送ったがクラウドの受け取り確認がまだの本」を端末に控えておき、
+     同期のときは控えにある本だけ端末の内容を優先して送り直す。
+     オフライン表示中(ログイン前)の変更も控えに入るので、次にログインして
+     同期したときにクラウドへ届く。 */
+  const PENDING_CLOUD_KEY = 'reading-log-pending-cloud';
+  const resentPendingIds = new Set();   // 同じ起動中に何度も送り直さない(同期のたびに送る→また同期、の繰り返しを防ぐ)
+  function readPendingCloud(){
+    try{
+      const p = JSON.parse(localStorage.getItem(PENDING_CLOUD_KEY) || 'null');
+      return { set: (p && p.set) || {}, del: (p && p.del) || {} };
+    }catch(e){ return { set: {}, del: {} }; }
+  }
+  function writePendingCloud(p){
+    try{ localStorage.setItem(PENDING_CLOUD_KEY, JSON.stringify(p)); }catch(e){ /* 控えが書けなくても保存自体は続ける */ }
+  }
+  function markPendingCloud(kind, id){
+    const p = readPendingCloud();
+    const token = Date.now() + '-' + Math.random().toString(36).slice(2, 7);
+    p[kind][id] = token;
+    delete p[kind === 'set' ? 'del' : 'set'][id];
+    writePendingCloud(p);
+    return token;
+  }
+  // 受け取り確認が来たら控えから外す(その後にまた変更していたら外さない)
+  function clearPendingCloud(kind, id, token){
+    const p = readPendingCloud();
+    if(p[kind][id] !== token) return;
+    delete p[kind][id];
+    writePendingCloud(p);
+  }
   function cloudSetBook(book){
+    const token = markPendingCloud('set', book.id);
     if(!currentUser || !db) return;
     db.collection('users').doc(currentUser.uid).collection('books').doc(book.id).set(toStoredBook(book))
+      .then(() => clearPendingCloud('set', book.id, token))
       .catch(err => { console.warn('クラウドへの保存に失敗しました', err); showSyncBanner('クラウドへの保存に失敗しました。電波の良い場所でもう一度お試しください。', true); });
   }
   function cloudDeleteBook(id){
+    const token = markPendingCloud('del', id);
     if(!currentUser || !db) return;
     db.collection('users').doc(currentUser.uid).collection('books').doc(id).delete()
+      .then(() => clearPendingCloud('del', id, token))
       .catch(err => { console.warn('クラウドからの削除に失敗しました', err); showSyncBanner('クラウドからの削除に失敗しました。電波の良い場所でもう一度お試しください。', true); });
+  }
+  // クラウドから届いた一覧に、まだクラウドに届いていない端末の変更を重ねる
+  function applyPendingCloud(cloudBooks){
+    const p = readPendingCloud();
+    const localById = new Map(books.map(b => [b.id, b]));
+    const merged = cloudBooks.filter(b => !p.del[b.id]);
+    const resend = [];
+    Object.keys(p.set).forEach(id => {
+      const local = localById.get(id);
+      if(!local){ clearPendingCloud('set', id, p.set[id]); return; }   // 端末にも無ければ控えは不要
+      const i = merged.findIndex(b => b.id === id);
+      if(i >= 0){ merged[i] = local; } else { merged.push(local); }
+      if(!resentPendingIds.has('set:' + id)) resend.push(() => cloudSetBook(local));
+      resentPendingIds.add('set:' + id);
+    });
+    Object.keys(p.del).forEach(id => {
+      if(!resentPendingIds.has('del:' + id)) resend.push(() => cloudDeleteBook(id));
+      resentPendingIds.add('del:' + id);
+    });
+    return { books: merged, resend: resend };
   }
   function cloudReplaceAllBooks(newBooks){
     if(!currentUser || !db) return;
@@ -4236,13 +4294,17 @@
         return;
       }
       const result = migrateBooks(rawBooks);
-      books = result.books;
+      const withPending = applyPendingCloud(result.books);
+      books = withPending.books;
       nextIdNum = computeNextId();
       saveBooks();
+      withPending.resend.forEach(fn => fn());
       // 移行で内容が変わった記録（旧ステータス統合・タグ移行・著者名の空白詰め・
       // createdAt付与）はクラウド側にも書き戻し、次回の同期で再び移行が走って
       // 並び順がぶれることのないようにする。
-      if(result.changedBooks.length) result.changedBooks.forEach(b => cloudSetBook(b));
+      // ただし端末の変更を優先した本は、クラウドの古い内容で書き戻さない
+      const pendingSetIds = readPendingCloud().set;
+      result.changedBooks.filter(b => !pendingSetIds[b.id]).forEach(b => cloudSetBook(b));
       const activeId = document.querySelector('.app-screen.active')?.id;
       if(activeId === 'screenList'){ renderList(); }
       if(activeId === 'screenStats'){ renderStats(); }
