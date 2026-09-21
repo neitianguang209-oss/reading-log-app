@@ -191,7 +191,34 @@
   }
   .mono{ font-size:26px; font-weight:600; color:rgba(255,255,255,.95); }
   .shelf-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:15px 12px; }
-  .book-card{ cursor:pointer; display:flex; flex-direction:column; gap:7px; }
+  .book-card{
+    cursor:pointer; display:flex; flex-direction:column; gap:7px;
+    /* 長押しで選ぶので、iPhoneの文字選択・画像メニューを出さない */
+    -webkit-touch-callout:none; -webkit-user-select:none; user-select:none;
+  }
+  /* 選択モード：左上に丸いチェック、選ばれていない本は少し薄く */
+  .select-check{
+    position:absolute; top:6px; left:6px; width:24px; height:24px; border-radius:50%;
+    background:rgba(255,255,255,.85); border:1.5px solid var(--line-strong);
+    display:none; align-items:center; justify-content:center; z-index:2;
+  }
+  .select-check svg{ width:15px; height:15px; fill:none; stroke:#fff; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; opacity:0; }
+  .select-mode .select-check{ display:flex; }
+  .select-mode .book-card:not(.selected) .book-cover{ opacity:.55; }
+  .book-card.selected .select-check{ background:var(--danger); border-color:var(--danger); }
+  .book-card.selected .select-check svg{ opacity:1; }
+  .select-mode .fab, .select-mode ~ .tab-bar{ display:none !important; }
+  .select-bar{
+    position:absolute; left:0; right:0; bottom:0; z-index:16; display:none;
+    padding:12px var(--side) calc(18px + env(safe-area-inset-bottom));
+    background:var(--bg); box-shadow:0 -6px 14px rgba(220,227,231,.9);
+  }
+  .select-bar.show{ display:block; }
+  .select-count{ margin:0 0 10px; font-size:13px; color:var(--ink-soft); text-align:center; }
+  .select-bar-buttons{ display:flex; gap:10px; }
+  .select-bar-buttons .save-btn{ flex:1; }
+  .save-btn.danger-fill{ background:var(--danger); }
+  .save-btn.danger-fill:disabled{ opacity:.4; cursor:default; }
   .book-cover{
     position:relative; width:100%; aspect-ratio:3/4.3;
     border-radius:2px; overflow:hidden;
@@ -326,7 +353,26 @@
      詳細画面
   ===================================================== */
   .detail-hero{ position:relative; padding:0 0 8px; }
-  .detail-hero .toolbar{ margin-top:8px; }
+  /* 戻るボタンを画面上部に貼り付けておく。止まっている間は背景と同じ色で目立たず、
+     スクロールすると(.scrolled)うっすら影が付き、真ん中に本のタイトルが出る */
+  .sticky-bar{
+    position:sticky; top:0; z-index:20; margin-top:0; padding-top:8px; height:56px;
+    background:var(--bg); transition:box-shadow .2s ease;
+  }
+  .sticky-bar.scrolled{ box-shadow:0 4px 10px rgba(120,135,145,.12); }
+  .toolbar-title{
+    flex:1; text-align:center; font-size:15px; font-weight:600; color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    opacity:0; transition:opacity .2s ease;
+  }
+  .sticky-bar.scrolled .toolbar-title{ opacity:1; }
+  /* 編集フォーム：英字の小見出しだけ流れて、戻る＋「本を編集」の段が上に残る */
+  #screenForm > .topbar{
+    position:sticky; top:-28px; z-index:20; background:var(--bg);
+    align-items:center; transition:box-shadow .2s ease;
+  }
+  #screenForm > .topbar .topbar-back{ margin-top:18px; }
+  #screenForm > .topbar.scrolled{ box-shadow:0 4px 10px rgba(120,135,145,.12); }
   .detail-cover-big{
     width:128px; height:176px; margin:6px auto 0;
     border-radius:2px; overflow:hidden; box-shadow:var(--shadow);
@@ -627,8 +673,9 @@
     padding:14px var(--side) calc(18px + env(safe-area-inset-bottom));
     background:var(--bg);
     box-shadow:0 -6px 14px rgba(220,227,231,.9);
-    display:flex; flex-direction:column; gap:9px;
+    display:flex; gap:10px;
   }
+  .save-bar .save-btn{ flex:1; }
   .save-btn{
     width:100%; background:var(--accent); color:#fff; border:none;
     border-radius:var(--radius-sm); padding:15px; font-size:16px; font-weight:600;
@@ -809,6 +856,13 @@
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
+    <div class="select-bar" id="selectBar">
+      <p class="select-count" id="selectCount"></p>
+      <div class="select-bar-buttons">
+        <button class="save-btn secondary" id="selectCancelBtn" type="button">キャンセル</button>
+        <button class="save-btn danger-fill" id="selectDeleteBtn" type="button">削除</button>
+      </div>
+    </div>
   </div>
 
   <!-- 並び替え選択（ボトムシート） -->
@@ -858,16 +912,16 @@
        画面2：詳細
   ===================================================== -->
   <div class="app-screen" id="screenDetail">
+    <div class="toolbar sticky-bar" id="detailToolbar">
+      <button class="icon-action" onclick="goToList()" title="戻る" type="button">
+        <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="toolbar-title" id="detailToolbarTitle"></div>
+      <button class="icon-action" id="detailEditIconBtn" title="編集" type="button">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+      </button>
+    </div>
     <div class="detail-hero">
-      <div class="toolbar">
-        <button class="icon-action" onclick="goToList()" title="戻る" type="button">
-          <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
-        </button>
-        <div class="toolbar-spacer"></div>
-        <button class="icon-action" id="detailEditIconBtn" title="編集" type="button">
-          <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-        </button>
-      </div>
       <div class="detail-cover-big" id="detailCover"></div>
     </div>
     <div class="detail-title-block">
@@ -878,7 +932,6 @@
     </div>
     <div class="detail-body" id="detailBody"></div>
     <div class="detail-actionbar">
-      <button class="save-btn danger" id="detailDeleteBtn" type="button">削除</button>
       <button class="save-btn" id="detailEditBtn" type="button">編集する</button>
     </div>
   </div>
@@ -1093,8 +1146,8 @@
     </div>
 
     <div class="save-bar">
-      <button class="save-btn" id="saveDetailBtn" type="button">保存する（詳細画面へ）</button>
-      <button class="save-btn secondary" id="saveListBtn" type="button">保存して一覧に戻る</button>
+      <button class="save-btn secondary" id="saveListBtn" type="button">一覧に戻る</button>
+      <button class="save-btn" id="saveDetailBtn" type="button">詳細画面へ</button>
     </div>
   </div>
 
@@ -1871,6 +1924,8 @@
   let statsYear = new Date().getFullYear();
   let statsRange = 'year';              // 'year' / 'total'
   let editingBookId = null;
+  let selectMode = false;              // 本棚の長押し選択モード
+  let selectedBookIds = new Set();
   let currentDetailId = null;
   let memoSortOrder = 'page';        // 'page'=ページ順 / 'written'=書いた順 / 'story'=話の順(短編集)
   let memoEmotionFilter = new Set(); // 選択中の感情タグ(空なら全件表示)
@@ -1901,6 +1956,8 @@
   function showScreen(name){
     // 編集画面から離れるときは、どんな経路でも(戻る・ログイン画面への切り替えなど)先に書き込む
     if(name !== 'Form' && formIsOpen()) autosaveNow();
+    if(name !== 'List' && typeof exitSelectMode === 'function') exitSelectMode();
+    document.querySelectorAll('.scrolled').forEach(el => el.classList.remove('scrolled'));
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
     const screenEl = document.getElementById('screen' + name);
     screenEl.classList.add('active');
@@ -1948,11 +2005,13 @@
   // 本棚のカード（3列の表紙グリッド）
   function buildBookCard(b){
     const card = document.createElement('div');
-    card.className = 'book-card';
-    card.addEventListener('click', () => openDetail(b.id));
+    card.className = 'book-card' + (selectedBookIds.has(b.id) ? ' selected' : '');
+    card.dataset.bookId = b.id;
+    attachBookCardPress(card, b.id);
     card.innerHTML =
       '<div class="book-cover" style="' + coverBgStyle(b) + '">' +
         buildCoverInnerHTML(b) + buildCoverBadgesHTML(b) +
+        '<span class="select-check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>' +
       '</div>' +
       '<div class="book-title">' + escapeHTML(b.title).replace(/\n/g, '<br>') + '</div>' +
       '<div class="book-meta">' + escapeHTML(b.author || '') + '</div>';
@@ -2695,6 +2754,7 @@
   }
   function renderDetail(b){
     currentDetailId = b.id;
+    document.getElementById('detailToolbarTitle').textContent = (b.title || '').replace(/\n/g, ' ');
     // 短編集は話ごとに分けて見せるのを既定にする
     memoSortOrder = (b.stories && b.stories.length) ? 'story' : 'page';
     memoEmotionFilter = new Set();
@@ -3617,6 +3677,10 @@
   function handleSave(destination){
     const titleVal = document.getElementById('titleInput').value.trim();
     if(!titleVal){
+      if(destination !== 'detail' && JSON.stringify(collectFormData()) === lastAutosavedJSON){
+        goToList();
+        return;
+      }
       alert('タイトルを入力してください');
       document.getElementById('titleInput').focus();
       return;
@@ -3836,13 +3900,81 @@
   document.getElementById('fabAdd').addEventListener('click', openFormNew);
   document.getElementById('detailEditIconBtn').addEventListener('click', () => openFormEdit(books.find(x => x.id === currentDetailId)));
   document.getElementById('detailEditBtn').addEventListener('click', () => openFormEdit(books.find(x => x.id === currentDetailId)));
-  document.getElementById('detailDeleteBtn').addEventListener('click', () => {
-    if(confirm('この本の記録を削除しますか？この操作は取り消せません。')){
-      cloudDeleteBook(currentDetailId);   // ← クラウドからも削除
-      books = books.filter(x => x.id !== currentDetailId);
-      saveBooks();   // ← 削除も永続化
-      goToList();
-    }
+  /* ---------- 本棚で長押しして選び、まとめて削除 ----------
+     長押しで選択モードに入り、その本が選ばれた状態になる。選択モード中は
+     タップで選択を切り替え、下のバーから削除する。 */
+  const LONG_PRESS_MS = 500;
+  function enterSelectMode(firstId){
+    selectMode = true;
+    selectedBookIds = new Set([firstId]);
+    if(navigator.vibrate) navigator.vibrate(15);
+    updateSelectUI();
+  }
+  function exitSelectMode(){
+    if(!selectMode) return;
+    selectMode = false;
+    selectedBookIds = new Set();
+    updateSelectUI();
+  }
+  function toggleBookSelected(id){
+    if(selectedBookIds.has(id)){ selectedBookIds.delete(id); } else { selectedBookIds.add(id); }
+    updateSelectUI();
+  }
+  function updateSelectUI(){
+    document.getElementById('screenList').classList.toggle('select-mode', selectMode);
+    document.getElementById('selectBar').classList.toggle('show', selectMode);
+    document.querySelectorAll('#shelfWrap .book-card').forEach(card => {
+      card.classList.toggle('selected', selectedBookIds.has(card.dataset.bookId));
+    });
+    const n = selectedBookIds.size;
+    document.getElementById('selectCount').textContent = n ? n + '冊を選択中' : '削除する本をタップして選択';
+    const delBtn = document.getElementById('selectDeleteBtn');
+    delBtn.disabled = n === 0;
+    delBtn.textContent = n ? n + '冊を削除' : '削除';
+  }
+  function attachBookCardPress(card, id){
+    let timer = null, startX = 0, startY = 0, longPressed = false;
+    const cancel = () => { clearTimeout(timer); timer = null; };
+    card.addEventListener('pointerdown', e => {
+      longPressed = false;
+      startX = e.clientX; startY = e.clientY;
+      cancel();
+      timer = setTimeout(() => {
+        timer = null;
+        longPressed = true;
+        if(selectMode){ toggleBookSelected(id); } else { enterSelectMode(id); }
+      }, LONG_PRESS_MS);
+    });
+    // 指が動いた(スクロールした)ときは長押しにしない
+    card.addEventListener('pointermove', e => {
+      if(timer && (Math.abs(e.clientX - startX) > 10 || Math.abs(e.clientY - startY) > 10)) cancel();
+    });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(t => card.addEventListener(t, cancel));
+    card.addEventListener('contextmenu', e => e.preventDefault());
+    card.addEventListener('click', () => {
+      if(longPressed){ longPressed = false; return; }   // 長押しの指を離したときのクリックは無視する
+      if(selectMode){ toggleBookSelected(id); } else { openDetail(id); }
+    });
+  }
+  document.getElementById('selectCancelBtn').addEventListener('click', exitSelectMode);
+
+  // 上部に貼り付けたバーは、少しでもスクロールしたら影とタイトルを出す
+  [['screenDetail', '#detailToolbar'], ['screenForm', '.topbar']].forEach(([screenId, barSel]) => {
+    const screenEl = document.getElementById(screenId);
+    const bar = screenEl.querySelector(barSel);
+    screenEl.addEventListener('scroll', () => bar.classList.toggle('scrolled', screenEl.scrollTop > 30), { passive: true });
+  });
+  document.getElementById('selectDeleteBtn').addEventListener('click', () => {
+    const ids = Array.from(selectedBookIds);
+    if(!ids.length) return;
+    const names = ids.map(id => (books.find(b => b.id === id) || {}).title).filter(Boolean);
+    const preview = names.slice(0, 3).map(t => '・' + t.replace(/\n/g, '')).join('\n') + (names.length > 3 ? '\nほか' + (names.length - 3) + '冊' : '');
+    if(!confirm(ids.length + '冊の記録を削除しますか？この操作は取り消せません。\n\n' + preview)) return;
+    ids.forEach(id => cloudDeleteBook(id));   // ← クラウドからも削除
+    books = books.filter(b => !selectedBookIds.has(b.id));
+    saveBooks();   // ← 削除も永続化
+    exitSelectMode();
+    renderList();
   });
 
   /* =========================================================
