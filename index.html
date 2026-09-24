@@ -1101,7 +1101,7 @@
       <!-- 収録されている話（書き方が「短編集」のときに出る） -->
       <div id="storyField" style="display:none;">
         <div class="section">
-          <div class="section-label"><span class="txt">収録されている話</span><span class="sub">各話のあらすじと感想</span></div>
+          <div class="section-label"><span class="txt">収録されている話</span><span class="sub">各話の感想</span></div>
           <div class="memo-list" id="storyList"></div>
           <button class="add-memo-btn" onclick="addStory()" type="button">＋ 話を追加</button>
         </div>
@@ -1242,6 +1242,15 @@
   ここに置くことで、CSSとローディング画面（.loading-screen）は
   Firebaseの読み込みを待たずに即座に表示される。
 -->
+<script>
+  /* オフラインでもアプリを開けるようにする。中身(index.html)は毎回まず
+     ネットから取りに行き、取れないときだけ控えを使う(古い版が残り続けないように)。 */
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(err => console.warn('オフライン用の準備に失敗しました', err));
+    });
+  }
+</script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore-compat.js"></script>
@@ -1699,6 +1708,14 @@
     };
     // 付箋を各話に結びつけるための固定id。無ければ一度だけ振って保存し直す
     b.stories.forEach(st => { if(!st.id){ st.id = genCatId('s'); changed = true; } });
+    /* 「どんな話か」の欄は廃止した。そこに書いてあった文章は感想のつもりで
+       書かれていることが多いので、感想欄へ移す(感想が既にあるなら後ろに足す)。 */
+    b.stories.forEach(st => {
+      if(!st.summary) return;
+      st.impression = st.impression ? (st.impression + '\n\n' + st.summary) : st.summary;
+      st.summary = '';
+      changed = true;
+    });
     // 見直し表は「見直し前の分類」と比べるので、移し替えより先に当てる
     if(applyReclass(b)) changed = true;
     if(applyCategoryMoves(b)) changed = true;
@@ -2656,8 +2673,8 @@
         html += '<div class="character-entry">' +
           '<div class="story-entry-head"><div class="character-entry-name">' + escapeHTML(storyLabel(i, st.title)) + '</div>' +
           (st.rating > 0 ? miniStarsHTML(st.rating) : '') + '</div>' +
-          (st.summary ? '<div class="character-entry-sub">どんな話か</div><div class="ic-text">' + escapeHTML(st.summary).replace(/\n/g, '<br>') + '</div>' : '') +
           (st.impression ? '<div class="character-entry-sub">この話の感想</div><div class="ic-text">' + escapeHTML(st.impression).replace(/\n/g, '<br>') + '</div>' : '') +
+          (st.summary ? '<div class="ic-text">' + escapeHTML(st.summary).replace(/\n/g, '<br>') + '</div>' : '') +
           (memoCount ? '<div class="character-entry-sub">付箋 ' + memoCount + '枚</div>' : '') +
           '</div>';
       });
@@ -3340,13 +3357,13 @@
       '</div>' +
       '<label class="field-label first">話のタイトル</label>' +
       '<input type="text" class="story-title" placeholder="例：夜の図書館" value="' + escapeHTML(story && story.title || '') + '">' +
-      '<label class="field-label">どんな話か</label>' +
-      '<textarea class="story-summary" placeholder="例：閉館後の図書館に迷い込んだ少女が、本の登場人物と出会う話">' + escapeHTML(story && story.summary || '') + '</textarea>' +
       '<label class="field-label">この話の感想</label>' +
       '<textarea class="story-impression" placeholder="この話を読んで感じたこと">' + escapeHTML(story && story.impression || '') + '</textarea>' +
       '<label class="field-label">この話の評価</label>' +
       '<div class="rating-row"><div class="stars"></div><span class="rating-label"></span></div>';
     card.dataset.rating = String((story && story.rating) || 0);
+    // あらすじ欄は廃止したが、古い記録に残っている文章は捨てずに持ち回る
+    card.dataset.summary = (story && story.summary) || '';
     renderStoryStars(card);
     card.querySelector('.memo-del').addEventListener('click', () => {
       card.remove();
@@ -3355,7 +3372,6 @@
     });
     card.querySelector('.story-title').addEventListener('input', refreshMemoStorySelects);
     const titleOf = () => card.querySelector('.story-title').value.trim() || '話';
-    makeFieldOpenFullscreen(card.querySelector('.story-summary'), () => titleOf() + '：どんな話か');
     makeFieldOpenFullscreen(card.querySelector('.story-impression'), () => titleOf() + '：この話の感想');
     return card;
   }
@@ -3400,7 +3416,7 @@
     return Array.from(document.querySelectorAll('#storyList .story-card')).map(card => ({
       id: card.dataset.storyId,
       title: card.querySelector('.story-title').value.trim(),
-      summary: card.querySelector('.story-summary').value.trim(),
+      summary: card.dataset.summary || '',
       impression: card.querySelector('.story-impression').value.trim(),
       rating: parseFloat(card.dataset.rating) || 0
     })).filter(s => s.title || s.summary || s.impression || s.rating > 0);
@@ -3585,7 +3601,8 @@
     document.getElementById('nextActionInput').value = '';
     rating = 0;
     renderStars();
-    startDateInput.value = '';
+    // 追加するのはたいてい「今日から読み始める本」なので、日付を先に入れておく
+    startDateInput.value = todayStr();
     endDateInput.value = '';
     setStatusUI('reading');
   }
@@ -4397,6 +4414,7 @@
   ========================================================= */
   const BOOT_TIMEOUT_MS = 9000;
   let firebaseAvailable = false;
+  let offlineFallback = false;   // 通信できずオフライン表示に切り替えた状態かどうか
 
   function showSyncBanner(text, isError){
     const banner = document.getElementById('syncBanner');
@@ -4408,12 +4426,63 @@
     document.getElementById('syncBanner').classList.remove('show');
   }
   function enterOfflineMode(reason){
+    offlineFallback = true;
     currentUser = null;
     if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
     renderList();
     showScreen('List');
     showSyncBanner(reason || 'クラウド同期に接続できません。この端末内の記録のみで表示しています。', true);
   }
+
+  /* ---------- オンラインに戻ったときの自動同期 ----------
+     オフラインの間に書いたものは端末とクラウド控え(reading-log-pending-cloud)に
+     溜まっている。通信が戻ったら、こちらから何もしなくても送り直す。
+     Firebase自体を読み込めていなかった場合は、読み込みからやり直す。 */
+  function flushPendingCloud(){
+    if(!currentUser || !db || navigator.onLine === false) return;
+    const p = readPendingCloud();
+    const ids = Object.keys(p.set);
+    ids.forEach(id => {
+      const book = books.find(b => b.id === id);
+      if(book){ cloudSetBook(book); } else { clearPendingCloud('set', id, p.set[id]); }
+    });
+    Object.keys(p.del).forEach(id => cloudDeleteBook(id));
+    if(ids.length || Object.keys(p.del).length){
+      showSyncBanner('オンラインに戻りました。オフライン中の記録をクラウドへ送っています。', false);
+      setTimeout(hideSyncBanner, 4000);
+    }
+  }
+  function loadFirebaseScripts(){
+    const base = 'https://www.gstatic.com/firebasejs/10.13.2/';
+    const files = ['firebase-app-compat.js', 'firebase-auth-compat.js', 'firebase-firestore-compat.js'];
+    return files.reduce((chain, name) => chain.then(() => new Promise((resolve, reject) => {
+      const el = document.createElement('script');
+      el.src = base + name;
+      el.onload = resolve;
+      el.onerror = reject;
+      document.body.appendChild(el);
+    })), Promise.resolve());
+  }
+  let reconnecting = false;
+  function handleBackOnline(){
+    if(navigator.onLine === false) return;
+    if(firebaseAvailable && currentUser){ flushPendingCloud(); return; }
+    if(!offlineFallback || reconnecting) return;   // 自分でログアウトしている場合などは何もしない
+    reconnecting = true;
+    hideSyncBanner();
+    const done = () => { reconnecting = false; };
+    if(typeof firebase === 'undefined'){
+      loadFirebaseScripts().then(() => { offlineFallback = false; bootApp(); }).catch(done).then(done);
+    } else {
+      offlineFallback = false;
+      bootApp();
+      done();
+    }
+  }
+  window.addEventListener('online', handleBackOnline);
+  document.addEventListener('visibilitychange', () => {
+    if(document.visibilityState === 'visible') handleBackOnline();
+  });
 
   function bootApp(){
     let settled = false;
@@ -4423,6 +4492,13 @@
       enterOfflineMode('通信に時間がかかっているため、この端末内の記録を表示しています。電波の良い場所でメニューからログインすると同期を再開できます。');
     }, BOOT_TIMEOUT_MS);
 
+    // 機内モードなどで最初から通信できないときは、9秒待たずにすぐ使える状態にする
+    if(navigator.onLine === false){
+      clearTimeout(bootTimeout);
+      settled = true;
+      enterOfflineMode('オフラインです。この端末内の記録で読み書きできます。書いた内容はオンラインに戻ると自動でクラウドへ送られます。');
+      return;
+    }
     if(typeof firebase === 'undefined'){
       clearTimeout(bootTimeout);
       settled = true;
@@ -4430,7 +4506,8 @@
       return;
     }
     try{
-      firebase.initializeApp(firebaseConfig);
+      // オフラインから復帰してもう一度ここを通ることがあるので、二重に初期化しない
+      if(!firebase.apps || !firebase.apps.length) firebase.initializeApp(firebaseConfig);
       auth = firebase.auth();
       db = firebase.firestore();
       firebaseAvailable = true;
@@ -4448,7 +4525,9 @@
       clearTimeout(bootTimeout);
       currentUser = user;
       if(user){
+        offlineFallback = false;
         startCloudSync(user);
+        flushPendingCloud();
       } else {
         if(unsubscribeBooksListener){ unsubscribeBooksListener(); unsubscribeBooksListener = null; }
         document.getElementById('authEmailInput').value = '';
