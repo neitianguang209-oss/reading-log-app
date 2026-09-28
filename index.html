@@ -9,6 +9,11 @@
 <link rel="icon" type="image/png" sizes="16x16" href="icons/favicon-16.png">
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <meta name="theme-color" content="#DCE3E7">
+<meta name="description" content="読んだ本と、そのとき感じたことを残しておく個人用の読書記録">
+<meta name="color-scheme" content="light">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="本棚">
 <style>
   /* =====================================================
      デザイントークン（UI仕様書 1章）
@@ -140,6 +145,7 @@
     background:var(--bg);
   }
   .search-wrap{
+    position:relative;
     padding:0 var(--side) 12px; max-height:64px; overflow:hidden;
     transition:max-height .18s ease, opacity .18s ease, padding .18s ease;
   }
@@ -208,6 +214,20 @@
   .book-card.selected .select-check{ background:var(--danger); border-color:var(--danger); }
   .book-card.selected .select-check svg{ opacity:1; }
   .select-mode .fab, .select-mode ~ .tab-bar{ display:none !important; }
+  /* 削除を取り消せる帯。消してすぐなら1タップで戻せる */
+  .undo-bar{
+    position:absolute; left:var(--side); right:var(--side); z-index:18; display:none;
+    bottom:calc(168px + env(safe-area-inset-bottom));   /* ＋ボタンに重ならない高さ */
+    background:var(--ink); color:#fff; border-radius:var(--radius-sm);
+    padding:12px 14px; font-size:13px; align-items:center; gap:12px;
+    box-shadow:0 4px 14px rgba(26,28,30,.28);
+  }
+  .undo-bar.show{ display:flex; }
+  .undo-bar span{ flex:1; }
+  .undo-bar button{
+    background:none; border:none; color:#9CC4EC; font-family:inherit; font-size:13px;
+    font-weight:600; cursor:pointer; padding:4px 2px;
+  }
   .select-bar{
     position:absolute; left:0; right:0; bottom:0; z-index:16; display:none;
     padding:12px var(--side) calc(18px + env(safe-area-inset-bottom));
@@ -696,6 +716,19 @@
     display:none; align-items:flex-end; z-index:20;
   }
   .modal-overlay.show{ display:flex; }
+  /* キーボード操作のとき、いまどこにいるか分かるように */
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+  .search-clear{
+    position:absolute; right:calc(var(--side) + 8px); top:6px;
+    width:30px; height:30px; border:none; background:none; color:var(--ink-faint);
+    font-size:18px; line-height:1; cursor:pointer; display:none;
+  }
+  .search-clear.show{ display:block; }
+  .book-hit{
+    font-size:10px; color:var(--accent-deep); background:var(--accent-tint);
+    border-radius:var(--pill); padding:2px 8px; margin:0 auto; max-width:100%;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
   .modal-sheet{
     width:100%; max-height:78%; background:var(--bg);
     border-radius:22px 22px 0 0; display:flex; flex-direction:column; overflow:hidden;
@@ -830,7 +863,8 @@
          場所を取りすぎないようにする（listHeader.compact） -->
     <div class="list-header" id="listHeader">
       <div class="search-wrap">
-        <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者で検索">
+        <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者・メモから検索">
+        <button type="button" class="search-clear" id="searchClearBtn" aria-label="検索をやめる">×</button>
       </div>
       <div class="filter-tabs" id="filterTabs">
         <div class="filter-chip" data-status="done">読了</div>
@@ -856,6 +890,10 @@
     </div>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
+    <div class="undo-bar" id="undoBar">
+      <span id="undoText"></span>
+      <button type="button" id="undoBtn">元に戻す</button>
+    </div>
     <div class="select-bar" id="selectBar">
       <p class="select-count" id="selectCount"></p>
       <div class="select-bar-buttons">
@@ -1006,6 +1044,7 @@
         <textarea id="titleInput" rows="1" placeholder="例：夜と霧"></textarea>
         <p class="field-note">長いタイトルは、改行したい位置でEnterを押すと表示時の折れ方を指定できます。</p>
 
+        <div class="field-msg warn" id="duplicateWarning"><span>ℹ</span><span id="duplicateWarningText"></span></div>
         <label class="field-label">著者</label>
         <input type="text" id="authorInput" placeholder="例：ヴィクトール・フランクル">
 
@@ -1346,12 +1385,20 @@
   }
   function saveBooks(){
     scheduleCloudBackup();
+    const stored = books.map(toStoredBook);
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(books.map(toStoredBook)));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     }catch(e){
-      // 容量超過（QuotaExceededError）など
-      alert('保存容量の上限に達した可能性があります。\n表紙画像の枚数を減らすか、不要な記録を削除してください。');
+      // 容量超過（QuotaExceededError）など。
+      // 場所を取っているのは表紙画像なので、それだけ落としてでも文章は必ず残す。
       console.warn('localStorage保存に失敗しました', e);
+      try{
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stored.map(b => Object.assign({}, b, { cover: null }))));
+        showSyncBanner('この端末の保存容量がいっぱいのため、表紙画像だけ端末から外しました。書いた文章はすべて残っています（ログインしていれば表紙はクラウドから戻ります）。', true);
+      }catch(e2){
+        alert('保存容量の上限に達しました。\n不要な記録を削除するか、メニューからデータを書き出してください。');
+        console.warn('表紙を外しても保存できませんでした', e2);
+      }
     }
   }
   function loadGoals(){
@@ -1970,6 +2017,17 @@
   }
   function uid(){ return 'b' + (nextIdNum++); }
 
+  /* ホーム画面アイコンの長押しメニュー(manifestのshortcuts)から開いたときに、
+     本棚が出た時点でその画面へ進む。?action=new / ?action=stats */
+  let pendingLaunchAction = (new URLSearchParams(location.search)).get('action');
+  function runLaunchAction(){
+    const action = pendingLaunchAction;
+    if(!action) return;
+    pendingLaunchAction = null;
+    history.replaceState(null, '', location.pathname);   // 次に開いたときに繰り返さない
+    if(action === 'new') setTimeout(openFormNew, 0);
+    if(action === 'stats') setTimeout(() => showScreen('Stats'), 0);
+  }
   function showScreen(name){
     // 編集画面から離れるときは、どんな経路でも(戻る・ログイン画面への切り替えなど)先に書き込む
     if(name !== 'Form' && formIsOpen()) autosaveNow();
@@ -1986,6 +2044,7 @@
       document.querySelectorAll('.tab-bar-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.tab === name));
     }
     window.scrollTo(0, 0);
+    if(name === 'List') runLaunchAction();
   }
   function goToList(){
     renderList();
@@ -2009,7 +2068,7 @@
   // 表紙（画像が無いときはタイトル頭文字のモノグラム）
   function buildCoverInnerHTML(b){
     return b.cover
-      ? '<img src="' + b.cover + '" alt="">'
+      ? '<img src="' + b.cover + '" alt="" loading="lazy" decoding="async">'
       : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>';
   }
   function coverBgStyle(b){
@@ -2020,7 +2079,7 @@
     return '<div class="book-status-dot" style="background:' + statusColorMap[b.status] + '"></div>' + ratingHTML;
   }
   // 本棚のカード（3列の表紙グリッド）
-  function buildBookCard(b){
+  function buildBookCard(b, hitLabel){
     const card = document.createElement('div');
     card.className = 'book-card' + (selectedBookIds.has(b.id) ? ' selected' : '');
     card.dataset.bookId = b.id;
@@ -2031,7 +2090,8 @@
         '<span class="select-check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>' +
       '</div>' +
       '<div class="book-title">' + escapeHTML(b.title).replace(/\n/g, '<br>') + '</div>' +
-      '<div class="book-meta">' + escapeHTML(b.author || '') + '</div>';
+      '<div class="book-meta">' + escapeHTML(b.author || '') + '</div>' +
+      (hitLabel ? '<div class="book-hit">' + escapeHTML(hitLabel) + 'に一致</div>' : '');
     return card;
   }
   // 件数はラベルの後ろに半角スペースで続ける（0件のときは数字を出さない）
@@ -2138,15 +2198,40 @@
     arr.sort((a, b) => (statusRank(a) - statusRank(b)) || compare(a, b));
     return arr;
   }
+  /* 「あの言葉どの本だっけ」を拾えるよう、自分が書いた文章も検索対象にする。
+     タイトル・著者以外で当たったときは、どこに一致したかを本棚に出す。 */
+  const SEARCH_FIELDS = [
+    ['出版社', b => [b.publisher]],
+    ['きっかけ', b => [b.kikkake]],
+    ['感想', b => (b.impressions || []).map(i => i && i.text)],
+    ['引用', b => (b.memos || []).map(m => m.quote)],
+    ['気づき', b => (b.memos || []).map(m => m.insight)],
+    ['各話の感想', b => (b.stories || []).reduce((a, st) => a.concat([st.title, st.impression]), [])],
+    ['人物メモ', b => (b.characters || []).reduce((a, c) => a.concat([c.name, c.profile, c.reason]), [])],
+    ['次にやりたいこと', b => [b.nextAction]]
+  ];
+  function searchHit(b, q){
+    if(normalize(b.title).includes(q) || normalize(b.author || '').includes(q)) return { hit: true, where: '' };
+    for(let i = 0; i < SEARCH_FIELDS.length; i++){
+      const [label, pick] = SEARCH_FIELDS[i];
+      if(pick(b).some(t => t && normalize(t).includes(q))) return { hit: true, where: label };
+    }
+    return { hit: false, where: '' };
+  }
   function renderList(){
     renderFilterTabs();
     const wrap = document.getElementById('shelfWrap');
     const isSearching = searchQuery.trim() !== '';
     // 検索とステータス・大分類・小分類の絞り込みは重ねて効く
     let filtered = books;
+    const hitWhere = new Map();
     if(isSearching){
       const q = normalize(searchQuery);
-      filtered = filtered.filter(b => normalize(b.title).includes(q) || normalize(b.author || '').includes(q));
+      filtered = filtered.filter(b => {
+        const r = searchHit(b, q);
+        if(r.hit && r.where) hitWhere.set(b.id, r.where);
+        return r.hit;
+      });
     }
     if(statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
     if(majorFilter) filtered = filtered.filter(b => b.majorCategory === majorFilter);
@@ -2159,14 +2244,14 @@
       const msg = books.length === 0
         ? 'まだ本が登録されていません。<br>右下の「＋」から追加しましょう。'
         : isSearching
-          ? '一致する本が見つかりません。'
+          ? '一致する本が見つかりません。<br>タイトル・著者のほか、感想や付箋メモの文章も探しています。'
           : 'この条件の本はありません。';
       wrap.innerHTML = '<div class="empty-state">' + msg + '</div>';
       return;
     }
     const grid = document.createElement('div');
     grid.className = 'shelf-grid';
-    filtered.forEach(b => grid.appendChild(buildBookCard(b)));
+    filtered.forEach(b => grid.appendChild(buildBookCard(b, hitWhere.get(b.id))));
     wrap.appendChild(grid);
   }
 
@@ -3067,8 +3152,19 @@
       statusChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       applyStatus(chip.dataset.status);
+      autoFillDatesForStatus(chip.dataset.status);
     });
   });
+  /* ステータスを押したときだけ日付を補う。読み込み時に動かすと、
+     わざと空にしてある既存の記録を勝手に書き換えてしまうため。 */
+  function autoFillDatesForStatus(status){
+    if(status === 'done' && !endDateInput.value){
+      endDateInput.value = todayStr();
+      endDateWarning.classList.remove('show');
+    }
+    if(status === 'reading' && !startDateInput.value) startDateInput.value = todayStr();
+    if(status === 'tsundoku') startDateInput.value = '';   // まだ読み始めていないので開始日は空にする
+  }
 
   /* =========================================================
      7. 付箋メモ(フォーム)
@@ -3535,6 +3631,27 @@
     autoResizeTextarea(titleInputEl);
   }
   titleInputEl.addEventListener('input', autoResizeTitle);
+  /* 同じ本をもう一度登録しようとしていたら教える（読み終えた本を
+     また買ってしまう・二重に記録する、を防ぐ） */
+  const STATUS_TEXT = { done: '読了', reading: '読書中', tsundoku: '積読' };
+  function checkDuplicateTitle(){
+    const box = document.getElementById('duplicateWarning');
+    const text = document.getElementById('duplicateWarningText');
+    box.classList.remove('show');
+    box.dataset.bookId = '';
+    const title = normalize(titleInputEl.value.trim());
+    if(!title) return;
+    const found = books.find(b => b.id !== editingBookId && normalize(b.title) === title);
+    if(!found) return;
+    text.textContent = 'この本はすでに登録されています（' + (STATUS_TEXT[found.status] || '') + '）。タップするとその記録を開きます。';
+    box.dataset.bookId = found.id;
+    box.classList.add('show');
+  }
+  document.getElementById('duplicateWarning').addEventListener('click', e => {
+    const id = e.currentTarget.dataset.bookId;
+    if(id) openDetail(id);
+  });
+  titleInputEl.addEventListener('input', checkDuplicateTitle);
 
   /* =========================================================
      9.5 フルスクリーン編集
@@ -3583,6 +3700,7 @@
     document.getElementById('formHeading').textContent = '本を登録';
     resetLookupUI();
     document.getElementById('titleInput').value = '';
+    document.getElementById("duplicateWarning").classList.remove("show");
     document.getElementById('authorInput').value = '';
     document.getElementById('publisherInput').value = '';
     selectedMajorId = null;
@@ -3866,8 +3984,26 @@
     styleFilter = (styleFilter === value) ? null : value;
     renderList();
   });
+  document.getElementById('searchClearBtn').addEventListener('click', () => {
+    const input = document.getElementById('searchInput');
+    input.value = '';
+    searchQuery = '';
+    document.getElementById('searchClearBtn').classList.remove('show');
+    renderList();
+    input.focus();
+  });
+  // Escで開いているものを閉じる(PCで使うとき用)
+  document.addEventListener('keydown', e => {
+    if(e.key !== 'Escape') return;
+    const editor = document.getElementById('fullscreenEditor');
+    if(editor.classList.contains('show')){ closeFullscreenEditor(); return; }
+    const overlays = document.querySelectorAll('.modal-overlay.show');
+    if(overlays.length){ overlays[overlays.length - 1].classList.remove('show'); return; }
+    if(selectMode) exitSelectMode();
+  });
   document.getElementById('searchInput').addEventListener('input', e => {
     searchQuery = e.target.value;
+    document.getElementById('searchClearBtn').classList.toggle('show', e.target.value !== '');
     renderList();
   });
   // 下にスクロールしたら固定ヘッダーを縮める（上に戻すと検索窓も戻る）
@@ -3973,6 +4109,30 @@
       if(selectMode){ toggleBookSelected(id); } else { openDetail(id); }
     });
   }
+  /* 消した直後なら元に戻せるようにしておく(まとめ削除の取り消し) */
+  let deletedBackup = [];
+  let undoTimer = null;
+  function showUndoBar(text){
+    document.getElementById('undoText').textContent = text;
+    document.getElementById('undoBar').classList.add('show');
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(hideUndoBar, 9000);
+  }
+  function hideUndoBar(){
+    clearTimeout(undoTimer);
+    document.getElementById('undoBar').classList.remove('show');
+    deletedBackup = [];
+  }
+  document.getElementById('undoBtn').addEventListener('click', () => {
+    if(!deletedBackup.length) return;
+    deletedBackup.forEach(b => {
+      if(!books.some(x => x.id === b.id)) books.push(b);
+      cloudSetBook(b);   // クラウドからも消しているので戻す
+    });
+    hideUndoBar();
+    saveBooks();
+    renderList();
+  });
   document.getElementById('selectCancelBtn').addEventListener('click', exitSelectMode);
 
   // 上部に貼り付けたバーは、少しでもスクロールしたら影とタイトルを出す
@@ -3987,11 +4147,13 @@
     const names = ids.map(id => (books.find(b => b.id === id) || {}).title).filter(Boolean);
     const preview = names.slice(0, 3).map(t => '・' + t.replace(/\n/g, '')).join('\n') + (names.length > 3 ? '\nほか' + (names.length - 3) + '冊' : '');
     if(!confirm(ids.length + '冊の記録を削除しますか？この操作は取り消せません。\n\n' + preview)) return;
+    deletedBackup = books.filter(b => selectedBookIds.has(b.id)).map(b => JSON.parse(JSON.stringify(b)));
     ids.forEach(id => cloudDeleteBook(id));   // ← クラウドからも削除
     books = books.filter(b => !selectedBookIds.has(b.id));
     saveBooks();   // ← 削除も永続化
     exitSelectMode();
     renderList();
+    showUndoBar(ids.length + '冊を削除しました');
   });
 
   /* =========================================================
@@ -5044,6 +5206,7 @@
     setIfFound('authorInput', (book.authors || []).join('、'));
     setIfFound('publisherInput', cleanPublisher(book.publisher));
     autoResizeTitle();
+    checkDuplicateTitle();   // 検索から入れたときも二重登録に気づけるように
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
     // ジャンル・線引き・書き方を決めるために紹介文も取りに行く

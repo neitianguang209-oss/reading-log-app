@@ -1,12 +1,22 @@
 {
   "name": "読書記録",
   "short_name": "本棚",
+  "description": "読んだ本と、そのとき感じたことを残しておく個人用の読書記録",
+  "lang": "ja",
+  "dir": "ltr",
   "start_url": ".",
+  "scope": ".",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#DCE3E7",
   "theme_color": "#DCE3E7",
   "icons": [
     { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "本を追加", "short_name": "追加", "url": "./?action=new" },
+    { "name": "統計を見る", "short_name": "統計", "url": "./?action=stats" }
   ]
 }
