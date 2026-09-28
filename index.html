@@ -195,7 +195,19 @@
     font-size:11px; background:rgba(26,28,30,.62); color:#fff;
     padding:1px 7px; border-radius:var(--pill); font-weight:400;
   }
+  .book-state-mini{
+    position:absolute; bottom:5px; right:5px;
+    font-size:11px; background:rgba(26,28,30,.62); color:#fff;
+    padding:1px 7px; border-radius:var(--pill); font-weight:400;
+  }
   .mono{ font-size:26px; font-weight:600; color:rgba(255,255,255,.95); }
+  /* いま何冊を、どの順番で見ているのか。押すと並び替えを開く */
+  .shelf-meta{
+    display:block; width:100%; text-align:left; background:none; border:none;
+    padding:0 var(--side) 10px; font-family:inherit; font-size:12px; color:var(--ink-faint);
+    cursor:pointer;
+  }
+  .shelf-meta b{ font-weight:400; color:var(--ink-soft); }
   .shelf-grid{ display:grid; grid-template-columns:repeat(3, 1fr); gap:15px 12px; }
   .book-card{
     cursor:pointer; display:flex; flex-direction:column; gap:7px;
@@ -353,7 +365,8 @@
   .goal-row:first-of-type{ margin-top:6px; }
   .goal-name{ font-size:14px; font-weight:400; color:var(--ink-soft); width:36px; flex:0 0 36px; }
   .goal-bar{ flex:1; height:8px; border-radius:var(--pill); background:rgba(120,135,145,.22); overflow:hidden; }
-  .goal-fill{ height:100%; background:var(--accent); border-radius:var(--pill); transition:width .25s ease; }
+  /* spanのままだと幅指定が効かず、ずっと空のバーになる */
+  .goal-fill{ display:block; height:100%; background:var(--accent); border-radius:var(--pill); transition:width .25s ease; }
   .goal-count{ font-size:13px; font-weight:400; color:var(--ink-soft); white-space:nowrap; }
   /* 入力欄の共通スタイル（width:100%）より詳細度を上げて幅を固定する */
   .goal-row input.stat-goal-input{
@@ -368,6 +381,26 @@
   .rate-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
   .rate-name{ width:118px; flex:0 0 118px; font-size:14px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stat-hint{ font-size:12px; font-weight:400; color:var(--ink-faint); line-height:1.7; margin:12px 0 0; }
+  .col-note{ font-size:11px; color:var(--ink-faint); margin-top:4px; line-height:1.5; }
+  /* 「◯日で読んだ」のような、本へ飛べる行 */
+  .stat-line{
+    display:flex; align-items:baseline; gap:10px; margin-top:12px;
+    font-size:14px; color:var(--ink); cursor:pointer;
+  }
+  .stat-line:first-of-type{ margin-top:8px; }
+  .stat-line .sl-label{ font-size:13px; color:var(--ink-soft); flex:0 0 78px; }
+  .stat-line .sl-main{ font-weight:600; white-space:nowrap; }
+  .stat-line .sl-sub{ font-size:12px; color:var(--ink-faint); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  /* ふりかえり：過去に書いた付箋を1枚引く */
+  .recall{ background:var(--surface-raised); border-radius:var(--radius-sm); padding:14px; margin-top:10px; cursor:pointer; }
+  .recall-quote{ font-size:15px; line-height:1.8; color:var(--ink); }
+  .recall-insight{ font-size:13px; line-height:1.8; color:var(--ink-soft); margin-top:8px; }
+  .recall-from{ font-size:12px; color:var(--ink-faint); margin-top:10px; }
+  .recall-actions{ display:flex; justify-content:flex-end; margin-top:10px; }
+  .recall-again{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:6px 14px; font-size:12px; font-family:inherit; cursor:pointer;
+  }
 
   /* =====================================================
      詳細画面
@@ -888,6 +921,7 @@
         <div class="filter-tabs" id="styleFilterTabs"></div>
       </div>
     </div>
+    <button class="shelf-meta" id="shelfMeta" type="button"></button>
     <div class="shelf-wrap" id="shelfWrap"></div>
     <button class="fab" id="fabAdd" title="本を追加" type="button">＋</button>
     <div class="undo-bar" id="undoBar">
@@ -2076,7 +2110,15 @@
   }
   function buildCoverBadgesHTML(b){
     const ratingHTML = b.rating > 0 ? '<div class="book-rating-mini">★ ' + b.rating.toFixed(1) + '</div>' : '';
-    return '<div class="book-status-dot" style="background:' + statusColorMap[b.status] + '"></div>' + ratingHTML;
+    // 読書中は何日目か、積読は積読であることを出す。読了は評価だけでよい
+    let stateHTML = '';
+    if(b.status === 'reading'){
+      const days = b.startDate ? Math.max(1, Math.round((Date.now() - dateToTime(b.startDate)) / 86400000) + 1) : 0;
+      stateHTML = '<div class="book-state-mini">' + (days ? days + '日目' : '読書中') + '</div>';
+    } else if(b.status === 'tsundoku'){
+      stateHTML = '<div class="book-state-mini">積読</div>';
+    }
+    return '<div class="book-status-dot" style="background:' + statusColorMap[b.status] + '"></div>' + ratingHTML + stateHTML;
   }
   // 本棚のカード（3列の表紙グリッド）
   function buildBookCard(b, hitLabel){
@@ -2247,10 +2289,17 @@
           ? '一致する本が見つかりません。<br>タイトル・著者のほか、感想や付箋メモの文章も探しています。'
           : 'この条件の本はありません。';
       wrap.innerHTML = '<div class="empty-state">' + msg + '</div>';
+      document.getElementById('shelfMeta').innerHTML = '';
       return;
     }
     const grid = document.createElement('div');
     grid.className = 'shelf-grid';
+    // 「22冊・新しい順」のように、見えている冊数と並び順を添える
+    const sortName = (SORT_OPTIONS.find(o => o[0] === sortOrder) || ['', ''])[1];
+    const narrowed = isSearching || statusFilter || majorFilter || minorFilter || formatFilter || styleFilter;
+    const metaEl = document.getElementById('shelfMeta');
+    metaEl.innerHTML = (narrowed ? '該当 <b>' + filtered.length + '冊</b>' : '全 <b>' + filtered.length + '冊</b>') +
+      ' ・ <b>' + escapeHTML(sortName) + '</b>';
     filtered.forEach(b => grid.appendChild(buildBookCard(b, hitWhere.get(b.id))));
     wrap.appendChild(grid);
   }
@@ -2308,6 +2357,14 @@
     }
     return out;
   }
+  /* グラフの横軸は画面上部の年に合わせる。
+     年を選んでいるときはその年の1〜12月、全期間のときは直近12ヶ月。 */
+  function statsMonths(){
+    if(statsRange === 'total') return recentMonths(12);
+    const out = [];
+    for(let m = 1; m <= 12; m++) out.push({ year: statsYear, month: m, label: m + '月' });
+    return out;
+  }
   function monthlyCounts(months){
     const done = doneBooks();
     return months.map(m => {
@@ -2340,7 +2397,10 @@
         const barH = plotH - (y(values[i]) - padT);
         svg += '<rect x="' + (cx - barW / 2) + '" y="' + y(values[i]) + '" width="' + barW + '" height="' + barH + '" rx="2" fill="#5B8FC9"/>';
       }
-      svg += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle" font-size="12" fill="#9BA1A5">' + m.label + '</text>';
+      const showLabel = months.length <= 7 || i % 2 === 0 || i === months.length - 1;
+      if(showLabel){
+        svg += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle" font-size="' + (months.length > 7 ? 11 : 12) + '" fill="#9BA1A5">' + m.label + '</text>';
+      }
     });
     const points = cumulative.map((v, i) => (padL + colW * i + colW / 2) + ',' + yCum(v));
     svg += '<polyline points="' + points.join(' ') + '" fill="none" stroke="#9BA1A5" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
@@ -2367,45 +2427,142 @@
   }
 
   /* ---------- 各カード ---------- */
+  function dateToTime(str){
+    const [y, m, d] = str.split('-').map(Number);
+    return new Date(y, m - 1, d).getTime();
+  }
+  function doneCountInYear(year){
+    return doneBooks().filter(b => (b.endDate || '').slice(0, 4) === String(year)).length;
+  }
+  // 全期間のときの「月あたり」は、最初に読了した月から今月までで割る
+  function monthsSinceFirstDone(){
+    const dates = doneBooks().map(b => b.endDate).filter(Boolean).sort();
+    if(!dates.length) return 0;
+    const first = dateToTime(dates[0]);
+    const now = new Date();
+    const f = new Date(first);
+    return Math.max(1, (now.getFullYear() - f.getFullYear()) * 12 + (now.getMonth() - f.getMonth()) + 1);
+  }
   function buildSummaryCard(target){
     const label = statsSummaryLabel();
-    let body;
     if(target.length === 0){
-      body = '<p class="stat-empty">まだ記録がありません' +
-        '<span>読み終えた本を登録すると、ここに記録されます</span></p>';
-    } else {
-      body = '<div class="stat-value"><span class="stat-num">' + target.length + '</span> <span class="stat-unit">冊</span></div>';
+      return '<div class="stat-card"><div class="stat-label">' + escapeHTML(label) + '</div>' +
+        '<p class="stat-empty">まだ記録がありません' +
+        '<span>読み終えた本を登録すると、ここに記録されます</span></p></div>';
     }
-    return '<div class="stat-card"><div class="stat-label">' + escapeHTML(label) + '</div>' + body + '</div>';
+    const now = new Date();
+    const thisYear = now.getFullYear();
+    const isYear = statsRange !== 'total';
+    const monthCount = isYear
+      ? (statsYear === thisYear ? now.getMonth() + 1 : 12)
+      : monthsSinceFirstDone();
+    const perMonth = monthCount > 0 ? (target.length / monthCount) : 0;
+
+    let note = '';
+    if(isYear){
+      const prev = doneCountInYear(statsYear - 1);
+      if(prev > 0){
+        const diff = target.length - prev;
+        note = (statsYear - 1) + '年 ' + prev + '冊（' + (diff >= 0 ? '+' : '') + diff + '）';
+      }
+    } else {
+      const years = {};
+      doneBooks().forEach(b => { const y = (b.endDate || '').slice(0, 4); if(y) years[y] = (years[y] || 0) + 1; });
+      const top = Object.keys(years).sort((a, b) => years[b] - years[a])[0];
+      if(top) note = 'いちばん読んだのは' + top + '年（' + years[top] + '冊）';
+    }
+    const monthStart = thisYear + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
+    const monthEndExcl = toDateStr(new Date(thisYear, now.getMonth() + 1, 1));
+    const cols = [
+      ['読了', target.length, '冊', note],   // 期間は画面上部の年ナビに出ているので、ここは短く
+      ['月あたり', perMonth.toFixed(1), '冊', ''],
+      ['今月', countDoneInRange(monthStart, monthEndExcl), '冊', '']
+    ];
+    return '<div class="status-cols">' + cols.map(([l, v, u, n]) =>
+      '<div class="status-col"><div class="stat-label">' + escapeHTML(l) + '</div>' +
+      '<div class="stat-value"><span class="stat-num">' + v + '</span> <span class="stat-unit">' + u + '</span></div>' +
+      (n ? '<div class="col-note">' + escapeHTML(n) + '</div>' : '') +
+      '</div>').join('') + '</div>';
+  }
+  /* 読むペース：開始日と読了日の両方がある本から、1冊にかけた日数を出す。
+     「自分はどれくらいで1冊読むのか」が分かると、次に読む本を選びやすい。 */
+  function buildPaceCard(target){
+    const spans = target
+      .filter(b => b.startDate && b.endDate && b.endDate >= b.startDate)
+      .map(b => ({ book: b, days: Math.round((dateToTime(b.endDate) - dateToTime(b.startDate)) / 86400000) + 1 }))
+      .sort((a, b) => a.days - b.days);
+    if(spans.length === 0){
+      return '<div class="stat-card"><div class="stat-label">読むペース</div>' +
+        '<p class="stat-empty">まだ計算できません<span>読み始めた日と読み終わった日の両方が入ると出ます</span></p></div>';
+    }
+    const avg = spans.reduce((a, x) => a + x.days, 0) / spans.length;
+    const line = (label, item) =>
+      '<div class="stat-line" data-open-book="' + escapeHTML(item.book.id) + '">' +
+        '<span class="sl-label">' + label + '</span>' +
+        '<span class="sl-main">' + item.days + '日</span>' +
+        '<span class="sl-sub">' + escapeHTML((item.book.title || '').replace(/\n/g, ' ')) + '</span>' +
+      '</div>';
+    return '<div class="stat-card"><div class="stat-label">読むペース</div>' +
+      '<div class="stat-value"><span class="stat-num">' + avg.toFixed(1) + '</span> <span class="stat-unit">日で1冊</span></div>' +
+      '<div class="col-note">' + spans.length + '冊の平均（日付が入っている本だけ）</div>' +
+      line('いちばん早い', spans[0]) +
+      (spans.length > 1 ? line('いちばん長い', spans[spans.length - 1]) : '') +
+      '</div>';
+  }
+  /* 残した言葉：このアプリは冊数より「何を感じたか」を残すためのものなので、
+     書いた量もちゃんと数える。あわせて過去の付箋を1枚引いて思い出せるようにする。 */
+  function buildWordsCard(target){
+    const memoCount = target.reduce((a, b) => a + (b.memos || []).length, 0);
+    const impCount = target.reduce((a, b) => a + (b.impressions || []).length + (b.stories || []).filter(st => st.impression).length, 0);
+    const chars = target.reduce((a, b) =>
+      a + (b.memos || []).reduce((x, m) => x + (m.quote || '').length + (m.insight || '').length, 0)
+        + (b.impressions || []).reduce((x, i) => x + ((i && i.text) || '').length, 0)
+        + (b.stories || []).reduce((x, st) => x + (st.impression || '').length, 0)
+        + (b.characters || []).reduce((x, c) => x + (c.profile || '').length + (c.reason || '').length, 0), 0);
+    const cols = [['付箋メモ', memoCount, '枚'], ['感想', impCount, '件'], ['書いた文字', chars.toLocaleString(), '字']];
+    return '<div class="status-cols">' + cols.map(([l, v, u]) =>
+      '<div class="status-col"><div class="stat-label">' + l + '</div>' +
+      '<div class="stat-value"><span class="stat-num sm">' + v + '</span> <span class="stat-unit">' + u + '</span></div></div>'
+    ).join('') + '</div>';
+  }
+  function pickRandomMemo(){
+    const pool = [];
+    books.forEach(b => (b.memos || []).forEach(m => {
+      if(m.quote || m.insight) pool.push({ book: b, memo: m });
+    }));
+    if(!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+  }
+  function buildRecallCard(){
+    const picked = pickRandomMemo();
+    if(!picked){
+      return '<div class="stat-card"><div class="stat-label">ふりかえり</div>' +
+        '<p class="stat-empty">まだ付箋メモがありません<span>気になった箇所を書き残すと、ここに引いて思い出せます</span></p></div>';
+    }
+    const { book, memo } = picked;
+    return '<div class="stat-card"><div class="stat-label">ふりかえり</div>' +
+      '<div class="recall" data-open-book="' + escapeHTML(book.id) + '">' +
+        (memo.quote ? '<div class="recall-quote">' + escapeHTML(memo.quote).replace(/\n/g, '<br>') + '</div>' : '') +
+        (memo.insight ? '<div class="recall-insight">' + escapeHTML(memo.insight).replace(/\n/g, '<br>') + '</div>' : '') +
+        '<div class="recall-from">『' + escapeHTML((book.title || '').replace(/\n/g, ' ')) + '』' +
+          (memo.page ? ' p.' + escapeHTML(String(memo.page)) : '') + '</div>' +
+      '</div>' +
+      '<div class="recall-actions"><button class="recall-again" type="button" id="recallAgainBtn">別のメモを引く</button></div>' +
+      '</div>';
   }
   function buildMonthlyCard(){
-    const months = recentMonths(6);
+    const months = statsMonths();
     const values = monthlyCounts(months);
     const total = values.reduce((a, v) => a + v, 0);
+    const label = statsRange === 'total' ? '月別の読了数（直近12ヶ月）' : statsYear + '年の月別の読了数';
     // 棒（冊数）と線（累計）は目盛が異なるため、累計の合計値は凡例に添えて示す
     return '<div class="stat-card">' +
-      '<div class="stat-label">月別の読了数（直近6ヶ月）</div>' +
+      '<div class="stat-label">' + escapeHTML(label) + '</div>' +
       '<div class="chart-legend">' +
         '<span class="legend-item"><span class="legend-bar"></span>冊数</span>' +
         '<span class="legend-item"><span class="legend-line"></span>累計 ' + total + '</span>' +
       '</div>' +
       barLineChartSVG(months, values) +
-      '</div>';
-  }
-  function buildCurrentStatusRow(){
-    const now = new Date();
-    const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-01';
-    const monthEndExcl = toDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 1));
-    const cols = [
-      ['今月', countDoneInRange(monthStart, monthEndExcl)],
-      ['今年', countDoneInRange(now.getFullYear() + '-01-01', (now.getFullYear() + 1) + '-01-01')],
-      ['累計', doneBooks().length]
-    ];
-    return '<div class="section-heading">読了の冊数</div><div class="status-cols">' +
-      cols.map(([label, n]) =>
-        '<div class="status-col"><div class="stat-label">' + label + '</div>' +
-        '<div class="stat-value"><span class="stat-num">' + n + '</span> <span class="stat-unit">冊</span></div></div>'
-      ).join('') +
       '</div>';
   }
   function buildGoalCard(){
@@ -2535,12 +2692,23 @@
   // 本棚全体の状況（年や期間に関係なく、今の冊数）
   function buildShelfStatusRow(){
     const cols = [['読書中', 'reading'], ['積読', 'tsundoku'], ['読了', 'done']];
-    return '<div class="section-heading">本棚の状況</div><div class="status-cols">' +
+    const tsundoku = books.filter(b => b.status === 'tsundoku' && b.createdAt)
+      .sort((a, b) => a.createdAt - b.createdAt)[0];
+    let note = '';
+    if(tsundoku){
+      const days = Math.max(0, Math.round((Date.now() - tsundoku.createdAt) / 86400000));
+      note = '<div class="stat-card" style="margin-top:-4px;"><div class="stat-line" data-open-book="' + escapeHTML(tsundoku.id) + '">' +
+        '<span class="sl-label">積んで最長</span>' +
+        '<span class="sl-main">' + days + '日</span>' +
+        '<span class="sl-sub">' + escapeHTML((tsundoku.title || '').replace(/\n/g, ' ')) + '</span>' +
+        '</div></div>';
+    }
+    return '<div class="section-heading">いまの本棚</div><div class="status-cols">' +
       cols.map(([label, key]) =>
         '<div class="status-col"><div class="stat-label">' + label + '</div>' +
         '<div class="stat-value"><span class="stat-num">' + books.filter(b => b.status === key).length + '</span> <span class="stat-unit">冊</span></div></div>'
       ).join('') +
-      '</div>';
+      '</div>' + note;
   }
   // 大分類は今後増えても、実際に使われているものが自動で並ぶ
   function buildMajorCategoryCard(target){
@@ -2557,8 +2725,8 @@
       '本を登録すると、著者ごとの内訳が表示されます', 5);
   }
   // 読書傾向：外部AIは使わず、登録済みの分類・評価から手元で集計する
-  function buildInsightCard(){
-    const done = books.filter(b => b.status === 'done' && b.majorCategory);
+  function buildInsightCard(target){
+    const done = target.filter(b => b.majorCategory);
     const head =
       '<div class="insight-head">' +
         '<svg viewBox="0 0 24 24"><path d="M12 3l2.2 5.4L20 9.6l-4 3.9 1 5.7-5-2.8-5 2.8 1-5.7-4-3.9 5.8-1.2L12 3Z"/></svg>' +
@@ -2582,9 +2750,9 @@
     const topOf = obj => Object.keys(obj).sort((a, b) => obj[b] - obj[a])[0];
     const topMajor = topOf(majorCounts);
     const topMinor = topOf(minorCounts);
-    const rated = books.filter(b => b.status === 'done' && b.rating > 0);
+    const rated = target.filter(b => b.rating > 0);
     const avg = rated.length ? (rated.reduce((a, b) => a + b.rating, 0) / rated.length) : 0;
-    let text = '読了した' + done.length + '冊のうち、大分類は「' + escapeHTML(topMajor) + '」が最も多く ' +
+    let text = statsSummaryLabel().replace('の読了', '') + 'に読了した' + done.length + '冊のうち、大分類は「' + escapeHTML(topMajor) + '」が最も多く ' +
       majorCounts[topMajor] + '冊（' + Math.round(majorCounts[topMajor] / done.length * 100) + '%）です。';
     if(topMinor) text += '小分類では「' + escapeHTML(topMinor) + '」が ' + minorCounts[topMinor] + '冊で最多でした。';
     const shinsho = done.filter(b => b.format === 'shinsho').length;
@@ -2605,15 +2773,31 @@
     body.innerHTML =
       buildSummaryCard(target) +
       buildMonthlyCard() +
-      buildCurrentStatusRow() +
+      buildPaceCard(target) +
       buildShelfStatusRow() +
       buildGoalCard() +
+      '<div class="section-heading">残した言葉</div>' +
+      buildWordsCard(target) +
+      buildRecallCard() +
       '<div class="section-heading">ジャンル</div>' +
       buildMajorCategoryCard(target) +
       buildGenreCard(target) +
       buildGenreRatingCard(target) +
       buildAuthorCard(target) +
-      buildInsightCard();
+      buildInsightCard(target);
+
+    // 数字から本そのものへ戻れるようにする
+    body.querySelectorAll('[data-open-book]').forEach(el => {
+      el.addEventListener('click', () => openDetail(el.dataset.openBook));
+    });
+    const againBtn = document.getElementById('recallAgainBtn');
+    if(againBtn) againBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      const screenEl = document.getElementById('screenStats');
+      const keep = screenEl.scrollTop;
+      renderStats();
+      screenEl.scrollTop = keep;   // 引き直しても読んでいた位置のまま
+    });
 
     body.querySelectorAll('[data-genre-major]').forEach(chip => {
       chip.addEventListener('click', () => {
@@ -4033,6 +4217,7 @@
   function openSortPicker(){ renderSortPickerList(); document.getElementById('sortPickerOverlay').classList.add('show'); }
   function closeSortPicker(){ document.getElementById('sortPickerOverlay').classList.remove('show'); }
   document.getElementById('sortBtn').addEventListener('click', openSortPicker);
+  document.getElementById('shelfMeta').addEventListener('click', openSortPicker);
   document.getElementById('sortPickerClose').addEventListener('click', closeSortPicker);
   document.getElementById('sortPickerOverlay').addEventListener('click', e => {
     if(e.target === document.getElementById('sortPickerOverlay')) closeSortPicker();
