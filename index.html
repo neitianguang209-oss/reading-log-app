@@ -833,6 +833,130 @@
     padding:0 var(--side) 18px; font-family:inherit; font-size:16px; line-height:1.9;
     color:var(--ink); background:var(--bg);
   }
+
+  /* =====================================================
+     写真から引用を読み取る
+     写真の上を蛍光ペンのようになぞる → 読み取った文章の範囲を文字タップで直す。
+     蛍光ペンの黄色だけは「本に線を引いた所」を表す色として例外的に使う。
+  ===================================================== */
+  :root{ --marker:#FFD400; --marker-tint:rgba(255,212,0,.42); --viewer:#1A1C1E; }
+  .field-label-actions{ display:flex; gap:6px; flex-shrink:0; }
+  .photo-quote-btn{ display:inline-flex; align-items:center; gap:4px; }
+  .photo-quote-btn svg{ width:14px; height:14px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .add-memo-row{ display:flex; flex-wrap:wrap; gap:8px; }
+  .add-memo-row .add-memo-btn{ display:inline-flex; align-items:center; gap:6px; }
+  .add-memo-row .add-memo-btn svg{ width:16px; height:16px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .memo-card.just-filled{ box-shadow:inset 3px 0 0 var(--marker), var(--shadow); }
+
+  .capture-screen{
+    position:absolute; inset:0; z-index:45; background:var(--viewer); color:#fff;
+    display:none; flex-direction:column; overflow:hidden;
+  }
+  .capture-screen.show{ display:flex; }
+  .cap-header{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:calc(10px + env(safe-area-inset-top)) var(--side) 10px;
+  }
+  .cap-title{ flex:1; min-width:0; text-align:center; font-size:15px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .cap-icon-btn{
+    width:40px; height:40px; flex-shrink:0; border-radius:50%; border:none;
+    background:rgba(255,255,255,.12); color:#fff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .cap-icon-btn svg, .cap-tool svg{ width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .cap-icon-btn:disabled, .cap-tool:disabled{ opacity:.32; cursor:default; }
+  .cap-stage{
+    flex:1 1 auto; position:relative; overflow:hidden;
+    touch-action:none; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none;
+  }
+  .cap-layer{ position:absolute; left:0; top:0; transform-origin:0 0; }
+  .cap-layer canvas{ position:absolute; left:0; top:0; width:100%; height:100%; display:block; }
+  .cap-layer .cap-ink{ opacity:.5; mix-blend-mode:multiply; }
+  .cap-float{
+    position:absolute; left:50%; transform:translateX(-50%); width:max-content; max-width:calc(100% - 28px);
+    background:rgba(26,28,30,.8); color:#fff; font-size:12px; line-height:1.6;
+    padding:6px 14px; border-radius:14px; text-align:center; pointer-events:none;
+  }
+  .cap-float span{ color:rgba(255,255,255,.7); font-size:11px; }
+  .cap-hint{ bottom:12px; transition:opacity .25s ease; }
+  .cap-hint.hide{ opacity:0; }
+  .cap-carry-banner{ bottom:12px; display:none; }
+  .cap-carry-banner.show{ display:block; }
+  .cap-footer{
+    flex:0 0 auto; display:flex; flex-direction:column; gap:10px;
+    padding:8px var(--side) calc(14px + env(safe-area-inset-bottom));
+  }
+  .cap-tools{ display:flex; justify-content:space-between; }
+  .cap-tool{
+    flex:1; border:none; background:none; color:#fff; cursor:pointer; font-family:inherit;
+    font-size:11px; display:flex; flex-direction:column; align-items:center; gap:4px; padding:4px 0;
+  }
+  .cap-read-btn:disabled{ opacity:.5; cursor:default; }
+  .cap-photo-loading{
+    position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+    color:rgba(255,255,255,.75); font-size:14px;
+  }
+  .cap-photo-loading.show{ display:flex; }
+
+  /* 読み取った文章（下から出るシート） */
+  .cap-sheet{
+    position:absolute; left:0; right:0; bottom:0; z-index:2; max-height:66%;
+    background:var(--bg); color:var(--ink); border-radius:22px 22px 0 0;
+    display:none; flex-direction:column;
+  }
+  .cap-sheet.show{ display:flex; }
+  .cap-sheet-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:16px var(--side) 10px; flex-shrink:0; }
+  .cap-sheet-title{ font-size:16px; font-weight:600; }
+  .cap-sheet-title .cap-count{ font-size:12px; font-weight:400; color:var(--ink-faint); margin-left:6px; }
+  .cap-sheet-body{ overflow-y:auto; padding:0 var(--side) 6px; -webkit-overflow-scrolling:touch; }
+  .cap-text{
+    background:var(--surface); border-radius:var(--radius-sm); padding:12px 14px;
+    font-size:16px; line-height:2; word-break:break-all; line-break:strict;
+  }
+  .cap-text .c{ color:var(--ink-faint); cursor:pointer; border-radius:2px; }
+  .cap-text .c.sel{ color:var(--ink); background:var(--marker-tint); }
+  .cap-text .c.nl{ font-size:12px; padding:0 2px; }
+  .cap-text .cap-carry{ color:var(--ink-soft); }
+  .cap-text .cap-carry::after{ content:'｜'; color:var(--accent); margin:0 2px; }
+  .cap-hint-text{ font-size:12px; color:var(--ink-faint); line-height:1.7; margin:8px 2px 0; }
+  .cap-chip-row{ display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+  .cap-chip{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:6px 12px; font-size:13px; font-family:inherit; cursor:pointer;
+  }
+  .cap-chip.active{ background:var(--accent); color:#fff; }
+  .cap-chip:disabled{ opacity:.4; cursor:default; }
+  .cap-model-note{ font-size:11px; color:var(--ink-faint); margin:10px 2px 0; line-height:1.6; }
+  .cap-model-note:empty{ display:none; }
+  .cap-sheet-foot{ display:flex; gap:10px; padding:10px var(--side) calc(14px + env(safe-area-inset-bottom)); flex-shrink:0; }
+  .cap-sheet-foot .save-btn{ flex:1; padding:13px 10px; font-size:15px; }
+  .cap-sheet-foot .save-btn:disabled{ opacity:.4; cursor:default; }
+  .cap-loading{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:26px 0 18px; color:var(--ink-soft); font-size:14px; text-align:center; line-height:1.7; }
+  .cap-spinner{
+    width:28px; height:28px; border-radius:50%;
+    border:3px solid var(--accent-tint); border-top-color:var(--accent);
+    animation:cap-spin .9s linear infinite;
+  }
+  @keyframes cap-spin{ to{ transform:rotate(360deg); } }
+  .cap-error{ padding:8px 0 14px; }
+  .cap-error p{ font-size:14px; line-height:1.8; color:var(--ink); margin:0 0 14px; }
+  .cap-error-actions{ display:flex; flex-wrap:wrap; gap:8px; }
+  .cap-sheet [hidden]{ display:none !important; }
+
+  /* 読み取りの設定（Gemini のキー） */
+  #ocrSetupOverlay{ z-index:50; }
+  .ocr-setup-body{ padding:0 var(--side) 26px; overflow-y:auto; }
+  .ocr-setup-body p{ font-size:14px; line-height:1.8; color:var(--ink); margin:0 0 12px; }
+  .ocr-step{ background:var(--surface); box-shadow:var(--shadow); border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:12px; }
+  .ocr-step-title{ font-size:14px; font-weight:600; color:var(--ink); margin-bottom:8px; }
+  .ocr-step .field-note{ margin-top:8px; }
+  .ocr-step a.btn-outline{ display:block; text-decoration:none; }
+  .ocr-key-row{ display:flex; gap:8px; }
+  .ocr-key-row input{ flex:1; min-width:0; font-family:ui-monospace, Menlo, monospace; }
+  .ocr-status{ font-size:13px; line-height:1.7; margin:10px 2px 0; color:var(--ink-soft); }
+  .ocr-status.ok{ color:var(--accent-deep); }
+  .ocr-status.ng{ color:var(--danger); }
+  .ocr-status:empty{ display:none; }
 </style>
 </head>
 <body>
@@ -1185,7 +1309,13 @@
       <div class="section conditional" id="sec-memo">
         <div class="section-label"><span class="num">②</span><span class="txt">付箋メモ</span><span class="sub">ページ順</span></div>
         <div class="memo-list" id="memoList"></div>
-        <button class="add-memo-btn" onclick="addMemo()" type="button">＋ 付箋を追加</button>
+        <div class="add-memo-row">
+          <button class="add-memo-btn" onclick="addMemo()" type="button">＋ 付箋を追加</button>
+          <button class="add-memo-btn" id="addMemoFromPhotoBtn" type="button">
+            <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+            写真から付箋を作る
+          </button>
+        </div>
       </div>
 
       <hr class="divider" id="div-memo">
@@ -1272,6 +1402,7 @@
       </div>
       <div class="modal-list">
         <button class="menu-action-btn" id="editCategoriesBtn" type="button">大分類・小分類を編集する</button>
+        <button class="menu-action-btn" id="ocrSetupMenuBtn" type="button">写真から引用を読み取る（Gemini の設定）</button>
         <hr class="divider" style="margin:16px 0;">
         <button class="menu-action-btn" id="exportBtn" type="button">JSONファイルに書き出す</button>
         <button class="menu-action-btn" id="importBtn" type="button">JSONファイルから読み込む</button>
@@ -1294,6 +1425,111 @@
       <div class="modal-list" id="categoryEditList" style="padding:10px 18px 24px;"></div>
     </div>
   </div>
+
+  <!-- 写真から引用を読み取る：Gemini のキーの登録 -->
+  <div class="modal-overlay" id="ocrSetupOverlay">
+    <div class="modal-sheet">
+      <div class="modal-header">
+        <span class="modal-title">写真から引用を読み取る</span>
+        <button class="modal-close" id="ocrSetupClose" type="button" aria-label="閉じる">×</button>
+      </div>
+      <div class="ocr-setup-body">
+        <p>本のページを撮って、引用したい所を指でなぞると、その文章を引用欄に入れます。文字の読み取りには Google の Gemini（無料）を使います。最初に一度だけ、この端末にキーを登録してください。</p>
+        <div class="ocr-step">
+          <div class="ocr-step-title">1. キーを作る</div>
+          <a class="btn-outline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio を開く</a>
+          <p class="field-note">Google アカウントでログイン →「API キーを作成」→ 出てきたキー（AIza… で始まる文字列）をコピーします。</p>
+        </div>
+        <div class="ocr-step">
+          <div class="ocr-step-title">2. ここに貼り付ける</div>
+          <div class="ocr-key-row">
+            <input type="text" id="ocrKeyInput" placeholder="AIza…" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+            <button class="btn-outline" id="ocrPasteBtn" type="button">貼り付け</button>
+          </div>
+          <button class="save-btn" id="ocrSaveBtn" type="button" style="margin-top:12px;">登録して確かめる</button>
+          <p class="ocr-status" id="ocrStatus"></p>
+          <button class="save-btn" id="ocrContinueBtn" type="button" style="margin-top:12px; display:none;">ページを撮る</button>
+        </div>
+        <p class="field-note">キーはこの端末の中にだけ保存され、同期はされません（iPhone と PC で使うときは、それぞれで登録します）。無料で使える回数には1日の上限があり、上限に達すると自動で別のモデルに切り替えて読みます。無料枠で送った写真は Google のサービス改善に使われることがあります。</p>
+        <p class="field-note" id="ocrKeyInfo"></p>
+        <button class="btn-outline" id="ocrDeleteKeyBtn" type="button" style="margin-top:6px; display:none; border-color:var(--danger); color:var(--danger);">この端末のキーを削除する</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 写真から引用を読み取る：なぞる画面 -->
+  <div class="capture-screen" id="captureScreen">
+    <div class="cap-header">
+      <button class="cap-icon-btn" id="capCloseBtn" type="button" aria-label="閉じる">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="cap-title">引用したい所をなぞる</span>
+      <button class="cap-icon-btn" id="capUndoBtn" type="button" aria-label="ひとつ戻す">
+        <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>
+      </button>
+    </div>
+    <div class="cap-stage" id="capStage">
+      <div class="cap-layer" id="capLayer"></div>
+      <div class="cap-photo-loading" id="capPhotoLoading">写真を開いています…</div>
+      <div class="cap-float cap-hint" id="capHint">引用したい行を、蛍光ペンのように指でなぞる<br><span>2本指で拡大・移動できます</span></div>
+      <div class="cap-float cap-carry-banner" id="capCarryBanner"></div>
+    </div>
+    <div class="cap-footer">
+      <div class="cap-tools">
+        <button class="cap-tool" id="capRetakeBtn" type="button">
+          <svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>撮り直す
+        </button>
+        <button class="cap-tool" id="capLibraryBtn" type="button">
+          <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M20 16l-5-5-8 8"/></svg>写真を選ぶ
+        </button>
+        <button class="cap-tool" id="capRotateBtn" type="button">
+          <svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 4v7h-7"/></svg>回転
+        </button>
+        <button class="cap-tool" id="capClearBtn" type="button">
+          <svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>線を全部消す
+        </button>
+      </div>
+      <button class="save-btn cap-read-btn" id="capReadBtn" type="button">ページ全体を読む</button>
+    </div>
+
+    <!-- 読み取った文章 -->
+    <div class="cap-sheet" id="capSheet">
+      <div class="cap-sheet-head">
+        <span class="cap-sheet-title" id="capSheetTitle">読み取った文章</span>
+        <button class="modal-close" id="capSheetClose" type="button" aria-label="なぞり直す">×</button>
+      </div>
+      <div class="cap-sheet-body" id="capSheetBody">
+        <div class="cap-loading" id="capLoading">
+          <span class="cap-spinner"></span>
+          <span id="capLoadingText">読み取っています…</span>
+          <button class="btn-outline" id="capCancelBtn" type="button">やめる</button>
+        </div>
+        <div class="cap-error" id="capError" hidden>
+          <p id="capErrorText"></p>
+          <div class="cap-error-actions">
+            <button class="btn-outline" id="capErrorRetryBtn" type="button">もう一度読む</button>
+            <button class="btn-outline" id="capErrorSetupBtn" type="button">キーを登録し直す</button>
+          </div>
+        </div>
+        <div id="capResult" hidden>
+          <div class="cap-text" id="capText"></div>
+          <p class="cap-hint-text" id="capResultHint"></p>
+          <div class="cap-chip-row">
+            <button class="cap-chip" id="capSnapBtn" type="button">文の区切りまで広げる</button>
+            <button class="cap-chip" id="capResetSelBtn" type="button">最初の範囲に戻す</button>
+            <button class="cap-chip active" id="capPageChip" type="button"></button>
+          </div>
+          <p class="cap-model-note" id="capModelNote"></p>
+        </div>
+      </div>
+      <div class="cap-sheet-foot" id="capSheetFoot" hidden>
+        <button class="save-btn secondary" id="capContinueBtn" type="button">次のページに続く</button>
+        <button class="save-btn" id="capInsertBtn" type="button">引用に入れる</button>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="capCameraInput" accept="image/*" capture="environment">
+  <input type="file" id="capLibraryInput" accept="image/*">
 
   <div class="app-toast" id="appToast"></div>
 
@@ -2065,6 +2301,7 @@
   function showScreen(name){
     // 編集画面から離れるときは、どんな経路でも(戻る・ログイン画面への切り替えなど)先に書き込む
     if(name !== 'Form' && formIsOpen()) autosaveNow();
+    if(name !== 'Form' && typeof closeQuoteCapture === 'function') closeQuoteCapture(true);
     if(name !== 'List' && typeof exitSelectMode === 'function') exitSelectMode();
     document.querySelectorAll('.scrolled').forEach(el => el.classList.remove('scrolled'));
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
@@ -3383,7 +3620,12 @@
       '</div>' +
       '<div class="field-label-row">' +
         '<label class="field-label first">引用・気になった箇所</label>' +
-        '<button class="to-diary-btn" type="button" data-to-diary="quote">日記へ</button>' +
+        '<div class="field-label-actions">' +
+          '<button class="to-diary-btn photo-quote-btn" type="button" aria-label="写真から読み取る">' +
+            '<svg viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>撮る' +
+          '</button>' +
+          '<button class="to-diary-btn" type="button" data-to-diary="quote">日記へ</button>' +
+        '</div>' +
       '</div>' +
       '<textarea class="memo-quote-input" rows="1" placeholder="本文からの引用">' + escapeHTML(memo && memo.quote || '') + '</textarea>' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
@@ -3418,6 +3660,7 @@
     };
     makeFieldOpenFullscreen(quoteInput, withStory('引用・気になった箇所'));
     makeFieldOpenFullscreen(card.querySelector('.memo-collapsible textarea'), withStory('気づきメモ'));
+    card.querySelector('.photo-quote-btn').addEventListener('click', () => requestQuotePhoto(card, false));
     card.querySelectorAll('[data-to-diary]').forEach(btn => {
       btn.addEventListener('click', () => {
         const isQuote = btn.dataset.toDiary === 'quote';
@@ -4179,6 +4422,7 @@
   // Escで開いているものを閉じる(PCで使うとき用)
   document.addEventListener('keydown', e => {
     if(e.key !== 'Escape') return;
+    if(handleCaptureEscape()) return;
     const editor = document.getElementById('fullscreenEditor');
     if(editor.classList.contains('show')){ closeFullscreenEditor(); return; }
     const overlays = document.querySelectorAll('.modal-overlay.show');
@@ -5620,6 +5864,1099 @@
   document.getElementById('scanBtn').addEventListener('click', openScanner);
   document.getElementById('scanClose').addEventListener('click', closeScanner);
   scanOverlay.addEventListener('click', e => { if(e.target === scanOverlay) closeScanner(); });
+
+  /* =========================================================
+     15. 写真から引用を読み取る
+     本のページを撮り、引用したい所を蛍光ペンのように指でなぞると、
+     その部分を Gemini に読み取らせて付箋の引用欄に入れる。
+     - 端末の中だけの文字認識は、日本語の縦書き・ルビで精度が出ないので Gemini を使う。
+       キーは利用者が Google AI Studio で作り、この端末の localStorage にだけ置く
+       (Firestore の books には本以外を置かない決まりなので同期しない)。
+     - 指でなぞった範囲はどうしてもずれるので、前後の文も一緒に読ませ、
+       読み取った後に文字をタップして1文字単位で範囲を直せるようにしてある。
+     - 無料枠の回数はモデルごとなので、上限に当たったら次のモデルで読み直す。
+  ========================================================= */
+  const OCR_API = 'https://generativelanguage.googleapis.com/v1beta/';
+  const OCR_KEY_STORAGE = 'reading-log-gemini-key';
+  const OCR_STATE_STORAGE = 'reading-log-gemini-state';   // { models, checkedAt, exhausted:{model:日付}, level:{model:0-2} }
+  // モデル一覧を取れなかったときの控え(精度の高い順。-lite は回数が多いが少し粗い)
+  const OCR_FALLBACK_MODELS = ['gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-3.1-flash-lite'];
+  const MARKER_COLOR = '#FFD400';
+  const MARKER_SCREEN_PX = 18;   // 画面上のペンの太さ。拡大してなぞると細い線になり、細かく引ける
+  const WORK_MAX_PX = 3000;      // 手元で扱う写真の長辺
+  const SEND_MAX_PX = 2400;      // Gemini に送る画像の長辺(これ以上大きくしても読み取りは変わらない)
+  const INK_SCALE = 0.5;         // 画面に出すなぞり跡は半分の解像度で十分
+
+  const OCR_SYSTEM = 'You are a meticulous OCR engine for printed books (mostly Japanese, sometimes English). ' +
+    'Transcribe exactly what is printed, character by character. Never paraphrase, summarize, correct, modernize, translate, or complete the text. ' +
+    'Reply only with the requested JSON.';
+  const OCR_RULES = [
+    'Transcription rules:',
+    '1. Copy characters exactly as printed: kanji forms (including old forms such as 旧字体), okurigana, small kana (っ ゃ ゅ ょ ぁ ァ stay small), long vowel marks, punctuation and symbols (、。，．・「」『』（）〈〉《》【】―― …… ！ ？ 〜), and full-width / half-width as printed. Do not fix typos or unusual spellings.',
+    '2. A line or column wrap is NOT a line break: join the lines into continuous text. Never insert spaces between Japanese characters. Write "\\n" only where a new paragraph begins (the next line is indented, or the previous line ends early because the paragraph ended).',
+    '3. Leave out ruby / furigana (small kana printed beside or above kanji), emphasis dots (傍点), running heads (柱), page numbers, and footnote reference marks.',
+    '4. Digits or Latin letters set horizontally inside vertical text (縦中横): write them as printed.',
+    '5. English text: keep spaces, capitalization and punctuation. If a word is hyphenated only because of a line break, join it without the hyphen.',
+    '6. If a character is hard to read, give the most likely character judging from its visible shape and the context. Never skip, add, or repeat characters.'
+  ].join('\n');
+  const OCR_MARKER_PROMPT = [
+    'The reader photographed a book page and drew a translucent yellow highlighter with a finger over the passage they want to quote.',
+    'Image A is the whole photo (for context). Image B is a high-resolution crop of the same photo around the highlighted area — read the characters from Image B.',
+    '',
+    '1. direction: "vertical" (縦書き: each column is read top to bottom, columns go right to left) or "horizontal" (横書き).',
+    '2. Find the intended passage. Finger marking is imprecise: it may start or stop one or two characters early or late, and may wobble onto a neighboring line/column. ' +
+      'The passage is ONE continuous span in reading order, from the first character clearly covered by the highlighter to the last character clearly covered. ' +
+      'Ignore slight spill onto an adjacent line unless that line is substantially covered along its length. ' +
+      'If the highlight stops within about two characters of the end of a sentence, extend it through the sentence-ending mark (。．！？!?) and any closing brackets right after it (」』）”). ' +
+      'If it starts within about two characters after the start of a sentence, begin at the start of that sentence (including an opening bracket such as 「『（).',
+    '3. Return JSON {"direction", "page", "before", "highlighted", "after"}:',
+    '- page: the printed page number (ノンブル) of the page containing the passage, digits only; "" if it is not visible.',
+    '- before: the text immediately before the passage in reading order on the same page — at most the last 120 characters, ending exactly where the passage begins. "" if nothing precedes it.',
+    '- highlighted: the passage.',
+    '- after: the text immediately after the passage — at most 120 characters, starting exactly where the passage ends. "" if nothing follows.',
+    'before + highlighted + after must read as one continuous text with no gaps or overlaps.',
+    '',
+    OCR_RULES
+  ].join('\n');
+  const OCR_PAGE_PROMPT = [
+    'The image is a photo of a book page (possibly a two-page spread). Transcribe all of the body text in reading order.',
+    'Return JSON {"direction", "page", "before", "highlighted", "after"}:',
+    '- direction: "vertical" (縦書き) or "horizontal" (横書き).',
+    '- page: the printed page number (ノンブル) of the first page in reading order, digits only; "" if it is not visible.',
+    '- before: the whole body text in reading order.',
+    '- highlighted and after: "".',
+    '',
+    OCR_RULES
+  ].join('\n');
+  // 有名な文章だと Gemini が「引用のしすぎ」として返してくれないことがあるので、
+  // そのときは1文字ずつ区切って書かせ、こちらで区切りを外す
+  const OCR_SPACED_RULE = '\n\nIMPORTANT output format for this request: inside the values of before, highlighted and after, put the character "|" between every two adjacent characters (for example 吾|輩|は|猫|で|あ|る|。). Keep "\\n" where a paragraph begins.';
+  const OCR_SCHEMA = {
+    type: 'object',
+    properties: {
+      direction: { type: 'string', enum: ['vertical', 'horizontal'] },
+      page: { type: 'string' },
+      before: { type: 'string' },
+      highlighted: { type: 'string' },
+      after: { type: 'string' }
+    },
+    required: ['direction', 'page', 'before', 'highlighted', 'after']
+  };
+  // 本の文章は暴力・性的な描写を含むことがあるので、読み取りでは止めない
+  const OCR_SAFETY = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT']
+    .map(category => ({ category, threshold: 'BLOCK_NONE' }));
+
+  class OcrError extends Error{
+    constructor(kind){ super(kind); this.kind = kind; }
+  }
+
+  /* ---------- キーと状態(この端末だけ) ---------- */
+  function readOcrKey(){
+    try{ return localStorage.getItem(OCR_KEY_STORAGE) || ''; }catch(e){ return ''; }
+  }
+  function readOcrState(){
+    try{
+      const s = JSON.parse(localStorage.getItem(OCR_STATE_STORAGE) || '{}');
+      return (s && typeof s === 'object') ? s : {};
+    }catch(e){ return {}; }
+  }
+  function writeOcrState(s){
+    try{ localStorage.setItem(OCR_STATE_STORAGE, JSON.stringify(s)); }catch(e){ /* 覚えておけなくても次回また試すだけ */ }
+  }
+  function updateOcrState(fn){
+    const s = readOcrState();
+    fn(s);
+    writeOcrState(s);
+  }
+  // 無料枠の1日の回数は米国太平洋時間の0時(日本時間の16〜17時)に戻る
+  function ocrQuotaDay(){
+    try{ return new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }); }
+    catch(e){ return new Date(Date.now() - 8 * 3600e3).toISOString().slice(0, 10); }
+  }
+  // gemini-3.8-flash のような読み取り向きのモデルだけを、精度の高い順(-lite は後ろ)に並べる
+  function orderOcrModels(names){
+    return names
+      .map(n => {
+        const m = /^gemini-(\d+(?:\.\d+)?)-flash(-lite)?$/.exec(n);
+        return m ? { name: n, ver: parseFloat(m[1]), lite: m[2] ? 1 : 0 } : null;
+      })
+      .filter(m => m && m.ver >= 3)   // 2.x は新しいキーでは使えないことが多い
+      .sort((a, b) => (a.lite - b.lite) || (b.ver - a.ver))
+      .map(m => m.name)
+      .slice(0, 7);
+  }
+  async function verifyOcrKey(key){
+    let res, data = null;
+    try{
+      res = await fetch(OCR_API + 'models?pageSize=1000', { headers: { 'x-goog-api-key': key } });
+      data = await res.json().catch(() => null);
+    }catch(e){
+      return { ok: false, message: '通信できませんでした。電波の良いところでもう一度試してください。' };
+    }
+    if(!res.ok){
+      return { ok: false, message: (res.status === 400 || res.status === 401 || res.status === 403)
+        ? 'このキーは使えないようです。AI Studio でキーをコピーし直して、丸ごと貼り付けてください。'
+        : 'Gemini に接続できませんでした（' + res.status + '）。少し待ってもう一度試してください。' };
+    }
+    const names = ((data && data.models) || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => String(m.name || '').replace(/^models\//, ''));
+    const models = orderOcrModels(names);
+    return { ok: true, models: models.length ? models : OCR_FALLBACK_MODELS.slice() };
+  }
+  // モデルは入れ替わっていくので、1週間に1回は一覧を取り直す
+  async function refreshOcrModelsIfStale(){
+    const key = readOcrKey();
+    const st = readOcrState();
+    if(!key || (st.checkedAt && Date.now() - st.checkedAt < 7 * 864e5)) return;
+    const r = await verifyOcrKey(key).catch(() => null);
+    if(r && r.ok) updateOcrState(s => { s.models = r.models; s.checkedAt = Date.now(); });
+  }
+  function ocrModelsForToday(){
+    const st = readOcrState();
+    const list = (Array.isArray(st.models) && st.models.length) ? st.models : OCR_FALLBACK_MODELS;
+    const today = ocrQuotaDay();
+    const exhausted = st.exhausted || {};
+    const usable = list.filter(m => exhausted[m] !== today);
+    return usable.length ? usable : list;   // 全部使い切った記録があっても、戻っているかもしれないので一応試す
+  }
+
+  /* ---------- Gemini への問い合わせ ---------- */
+  // level 0: 画像ごとの解像度・考える量まで指定 / 1: JSONの形だけ指定 / 2: 最低限。
+  // 古いモデルなどで項目が通じないとき(400)に1段ずつ落として読み直す
+  function buildOcrBody(job, level, spaced){
+    const parts = [];
+    job.images.forEach(img => {
+      parts.push({ text: img.label });
+      const part = { inlineData: { mimeType: 'image/jpeg', data: img.data } };
+      if(level === 0) part.mediaResolution = { level: img.resolution };
+      parts.push(part);
+    });
+    parts.push({ text: job.prompt + (spaced ? OCR_SPACED_RULE : '') });
+    const body = {
+      systemInstruction: { parts: [{ text: OCR_SYSTEM }] },
+      contents: [{ role: 'user', parts }],
+      generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 8192 }
+    };
+    if(level <= 1){
+      body.generationConfig.responseJsonSchema = OCR_SCHEMA;
+      body.safetySettings = OCR_SAFETY;
+    }
+    // なぞった範囲の見きわめには少し考えさせる。ページ全体は書き写すだけなので軽く
+    if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: job.mode === 'page' ? 'LOW' : 'MEDIUM' };
+    return body;
+  }
+  async function postGemini(model, body, job){
+    const ctrl = new AbortController();
+    let timedOut = false;
+    job.abort = () => ctrl.abort();
+    const timer = setTimeout(() => { timedOut = true; ctrl.abort(); }, 60000);
+    try{
+      const res = await fetch(OCR_API + 'models/' + encodeURIComponent(model) + ':generateContent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': readOcrKey() },
+        body: JSON.stringify(body),
+        signal: ctrl.signal
+      });
+      const data = await res.json().catch(() => null);
+      return { status: res.status, data };
+    }catch(e){
+      if(job.cancelled) throw new OcrError('cancel');
+      if(timedOut) throw new OcrError('timeout');
+      throw new OcrError(navigator.onLine === false ? 'offline' : 'network');
+    }finally{
+      clearTimeout(timer);
+      job.abort = null;
+    }
+  }
+  function classifyOcrHttpError(status, data){
+    const err = (data && data.error) || {};
+    const text = String(err.message || '') + ' ' + JSON.stringify(err.details || '');
+    if(/API[_ ]?key|API_KEY_INVALID|SERVICE_DISABLED|has not been used|is disabled/i.test(text) && status >= 400 && status < 500) return 'key';
+    if(status === 429) return /PerDay|per day|daily/i.test(text) ? 'quota-day' : 'quota';
+    if(status === 400) return 'invalid';
+    if(status === 404) return 'nomodel';
+    if(status === 401) return 'key';
+    if(status === 403) return 'nomodel';   // 一部のモデルは使える人が限られている
+    if(status >= 500) return 'server';
+    return 'unknown';
+  }
+  // 日本語の文字どうしの間に入った半角スペースは読み取りの癖なので消す(英語の単語間は残す)
+  const OCR_JP_CHAR = '[\\u2E80-\\u9FFF\\uF900-\\uFAFF\\uFF00-\\uFFEF\\u3000-\\u303F\\u2010-\\u2027]';
+  const OCR_JP_SPACE_RE = new RegExp('(' + OCR_JP_CHAR + ')[ \\t]+(?=' + OCR_JP_CHAR + ')', 'g');
+  function cleanOcrText(s, spaced){
+    s = String(s == null ? '' : s).replace(/\r\n?/g, '\n').replace(/\\n/g, '\n');
+    if(spaced) s = s.replace(/\|/g, '');
+    return s.replace(OCR_JP_SPACE_RE, '$1')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n[ \t　]+/g, '\n')   // 段落はじめの字下げは引用には要らない
+      .replace(/\n{2,}/g, '\n');
+  }
+  function parseOcrResponse(data, spaced){
+    const cand = data && data.candidates && data.candidates[0];
+    if(!cand) return { ok: false, kind: (data && data.promptFeedback && data.promptFeedback.blockReason) ? 'blocked' : 'empty' };
+    const reason = cand.finishReason || '';
+    if(/RECITATION/.test(reason)) return { ok: false, kind: 'recitation' };
+    if(/SAFETY|PROHIBITED|BLOCKLIST|SPII/.test(reason)) return { ok: false, kind: 'blocked' };
+    const text = ((cand.content && cand.content.parts) || [])
+      .filter(p => p && typeof p.text === 'string' && !p.thought)
+      .map(p => p.text).join('');
+    let obj = null;
+    try{ obj = JSON.parse(text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')); }catch(e){ /* 下で扱う */ }
+    if(!obj || typeof obj !== 'object') return { ok: false, kind: reason === 'MAX_TOKENS' ? 'toolong' : 'badjson' };
+    const pageMatch = String(obj.page == null ? '' : obj.page).normalize('NFKC').match(/\d{1,4}/);
+    return { ok: true, value: {
+      direction: obj.direction === 'horizontal' ? 'horizontal' : 'vertical',
+      page: pageMatch ? String(parseInt(pageMatch[0], 10)) : '',
+      before: cleanOcrText(obj.before, spaced),
+      highlighted: cleanOcrText(obj.highlighted, spaced),
+      after: cleanOcrText(obj.after, spaced)
+    } };
+  }
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  async function runOcr(job, onStatus){
+    if(!readOcrKey()) throw new OcrError('nokey');
+    if(navigator.onLine === false) throw new OcrError('offline');
+    const models = ocrModelsForToday();
+    let last = null;
+    for(let mi = 0; mi < models.length; mi++){
+      const model = models[mi];
+      if(mi > 0 && onStatus) onStatus('混み合っているので、別のモデルで読み直しています…');
+      let level = ((readOcrState().level || {})[model]) || 0;
+      let spaced = false;
+      let retried = false;
+      for(;;){
+        if(job.cancelled) throw new OcrError('cancel');
+        const r = await postGemini(model, buildOcrBody(job, level, spaced), job);
+        if(job.cancelled) throw new OcrError('cancel');
+        if(r.status === 200){
+          const out = parseOcrResponse(r.data, spaced);
+          if(out.ok){
+            updateOcrState(s => { s.level = s.level || {}; s.level[model] = level; });
+            return Object.assign({ model }, out.value);
+          }
+          if(out.kind === 'recitation' && !spaced){
+            spaced = true;
+            if(onStatus) onStatus('読み方を変えて、もう一度読んでいます…');
+            continue;
+          }
+          if(out.kind === 'badjson' && !retried){ retried = true; continue; }
+          last = new OcrError(out.kind);
+          break;   // 次のモデルへ
+        }
+        const kind = classifyOcrHttpError(r.status, r.data);
+        if(kind === 'key') throw new OcrError('key');
+        if(kind === 'invalid' && level < 2){ level++; continue; }
+        if(kind === 'quota-day'){
+          updateOcrState(s => { s.exhausted = s.exhausted || {}; s.exhausted[model] = ocrQuotaDay(); });
+          last = new OcrError('quota');
+          break;
+        }
+        if(kind === 'quota'){ last = new OcrError('quota'); break; }
+        if(kind === 'nomodel'){
+          // このキーでは使えないモデルは一覧から外す(全部消えたら次回一覧を取り直す)
+          updateOcrState(s => {
+            if(Array.isArray(s.models)) s.models = s.models.filter(m => m !== model);
+            if(!s.models || !s.models.length) s.checkedAt = 0;
+          });
+          last = new OcrError('unknown');
+          break;
+        }
+        if(kind === 'server' && !retried){ retried = true; await sleep(1500); continue; }
+        last = new OcrError(kind === 'server' ? 'server' : 'unknown');
+        break;
+      }
+    }
+    throw last || new OcrError('unknown');
+  }
+  function ocrErrorMessage(err){
+    switch(err && err.kind){
+      case 'offline':
+      case 'network': return '通信できませんでした。電波の良いところでもう一度試してください。';
+      case 'timeout': return '読み取りに時間がかかりすぎました。もう一度試してください。';
+      case 'nokey':
+      case 'key': return 'Gemini のキーが使えないようです。キーを登録し直してください。';
+      case 'quota': return '今日、無料で読める回数を使い切ったようです。日本時間の16〜17時ごろに回復します。';
+      case 'server': return 'Gemini が混み合っています。少し待ってからもう一度試してください。';
+      case 'recitation': return '読み取った文章を Gemini が返してくれませんでした（よく知られた文章で起きることがあります）。なぞる範囲を少し変えて、もう一度試してください。';
+      case 'blocked': return '内容の制限で読み取れませんでした。';
+      case 'toolong': return '範囲が長すぎました。何回かに分けてなぞってください。';
+      default: return '読み取りに失敗しました。もう一度試してください。';
+    }
+  }
+
+  /* ---------- なぞる画面 ---------- */
+  const captureScreen = document.getElementById('captureScreen');
+  const capStage = document.getElementById('capStage');
+  const capLayer = document.getElementById('capLayer');
+  const capSheet = document.getElementById('capSheet');
+  const capText = document.getElementById('capText');
+  const capCameraInput = document.getElementById('capCameraInput');
+  const capLibraryInput = document.getElementById('capLibraryInput');
+  const cap = {
+    work: null, ink: null, inkCtx: null,   // 写真(回転・縮小済み)と、なぞり跡
+    strokes: [],                           // { w: 太さ, pts: [x0,y0,x1,y1,...] } 写真の座標
+    scale: 1, tx: 0, ty: 0, fit: 1,        // 表示の拡大率と位置
+    pointers: new Map(), drawing: null, pinch: null, pan: null, gestureLock: false,
+    target: null, pendingTarget: null,     // 引用を入れる付箋(null なら新しい付箋を作る)
+    sheet: null, busy: false, job: null,
+    chars: [], selStart: 0, selEnd: 0, initSel: [0, 0], resultMode: 'marker',
+    carry: '', pendingCarry: null,         // 前のページから続く引用
+    page: '', usePage: true, model: ''
+  };
+  function captureIsOpen(){ return captureScreen.classList.contains('show'); }
+
+  // 付箋の「撮る」、または「写真から付箋を作る」から呼ぶ(ボタンを押した流れのまま呼ばないとカメラが開かない)
+  function requestQuotePhoto(target, fromLibrary){
+    if(!readOcrKey()){ openOcrSetup({ kind: 'photo', target, fromLibrary }); return; }
+    if(!captureIsOpen()) cap.pendingTarget = target;
+    cap.pendingCarry = null;
+    (fromLibrary ? capLibraryInput : capCameraInput).click();
+  }
+  [capCameraInput, capLibraryInput].forEach(input => {
+    input.addEventListener('change', () => {
+      const file = input.files && input.files[0];
+      input.value = '';
+      if(file) openCaptureWithFile(file);
+    });
+  });
+  function loadImageFile(file){
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('画像を開けませんでした')); };
+      img.src = url;
+    });
+  }
+  // 写真の向き(EXIF)はブラウザが直して描くので、そのまま縮小して描けばよい
+  function toWorkCanvas(img){
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const k = Math.min(1, WORK_MAX_PX / Math.max(w, h));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k));
+    c.height = Math.max(1, Math.round(h * k));
+    const ctx = c.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    return c;
+  }
+  async function openCaptureWithFile(file){
+    if(!captureIsOpen()){
+      cap.target = cap.pendingTarget || null;
+      cap.carry = '';
+      cap.page = '';
+      cap.usePage = true;
+      captureScreen.classList.add('show');
+      refreshOcrModelsIfStale();
+    }
+    cap.pendingTarget = null;
+    const loadingEl = document.getElementById('capPhotoLoading');
+    loadingEl.classList.add('show');
+    let img;
+    try{
+      img = await loadImageFile(file);
+    }catch(e){
+      loadingEl.classList.remove('show');
+      showToast('写真を開けませんでした');
+      if(!cap.work) closeQuoteCapture(true);
+      return;
+    }
+    loadingEl.classList.remove('show');
+    if(!captureIsOpen()) return;
+    capCancelJob();
+    cap.work = toWorkCanvas(img);
+    cap.strokes = [];
+    if(cap.pendingCarry){
+      cap.carry = cap.pendingCarry.text;
+      cap.page = cap.pendingCarry.page;
+      cap.pendingCarry = null;
+    }
+    capShowSheet(null);
+    capSetupCanvases();
+    capRefreshControls();
+  }
+  function closeQuoteCapture(force){
+    if(!captureIsOpen()) return;
+    const unsaved = cap.carry || (cap.sheet === 'result' && cap.selEnd > cap.selStart);
+    if(!force && unsaved && !confirm('読み取った文章を引用に入れずに閉じますか？')) return;
+    capCancelJob();
+    captureScreen.classList.remove('show');
+    capShowSheet(null);
+    capLayer.innerHTML = '';
+    Object.assign(cap, {
+      work: null, ink: null, inkCtx: null, strokes: [], drawing: null, pinch: null, pan: null, gestureLock: false,
+      target: null, pendingTarget: null, busy: false, job: null, chars: [], carry: '', pendingCarry: null, page: ''
+    });
+    cap.pointers.clear();
+  }
+  function handleCaptureEscape(){
+    if(ocrSetupOverlay.classList.contains('show')){ closeOcrSetup(); return true; }
+    if(!captureIsOpen()) return false;
+    if(cap.sheet === 'loading') capCancelJob();
+    else if(cap.sheet) capShowSheet(null);
+    else closeQuoteCapture(false);
+    return true;
+  }
+
+  function capSetupCanvases(){
+    const W = cap.work.width, H = cap.work.height;
+    capLayer.innerHTML = '';
+    capLayer.style.width = W + 'px';
+    capLayer.style.height = H + 'px';
+    capLayer.appendChild(cap.work);
+    const ink = document.createElement('canvas');
+    ink.className = 'cap-ink';
+    ink.width = Math.max(1, Math.round(W * INK_SCALE));
+    ink.height = Math.max(1, Math.round(H * INK_SCALE));
+    capLayer.appendChild(ink);
+    cap.ink = ink;
+    cap.inkCtx = ink.getContext('2d');
+    capRedrawInk();
+    capFitView();
+  }
+  function drawStrokes(ctx, strokes){
+    ctx.strokeStyle = MARKER_COLOR;
+    ctx.fillStyle = MARKER_COLOR;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    strokes.forEach(st => {
+      const p = st.pts;
+      if(p.length === 2){
+        ctx.beginPath();
+        ctx.arc(p[0], p[1], st.w / 2, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+      ctx.lineWidth = st.w;
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1]);
+      for(let i = 2; i < p.length; i += 2) ctx.lineTo(p[i], p[i + 1]);
+      ctx.stroke();
+    });
+  }
+  function capRedrawInk(){
+    const ctx = cap.inkCtx;
+    if(!ctx) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, cap.ink.width, cap.ink.height);
+    ctx.setTransform(INK_SCALE, 0, 0, INK_SCALE, 0, 0);
+    drawStrokes(ctx, cap.strokes);
+  }
+
+  // 表示：写真の座標 × scale + (tx, ty) = 画面の座標
+  function capApplyView(){
+    capLayer.style.transform = 'translate(' + cap.tx + 'px,' + cap.ty + 'px) scale(' + cap.scale + ')';
+  }
+  // 下のシートが出ているときは、その上に見えている部分だけを表示範囲として扱う
+  function capVisibleHeight(){
+    const sh = capStage.clientHeight;
+    if(!cap.sheet) return sh;
+    const top = capSheet.getBoundingClientRect().top - capStage.getBoundingClientRect().top;
+    return Math.max(60, Math.min(sh, top));
+  }
+  function capClampView(){
+    if(!cap.work) return;
+    const sw = capStage.clientWidth, vh = capVisibleHeight();
+    const iw = cap.work.width * cap.scale, ih = cap.work.height * cap.scale;
+    cap.tx = iw <= sw ? (sw - iw) / 2 : Math.min(0, Math.max(sw - iw, cap.tx));
+    cap.ty = ih <= vh ? (vh - ih) / 2 : Math.min(0, Math.max(vh - ih, cap.ty));
+  }
+  function capFitView(){
+    if(!cap.work) return;
+    cap.fit = Math.min(capStage.clientWidth / cap.work.width, capStage.clientHeight / cap.work.height);
+    cap.scale = cap.fit;
+    capClampView();
+    capApplyView();
+  }
+  function capAnimateView(){
+    capLayer.style.transition = 'transform .3s ease';
+    capApplyView();
+    setTimeout(() => { capLayer.style.transition = ''; }, 320);
+  }
+  // 読み取った文と見比べられるよう、なぞった所をシートの上に寄せる。
+  // 収まるなら少し拡大して全体を、収まらないなら読み始めの側(縦書きは右上・横書きは左上)を見せる
+  function capFocusRect(r){
+    const sw = capStage.clientWidth, vh = capVisibleHeight(), m = 12;
+    const fitAll = Math.min(sw / (r.w * 1.15), vh / (r.h * 1.15));
+    const s = Math.max(cap.scale, cap.fit, fitAll >= cap.fit ? Math.min(cap.fit * 2.5, fitAll) : cap.fit * 1.6);
+    cap.scale = s;
+    cap.tx = r.w * s <= sw - m * 2 ? sw / 2 - (r.x + r.w / 2) * s
+      : (r.vertical ? sw - m - (r.x + r.w) * s : m - r.x * s);
+    cap.ty = r.h * s <= vh - m * 2 ? vh / 2 - (r.y + r.h / 2) * s : m - r.y * s;
+    capClampView();
+    capAnimateView();
+  }
+  window.addEventListener('resize', () => {
+    if(!captureIsOpen() || !cap.work) return;
+    cap.fit = Math.min(capStage.clientWidth / cap.work.width, capStage.clientHeight / cap.work.height);
+    if(cap.scale < cap.fit) cap.scale = cap.fit;
+    capClampView();
+    capApplyView();
+  });
+
+  function capStagePoint(e){
+    const r = capStage.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+  function capToWork(p){ return { x: (p.x - cap.tx) / cap.scale, y: (p.y - cap.ty) / cap.scale }; }
+  function capStartStroke(id, p){
+    const w = capToWork(p);
+    const stroke = { w: MARKER_SCREEN_PX / cap.scale, pts: [w.x, w.y] };
+    cap.strokes.push(stroke);
+    cap.drawing = { id, stroke, startedAt: performance.now(), screenLen: 0, last: p };
+    const ctx = cap.inkCtx;
+    ctx.fillStyle = MARKER_COLOR;
+    ctx.beginPath();
+    ctx.arc(w.x, w.y, stroke.w / 2, 0, Math.PI * 2);
+    ctx.fill();
+    capRefreshControls();
+  }
+  function capExtendStroke(p){
+    const d = cap.drawing;
+    const dist = Math.hypot(p.x - d.last.x, p.y - d.last.y);
+    if(dist < 2) return;
+    const a = capToWork(d.last), b = capToWork(p);
+    d.stroke.pts.push(b.x, b.y);
+    d.screenLen += dist;
+    d.last = p;
+    const ctx = cap.inkCtx;
+    ctx.strokeStyle = MARKER_COLOR;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = d.stroke.w;
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+  // 2本目の指が来たら拡大の操作。1本目の指で引き始めたばかりの線は、拡大のつもりだったので消す
+  function capDropStrokeForPinch(){
+    const d = cap.drawing;
+    if(!d) return;
+    cap.drawing = null;
+    if(performance.now() - d.startedAt < 350 || d.screenLen < 14){
+      cap.strokes = cap.strokes.filter(s => s !== d.stroke);
+      capRedrawInk();
+    }
+    capRefreshControls();
+  }
+  function capTwoPointers(){
+    const pts = Array.from(cap.pointers.values());
+    return [pts[0], pts[1]];
+  }
+  function capStartPinch(){
+    const [a, b] = capTwoPointers();
+    const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    cap.pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, s0: cap.scale, anchor: capToWork(c) };
+    cap.gestureLock = true;
+  }
+  function capMovePinch(){
+    const [a, b] = capTwoPointers();
+    const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const d = Math.hypot(a.x - b.x, a.y - b.y) || 1;
+    cap.scale = Math.max(cap.fit, Math.min(cap.fit * 10, cap.pinch.s0 * d / cap.pinch.d0));
+    cap.tx = c.x - cap.pinch.anchor.x * cap.scale;
+    cap.ty = c.y - cap.pinch.anchor.y * cap.scale;
+    capClampView();
+    capApplyView();
+  }
+  capStage.addEventListener('pointerdown', e => {
+    if(!cap.work || cap.busy) return;
+    e.preventDefault();
+    try{ capStage.setPointerCapture(e.pointerId); }catch(err){ /* 取れなくても動く */ }
+    const p = capStagePoint(e);
+    cap.pointers.set(e.pointerId, p);
+    // 読み取り結果を見ている間は、なぞらずに動かすだけ(PCは右ボタン・Shiftを押しながらで移動)
+    const panOnly = !!cap.sheet || (e.pointerType === 'mouse' && (e.button !== 0 || e.shiftKey || e.altKey));
+    if(cap.pointers.size === 1){
+      if(panOnly || cap.gestureLock) cap.pan = { id: e.pointerId, x: p.x, y: p.y, tx: cap.tx, ty: cap.ty };
+      else capStartStroke(e.pointerId, p);
+    } else if(cap.pointers.size === 2){
+      capDropStrokeForPinch();
+      cap.pan = null;
+      capStartPinch();
+    }
+  });
+  capStage.addEventListener('pointermove', e => {
+    if(!cap.pointers.has(e.pointerId)) return;
+    const p = capStagePoint(e);
+    cap.pointers.set(e.pointerId, p);
+    if(cap.pinch && cap.pointers.size >= 2){
+      capMovePinch();
+    } else if(cap.drawing && cap.drawing.id === e.pointerId){
+      // 指の速い動きでも線が角ばらないよう、間の点も拾う
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [];
+      (events.length ? events : [e]).forEach(ev => capExtendStroke(capStagePoint(ev)));
+    } else if(cap.pan && cap.pan.id === e.pointerId){
+      cap.tx = cap.pan.tx + p.x - cap.pan.x;
+      cap.ty = cap.pan.ty + p.y - cap.pan.y;
+      capClampView();
+      capApplyView();
+    }
+  });
+  function capPointerEnd(e){
+    if(!cap.pointers.has(e.pointerId)) return;
+    cap.pointers.delete(e.pointerId);
+    if(cap.drawing && cap.drawing.id === e.pointerId){
+      cap.drawing = null;
+      capRefreshControls();
+    }
+    if(cap.pan && cap.pan.id === e.pointerId) cap.pan = null;
+    if(cap.pointers.size < 2) cap.pinch = null;
+    // 拡大のあと片方の指だけ残っているときは、そのまま移動に使う
+    if(cap.pointers.size === 1 && cap.gestureLock){
+      const [id, p] = Array.from(cap.pointers.entries())[0];
+      cap.pan = { id, x: p.x, y: p.y, tx: cap.tx, ty: cap.ty };
+    }
+    if(cap.pointers.size === 0) cap.gestureLock = false;
+  }
+  capStage.addEventListener('pointerup', capPointerEnd);
+  capStage.addEventListener('pointercancel', capPointerEnd);
+  capStage.addEventListener('wheel', e => {
+    if(!cap.work) return;
+    e.preventDefault();
+    const p = capStagePoint(e);
+    const anchor = capToWork(p);
+    cap.scale = Math.max(cap.fit, Math.min(cap.fit * 10, cap.scale * Math.exp(-e.deltaY * 0.0015)));
+    cap.tx = p.x - anchor.x * cap.scale;
+    cap.ty = p.y - anchor.y * cap.scale;
+    capClampView();
+    capApplyView();
+  }, { passive: false });
+  capStage.addEventListener('dblclick', () => { if(cap.work){ capFitView(); } });
+  // iPhone で画面ごと拡大・スクロールされないように
+  capStage.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  captureScreen.addEventListener('gesturestart', e => e.preventDefault());
+
+  function capRefreshControls(){
+    const hasStrokes = cap.strokes.length > 0;
+    document.getElementById('capUndoBtn').disabled = !hasStrokes || cap.busy;
+    document.getElementById('capClearBtn').disabled = !hasStrokes || cap.busy;
+    document.getElementById('capRotateBtn').disabled = !cap.work || cap.busy;
+    const readBtn = document.getElementById('capReadBtn');
+    readBtn.textContent = hasStrokes ? 'なぞった所を読み取る' : 'ページ全体を読む';
+    readBtn.disabled = !cap.work || cap.busy;
+    document.getElementById('capHint').classList.toggle('hide', hasStrokes || !!cap.carry);
+    const banner = document.getElementById('capCarryBanner');
+    if(cap.carry){
+      const tail = Array.from(cap.carry).slice(-14).join('');
+      banner.innerHTML = '前のページの続きをなぞってください<br><span>…' + escapeHTML(tail) + '</span>';
+    }
+    banner.classList.toggle('show', !!cap.carry && !hasStrokes);
+  }
+  function capRotate(){
+    if(!cap.work || cap.busy) return;
+    const src = cap.work;
+    const c = document.createElement('canvas');
+    c.width = src.height;
+    c.height = src.width;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width, 0);
+    ctx.rotate(Math.PI / 2);
+    ctx.drawImage(src, 0, 0);
+    // 右に90度：(x, y) → (元の高さ - y, x)
+    cap.strokes = cap.strokes.map(st => {
+      const pts = [];
+      for(let i = 0; i < st.pts.length; i += 2) pts.push(src.height - st.pts[i + 1], st.pts[i]);
+      return { w: st.w, pts };
+    });
+    cap.work = c;
+    capSetupCanvases();
+  }
+
+  /* ---------- 送る画像をつくる ---------- */
+  function capStrokeBounds(){
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, maxW = 0, sumDx = 0, sumDy = 0;
+    cap.strokes.forEach(st => {
+      const p = st.pts, r = st.w / 2;
+      maxW = Math.max(maxW, st.w);
+      for(let i = 0; i < p.length; i += 2){
+        x0 = Math.min(x0, p[i] - r); x1 = Math.max(x1, p[i] + r);
+        y0 = Math.min(y0, p[i + 1] - r); y1 = Math.max(y1, p[i + 1] + r);
+        if(i >= 2){ sumDx += Math.abs(p[i] - p[i - 2]); sumDy += Math.abs(p[i + 1] - p[i - 1]); }
+      }
+    });
+    const W = cap.work.width, H = cap.work.height;
+    x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(W, x1); y1 = Math.min(H, y1);
+    // 日本の本は縦書きが多いので、迷うときは縦書きとみなす
+    return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0), maxW, vertical: sumDy * 1.3 >= sumDx };
+  }
+  // 写真の一部を切り出して JPEG(base64) にする。なぞり跡は蛍光ペンのように重ねる(文字は黒いまま)
+  function capRenderRegion(rect, maxLong, withMarker, quality){
+    const k = Math.min(1, maxLong / Math.max(rect.w, rect.h));
+    const out = document.createElement('canvas');
+    out.width = Math.max(1, Math.round(rect.w * k));
+    out.height = Math.max(1, Math.round(rect.h * k));
+    const ctx = out.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(cap.work, rect.x, rect.y, rect.w, rect.h, 0, 0, out.width, out.height);
+    if(withMarker && cap.strokes.length){
+      const ink = document.createElement('canvas');
+      ink.width = out.width;
+      ink.height = out.height;
+      const ictx = ink.getContext('2d');
+      ictx.setTransform(k, 0, 0, k, -rect.x * k, -rect.y * k);
+      drawStrokes(ictx, cap.strokes);
+      ctx.globalAlpha = 0.5;
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.drawImage(ink, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    return out.toDataURL('image/jpeg', quality).split(',')[1];
+  }
+  function buildCapJob(){
+    const W = cap.work.width, H = cap.work.height;
+    const whole = { x: 0, y: 0, w: W, h: H };
+    if(!cap.strokes.length){
+      return {
+        mode: 'page', prompt: OCR_PAGE_PROMPT,
+        images: [{ label: 'Image:', data: capRenderRegion(whole, SEND_MAX_PX, false, 0.9), resolution: 'MEDIA_RESOLUTION_ULTRA_HIGH' }]
+      };
+    }
+    // なぞった行の前後の文も読めるよう、行の方向には端から端まで、横には数行ぶん広げて切り出す
+    const b = capStrokeBounds();
+    let rect;
+    if(b.vertical){
+      const pad = Math.max(W * 0.08, b.maxW * 2.5);
+      const x0 = Math.max(0, b.x - pad), x1 = Math.min(W, b.x + b.w + pad);
+      rect = { x: Math.floor(x0), y: 0, w: Math.ceil(x1 - x0), h: H };
+    } else {
+      const pad = Math.max(H * 0.06, b.maxW * 2.5);
+      const y0 = Math.max(0, b.y - pad), y1 = Math.min(H, b.y + b.h + pad);
+      rect = { x: 0, y: Math.floor(y0), w: W, h: Math.ceil(y1 - y0) };
+    }
+    return {
+      mode: 'marker', prompt: OCR_MARKER_PROMPT, focus: b,
+      images: [
+        { label: 'Image A (whole photo, for context):', data: capRenderRegion(whole, 1280, true, 0.8), resolution: 'MEDIA_RESOLUTION_MEDIUM' },
+        { label: 'Image B (high-resolution crop around the highlighted passage — read the characters from this image):', data: capRenderRegion(rect, SEND_MAX_PX, true, 0.9), resolution: 'MEDIA_RESOLUTION_ULTRA_HIGH' }
+      ]
+    };
+  }
+
+  /* ---------- 読み取り → 結果のシート ---------- */
+  function capShowSheet(state){
+    cap.sheet = state;
+    capSheet.classList.toggle('show', !!state);
+    document.getElementById('capLoading').hidden = state !== 'loading';
+    document.getElementById('capError').hidden = state !== 'error';
+    document.getElementById('capResult').hidden = state !== 'result';
+    document.getElementById('capSheetFoot').hidden = state !== 'result';
+    if(state !== 'result') document.getElementById('capSheetTitle').textContent = state === 'error' ? '読み取れませんでした' : '読み取った文章';
+    if(cap.work){ capClampView(); capApplyView(); }
+  }
+  function capCancelJob(){
+    const job = cap.job;
+    if(!job) return;
+    job.cancelled = true;
+    if(job.abort) job.abort();
+    cap.job = null;
+    cap.busy = false;
+    if(cap.sheet === 'loading') capShowSheet(null);
+    capRefreshControls();
+  }
+  async function capRead(){
+    if(!cap.work || cap.busy) return;
+    if(!readOcrKey()){ openOcrSetup({ kind: 'retry' }); return; }
+    const job = buildCapJob();
+    cap.job = job;
+    cap.busy = true;
+    capRefreshControls();
+    document.getElementById('capLoadingText').textContent = job.mode === 'page' ? 'ページ全体を読み取っています…' : 'なぞった所を読み取っています…';
+    capShowSheet('loading');
+    const slowTimer = setTimeout(() => {
+      if(cap.job === job) document.getElementById('capLoadingText').textContent = '時間がかかっています。もう少し待ってください…';
+    }, 15000);
+    try{
+      const res = await runOcr(job, msg => { if(cap.job === job) document.getElementById('capLoadingText').textContent = msg; });
+      if(cap.job !== job) return;
+      cap.job = null;
+      cap.busy = false;
+      capShowResult(res, job);
+    }catch(err){
+      if(cap.job !== job) return;   // やめた・閉じた
+      cap.job = null;
+      cap.busy = false;
+      document.getElementById('capErrorText').textContent = ocrErrorMessage(err);
+      document.getElementById('capErrorSetupBtn').hidden = !(err.kind === 'key' || err.kind === 'nokey');
+      document.getElementById('capErrorRetryBtn').hidden = err.kind === 'key' || err.kind === 'nokey';
+      capShowSheet('error');
+    }finally{
+      clearTimeout(slowTimer);
+      capRefreshControls();
+    }
+  }
+  function capShowResult(res, job){
+    const before = Array.from(res.before), mid = Array.from(res.highlighted), after = Array.from(res.after);
+    // 範囲の両端の空白・改行は範囲の外に出す
+    while(mid.length && /\s/.test(mid[0])) before.push(mid.shift());
+    while(mid.length && /\s/.test(mid[mid.length - 1])) after.unshift(mid.pop());
+    cap.chars = before.concat(mid, after);
+    cap.selStart = before.length;
+    cap.selEnd = before.length + mid.length;
+    cap.initSel = [cap.selStart, cap.selEnd];
+    cap.resultMode = job.mode;
+    if(!cap.carry) cap.page = res.page;   // 前のページから続くときは、始まりのページのまま
+    cap.model = res.model;
+
+    let html = '';
+    if(cap.carry) html += '<span class="cap-carry">…' + escapeHTML(Array.from(cap.carry).slice(-24).join('')) + '</span>';
+    cap.chars.forEach((ch, i) => {
+      html += ch === '\n'
+        ? '<span class="c nl" data-i="' + i + '">↵</span><br>'
+        : '<span class="c" data-i="' + i + '">' + escapeHTML(ch) + '</span>';
+    });
+    capText.innerHTML = html;
+
+    const hint = document.getElementById('capResultHint');
+    if(job.mode === 'page') hint.textContent = '引用したい所の、最初の文字と最後の文字をタップしてください。';
+    else if(!mid.length) hint.textContent = 'なぞった所の文字が見つかりませんでした。引用したい所の最初の文字と最後の文字をタップしてください。';
+    else hint.textContent = '文字をタップすると、範囲の始まり・終わりを1文字ずつ動かせます。';
+    document.getElementById('capResetSelBtn').hidden = job.mode === 'page' || !mid.length;
+    document.getElementById('capModelNote').textContent = /lite/.test(res.model)
+      ? '今日は精度の高いモデルの無料回数を使い切ったため、軽いモデル（' + res.model + '）で読みました。読み違いがあれば引用欄で直してください。'
+      : '';
+    const pageInput = capTargetPageInput();
+    const pageChip = document.getElementById('capPageChip');
+    pageChip.hidden = !cap.page || !!(pageInput && pageInput.value.trim());
+    pageChip.textContent = 'p.' + cap.page + ' を付箋に入れる';
+    pageChip.classList.toggle('active', cap.usePage);
+
+    capShowSheet('result');
+    capUpdateSelection();
+    requestAnimationFrame(() => {
+      if(job.focus) capFocusRect(job.focus);
+      const first = capText.querySelector('.c.sel');
+      if(first){
+        const body = document.getElementById('capSheetBody');
+        body.scrollTop = Math.max(0, first.offsetTop - capText.offsetTop - 24);
+      }
+    });
+  }
+  function capTargetPageInput(){
+    const card = cap.target && document.body.contains(cap.target) ? cap.target : null;
+    return card ? card.querySelector('.page-field input') : null;
+  }
+  function capSelectedText(){
+    return cap.chars.slice(cap.selStart, cap.selEnd).join('').replace(/^\s+|\s+$/g, '');
+  }
+  function capUpdateSelection(){
+    capText.querySelectorAll('.c').forEach(el => {
+      const i = +el.dataset.i;
+      el.classList.toggle('sel', i >= cap.selStart && i < cap.selEnd);
+    });
+    const count = Array.from(cap.carry).length + Array.from(capSelectedText()).length;
+    document.getElementById('capSheetTitle').innerHTML = '読み取った文章<span class="cap-count">' + (count ? count + '字' : '') + '</span>';
+    const hasSel = capSelectedText().length > 0;
+    document.getElementById('capInsertBtn').disabled = !hasSel && !cap.carry;
+    document.getElementById('capContinueBtn').disabled = !hasSel;
+    document.getElementById('capSnapBtn').disabled = !hasSel;
+    document.getElementById('capResetSelBtn').disabled = cap.selStart === cap.initSel[0] && cap.selEnd === cap.initSel[1];
+  }
+  // タップした文字が範囲の外なら範囲をそこまで広げ、内側なら近い方の端をそこまで縮める
+  capText.addEventListener('click', e => {
+    const span = e.target.closest('.c');
+    if(!span) return;
+    const i = +span.dataset.i;
+    let s = cap.selStart, en = cap.selEnd;
+    if(s === en){ s = i; en = i + 1; }
+    else if(i < s) s = i;
+    else if(i >= en) en = i + 1;
+    else if(i - s <= en - 1 - i) s = i;
+    else en = i + 1;
+    cap.selStart = s;
+    cap.selEnd = en;
+    capUpdateSelection();
+  });
+  const SENTENCE_END = '。．！？!?';
+  const CLOSING_MARKS = '」』）)】〉》”’';
+  // i 文字目の直前で文が区切れているか(「。」の後・「。」」の後・段落の頭)
+  function capIsSentenceStart(i){
+    const ch = cap.chars;
+    if(i <= 0) return true;
+    let k = i - 1;
+    if(ch[k] === '\n') return true;
+    while(k > 0 && CLOSING_MARKS.includes(ch[k])) k--;
+    return SENTENCE_END.includes(ch[k]);
+  }
+  function capSnapToSentence(){
+    const ch = cap.chars;
+    let s = cap.selStart, en = cap.selEnd;
+    if(s >= en) return;
+    while(s > 0 && !capIsSentenceStart(s)) s--;
+    // 「…。」の直後から始まるときは、閉じかっこを前の文に残す
+    while(s < en && (CLOSING_MARKS.includes(ch[s]) || /\s/.test(ch[s]))) s++;
+    while(en < ch.length && !capIsSentenceStart(en)) en++;
+    while(en < ch.length && CLOSING_MARKS.includes(ch[en])) en++;
+    while(en > s && /\s/.test(ch[en - 1])) en--;
+    cap.selStart = s;
+    cap.selEnd = en;
+    capUpdateSelection();
+  }
+  function capInsert(){
+    const text = (cap.carry + capSelectedText()).replace(/^\s+|\s+$/g, '');
+    if(!text) return;
+    let card = cap.target && document.body.contains(cap.target) ? cap.target : null;
+    if(!card){
+      addMemo();
+      const cards = document.querySelectorAll('#memoList .memo-card');
+      card = cards[cards.length - 1];
+    }
+    const quoteInput = card.querySelector('.memo-quote-input');
+    const current = quoteInput.value.replace(/\s+$/, '');
+    quoteInput.value = current ? current + '\n\n' + text : text;
+    quoteInput.dispatchEvent(new Event('input', { bubbles: true }));
+    const pageInput = card.querySelector('.page-field input');
+    if(cap.usePage && cap.page && !pageInput.value.trim()){
+      pageInput.value = cap.page;
+      pageInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    closeQuoteCapture(true);
+    autoResizeTextarea(quoteInput);
+    card.classList.add('just-filled');
+    setTimeout(() => card.classList.remove('just-filled'), 2400);
+    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    showToast('引用に入れました');
+  }
+
+  document.getElementById('addMemoFromPhotoBtn').addEventListener('click', () => requestQuotePhoto(null, true));
+  document.getElementById('capCloseBtn').addEventListener('click', () => closeQuoteCapture(false));
+  document.getElementById('capUndoBtn').addEventListener('click', () => {
+    if(cap.busy) return;
+    cap.strokes.pop();
+    capRedrawInk();
+    capRefreshControls();
+  });
+  document.getElementById('capClearBtn').addEventListener('click', () => {
+    if(cap.busy) return;
+    cap.strokes = [];
+    capRedrawInk();
+    capRefreshControls();
+  });
+  document.getElementById('capRetakeBtn').addEventListener('click', () => requestQuotePhoto(cap.target, false));
+  document.getElementById('capLibraryBtn').addEventListener('click', () => requestQuotePhoto(cap.target, true));
+  document.getElementById('capRotateBtn').addEventListener('click', capRotate);
+  document.getElementById('capReadBtn').addEventListener('click', capRead);
+  document.getElementById('capCancelBtn').addEventListener('click', capCancelJob);
+  document.getElementById('capSheetClose').addEventListener('click', () => {
+    if(cap.sheet === 'loading') capCancelJob();
+    else capShowSheet(null);
+  });
+  document.getElementById('capErrorRetryBtn').addEventListener('click', capRead);
+  document.getElementById('capErrorSetupBtn').addEventListener('click', () => openOcrSetup({ kind: 'retry' }));
+  document.getElementById('capSnapBtn').addEventListener('click', capSnapToSentence);
+  document.getElementById('capResetSelBtn').addEventListener('click', () => {
+    cap.selStart = cap.initSel[0];
+    cap.selEnd = cap.initSel[1];
+    capUpdateSelection();
+  });
+  document.getElementById('capPageChip').addEventListener('click', e => {
+    cap.usePage = !cap.usePage;
+    e.currentTarget.classList.toggle('active', cap.usePage);
+  });
+  document.getElementById('capInsertBtn').addEventListener('click', capInsert);
+  // ページをまたぐ引用：ここまでを覚えておき、次のページを撮って続きをなぞる
+  document.getElementById('capContinueBtn').addEventListener('click', () => {
+    const text = capSelectedText();
+    if(!text) return;
+    cap.pendingCarry = { text: cap.carry + text, page: cap.page };
+    capCameraInput.click();
+  });
+
+  /* ---------- 読み取りの設定(キーの登録) ---------- */
+  const ocrSetupOverlay = document.getElementById('ocrSetupOverlay');
+  const ocrKeyInput = document.getElementById('ocrKeyInput');
+  let ocrSetupPending = null;   // キーを登録したあと、撮影や読み直しに進むため
+  function setOcrStatus(text, tone){
+    const el = document.getElementById('ocrStatus');
+    el.textContent = text;
+    el.className = 'ocr-status' + (tone ? ' ' + tone : '');
+  }
+  function refreshOcrSetupUI(){
+    const key = readOcrKey();
+    const models = readOcrState().models || [];
+    document.getElementById('ocrKeyInfo').textContent = key
+      ? 'この端末に登録済みのキー：' + key.slice(0, 4) + '…' + key.slice(-4) + (models.length ? '（読み取りに使うモデル：' + models[0] + ' ほか）' : '')
+      : '';
+    document.getElementById('ocrDeleteKeyBtn').style.display = key ? 'block' : 'none';
+  }
+  function openOcrSetup(pending){
+    ocrSetupPending = pending || null;
+    ocrKeyInput.value = '';
+    setOcrStatus(pending && pending.kind === 'photo' ? '写真から読み取るには、最初に一度だけキーの登録が必要です。' : '', '');
+    document.getElementById('ocrContinueBtn').style.display = 'none';
+    refreshOcrSetupUI();
+    closeDataMenu();
+    ocrSetupOverlay.classList.add('show');
+  }
+  function closeOcrSetup(){
+    ocrSetupOverlay.classList.remove('show');
+    ocrSetupPending = null;
+  }
+  async function saveOcrKey(){
+    const key = ocrKeyInput.value.replace(/\s+/g, '');
+    if(!key){ setOcrStatus('キーを貼り付けてください。', 'ng'); return; }
+    if(!/^[A-Za-z0-9._\-]{20,}$/.test(key)){
+      setOcrStatus('キーの形が違うようです。AIza… で始まる文字列を丸ごとコピーして貼り付けてください。', 'ng');
+      return;
+    }
+    const btn = document.getElementById('ocrSaveBtn');
+    btn.disabled = true;
+    setOcrStatus('確かめています…', '');
+    const r = await verifyOcrKey(key);
+    btn.disabled = false;
+    if(!r.ok){ setOcrStatus(r.message, 'ng'); return; }
+    try{
+      localStorage.setItem(OCR_KEY_STORAGE, key);
+    }catch(e){
+      setOcrStatus('この端末に保存できませんでした。', 'ng');
+      return;
+    }
+    writeOcrState({ models: r.models, checkedAt: Date.now(), exhausted: {}, level: {} });
+    ocrKeyInput.value = '';
+    setOcrStatus('✓ 登録しました。写真から読み取れます。', 'ok');
+    refreshOcrSetupUI();
+    if(ocrSetupPending){
+      const cont = document.getElementById('ocrContinueBtn');
+      cont.textContent = ocrSetupPending.kind === 'retry' ? 'もう一度読み取る' : (ocrSetupPending.fromLibrary ? '写真を選ぶ' : 'ページを撮る');
+      cont.style.display = 'block';
+    }
+  }
+  document.getElementById('ocrSaveBtn').addEventListener('click', saveOcrKey);
+  ocrKeyInput.addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); saveOcrKey(); }
+  });
+  document.getElementById('ocrPasteBtn').addEventListener('click', async () => {
+    try{
+      const t = await navigator.clipboard.readText();
+      ocrKeyInput.value = (t || '').trim();
+      if(ocrKeyInput.value) setOcrStatus('', '');
+    }catch(e){
+      ocrKeyInput.focus();
+      setOcrStatus('入力欄を長押しして「ペースト」してください。', '');
+    }
+  });
+  document.getElementById('ocrContinueBtn').addEventListener('click', () => {
+    const pending = ocrSetupPending;
+    closeOcrSetup();
+    if(!pending) return;
+    if(pending.kind === 'retry'){ if(captureIsOpen()) capRead(); }
+    else requestQuotePhoto(pending.target, pending.fromLibrary);
+  });
+  document.getElementById('ocrDeleteKeyBtn').addEventListener('click', () => {
+    if(!confirm('この端末に登録した Gemini のキーを削除しますか？\n（写真から読み取るには、もう一度登録が必要になります）')) return;
+    try{
+      localStorage.removeItem(OCR_KEY_STORAGE);
+      localStorage.removeItem(OCR_STATE_STORAGE);
+    }catch(e){ /* 消せなくても表示だけは更新する */ }
+    setOcrStatus('削除しました。', '');
+    refreshOcrSetupUI();
+  });
+  document.getElementById('ocrSetupClose').addEventListener('click', closeOcrSetup);
+  ocrSetupOverlay.addEventListener('click', e => { if(e.target === ocrSetupOverlay) closeOcrSetup(); });
+  document.getElementById('ocrSetupMenuBtn').addEventListener('click', () => openOcrSetup(null));
 
   bootApp();
 </script>
