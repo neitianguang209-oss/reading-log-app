@@ -1029,17 +1029,34 @@
   .cap-sheet-foot{ display:flex; gap:10px; padding:10px var(--side) calc(14px + env(safe-area-inset-bottom)); flex-shrink:0; }
   .cap-sheet-foot .save-btn{ flex:1; padding:13px 10px; font-size:15px; }
   .cap-sheet-foot .save-btn:disabled{ opacity:.4; cursor:default; }
-  .cap-loading{ display:flex; flex-direction:column; align-items:center; gap:14px; padding:26px 0 18px; color:var(--ink-soft); font-size:14px; text-align:center; line-height:1.7; }
-  .cap-spinner{
-    width:28px; height:28px; border-radius:50%;
-    border:3px solid var(--accent-tint); border-top-color:var(--accent);
-    animation:cap-spin .9s linear infinite;
-  }
-  @keyframes cap-spin{ to{ transform:rotate(360deg); } }
-  .cap-error{ padding:8px 0 14px; }
-  .cap-error p{ font-size:14px; line-height:1.8; color:var(--ink); margin:0 0 14px; }
-  .cap-error-actions{ display:flex; flex-wrap:wrap; gap:8px; }
   .cap-sheet [hidden]{ display:none !important; }
+  .cap-read-row{ display:flex; gap:10px; }
+  .cap-read-row .save-btn{ width:auto; flex:1 1 auto; min-width:0; padding:13px 8px; font-size:15px; line-height:1.3; }
+  .cap-read-row .cap-next-btn{ flex:0 0 auto; padding-left:12px; padding-right:12px; white-space:nowrap; color:#fff; border-color:rgba(255,255,255,.5); }
+  .cap-read-row [hidden]{ display:none; }
+
+  /* 付箋のカード：写真の読み取りの状態(裏で読んでいる・入れた・選ぶ・失敗) */
+  .memo-ocr{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    background:var(--surface-raised); border-radius:var(--radius-sm);
+    padding:10px 12px; margin:0 0 8px; font-size:13px; line-height:1.55;
+  }
+  .memo-ocr[hidden]{ display:none; }
+  .memo-ocr.reading{ box-shadow:inset 3px 0 0 var(--marker); }
+  .memo-ocr.error{ box-shadow:inset 3px 0 0 var(--danger); }
+  .memo-ocr.select{ box-shadow:inset 3px 0 0 var(--accent); }
+  .memo-ocr-main{ flex:1 1 200px; min-width:0; display:flex; flex-direction:column; }   /* 狭いときはボタンが下の行に回る */
+  .memo-ocr-main b{ font-weight:600; color:var(--ink); }
+  .memo-ocr-main span{ font-size:12px; color:var(--ink-soft); }
+  .memo-ocr.error .memo-ocr-main b{ color:var(--danger); }
+  .memo-ocr-actions{ display:flex; flex-wrap:wrap; gap:6px; margin-left:auto; }
+  .memo-ocr-btn{
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:5px 12px; font-size:12px; font-family:inherit; cursor:pointer; white-space:nowrap;
+  }
+  .memo-ocr-btn.primary{ background:var(--accent); color:#fff; }
+  .memo-ocr-btn.plain{ border-color:transparent; color:var(--ink-soft); padding-left:6px; padding-right:6px; }
+  .photo-quote-btn:disabled{ opacity:.4; cursor:default; }
 
   /* 読み取りの設定（Gemini のキー） */
   #ocrSetupOverlay{ z-index:50; }
@@ -1603,29 +1620,21 @@
           <svg viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>線を全部消す
         </button>
       </div>
-      <button class="save-btn cap-read-btn" id="capReadBtn" type="button">ページ全体を読む</button>
+      <!-- 読み取りは裏で進むので、押したらすぐ付箋の画面に戻る -->
+      <div class="cap-read-row">
+        <button class="save-btn secondary cap-next-btn" id="capNextPageBtn" type="button">次のページに続く</button>
+        <button class="save-btn cap-read-btn" id="capReadBtn" type="button">ページ全体を読む</button>
+      </div>
     </div>
 
-    <!-- 読み取った文章 -->
+    <!-- 読み取った文章(付箋の「範囲を直す」「選ぶ」から開く) -->
     <div class="cap-sheet" id="capSheet">
       <div class="cap-sheet-head">
         <span class="cap-sheet-title" id="capSheetTitle">読み取った文章</span>
         <button class="modal-close" id="capSheetClose" type="button" aria-label="なぞり直す">×</button>
       </div>
       <div class="cap-sheet-body" id="capSheetBody">
-        <div class="cap-loading" id="capLoading">
-          <span class="cap-spinner"></span>
-          <span id="capLoadingText">読み取っています…</span>
-          <button class="btn-outline" id="capCancelBtn" type="button">やめる</button>
-        </div>
-        <div class="cap-error" id="capError" hidden>
-          <p id="capErrorText"></p>
-          <div class="cap-error-actions">
-            <button class="btn-outline" id="capErrorRetryBtn" type="button">もう一度読む</button>
-            <button class="btn-outline" id="capErrorSetupBtn" type="button">キーを登録し直す</button>
-          </div>
-        </div>
-        <div id="capResult" hidden>
+        <div id="capResult">
           <div class="cap-text" id="capText"></div>
           <p class="cap-hint-text" id="capResultHint"></p>
           <div class="cap-chip-row">
@@ -1636,9 +1645,8 @@
           <p class="cap-model-note" id="capModelNote"></p>
         </div>
       </div>
-      <div class="cap-sheet-foot" id="capSheetFoot" hidden>
-        <button class="save-btn secondary" id="capContinueBtn" type="button">次のページに続く</button>
-        <button class="save-btn" id="capInsertBtn" type="button">引用に入れる</button>
+      <div class="cap-sheet-foot" id="capSheetFoot">
+        <button class="save-btn" id="capInsertBtn" type="button">この範囲にする</button>
       </div>
     </div>
   </div>
@@ -2419,7 +2427,10 @@
   }
   function showScreen(name){
     // 編集画面から離れるときは、どんな経路でも(戻る・ログイン画面への切り替えなど)先に書き込む
-    if(name !== 'Form' && formIsOpen()) autosaveNow();
+    if(name !== 'Form' && formIsOpen()){
+      autosaveNow();
+      ocrSnapshotCards();   // 写真の読み取り中なら、終わったときに入れる先(本と付箋)を控えておく
+    }
     if(name !== 'Form' && typeof closeQuoteCapture === 'function') closeQuoteCapture(true);
     if(name !== 'List' && typeof exitSelectMode === 'function') exitSelectMode();
     document.querySelectorAll('.scrolled').forEach(el => el.classList.remove('scrolled'));
@@ -4506,6 +4517,7 @@
           '<button class="to-diary-btn" type="button" data-to-diary="quote">日記へ</button>' +
         '</div>' +
       '</div>' +
+      '<div class="memo-ocr" hidden></div>' +
       '<textarea class="memo-quote-input" rows="1" placeholder="本文からの引用">' + escapeHTML(memo && memo.quote || '') + '</textarea>' +
       '<label class="field-label">感情タグ（複数選択可）</label>' +
       '<div class="emo-row">' +
@@ -4530,8 +4542,26 @@
     });
     attachMemoCardHandlers(card);
     const quoteInput = card.querySelector('.memo-quote-input');
-    quoteInput.addEventListener('input', () => autoResizeTextarea(quoteInput));
+    quoteInput.addEventListener('input', () => {
+      autoResizeTextarea(quoteInput);
+      // 写真から入れた引用を自分で書き換えたら、それ以後は「範囲を直す」で上書きしない
+      const st = card._ocr;
+      if(st && st.lastWritten !== null && quoteInput.value !== st.lastWritten && st.parts.every(p => p.status === 'done')){
+        card._ocr = null;
+        renderOcrStatus(card);
+      }
+    });
     autoResizeTextarea(quoteInput);
+    card.querySelector('.memo-ocr').addEventListener('click', e => {
+      const btn = e.target.closest('[data-ocr]');
+      if(!btn) return;
+      const act = btn.dataset.ocr;
+      if(act === 'cancel') ocrCancel(card);
+      else if(act === 'retry') ocrRetry(card);
+      else if(act === 'setup') openOcrSetup({ kind: 'ocr-retry', card });
+      else if(act === 'adjust') ocrOpenAdjust(card, parseInt(btn.dataset.part, 10) || 0);
+      else if(act === 'dismiss'){ card._ocr = null; renderOcrStatus(card); }
+    });
     // 全画面で書いているときも、どの話の付箋か見出しで分かるようにする
     const withStory = label => () => {
       const banner = card.querySelector('.memo-story-banner').textContent;
@@ -6800,6 +6830,8 @@
      - 指でなぞった範囲はどうしてもずれるので、前後の文も一緒に読ませ、
        読み取った後に文字をタップして1文字単位で範囲を直せるようにしてある。
      - 無料枠の回数はモデルごとなので、上限に当たったら次のモデルで読み直す。
+     - 読み取りは待たせない。押したらすぐ付箋に戻し、裏で読んで終わったら引用欄に入れる
+       (待つあいだに気づきや次の付箋を書ける。「読み取りは裏で進める」の所)。
   ========================================================= */
   const OCR_API = 'https://generativelanguage.googleapis.com/v1beta/';
   const OCR_KEY_STORAGE = 'reading-log-gemini-key';
@@ -6836,9 +6868,9 @@
       'If it starts within about two characters after the start of a sentence, begin at the start of that sentence (including an opening bracket such as 「『（).',
     '3. Return JSON {"direction", "page", "before", "highlighted", "after"}:',
     '- page: the printed page number (ノンブル) of the page containing the passage, digits only; "" if it is not visible.',
-    '- before: the text immediately before the passage in reading order on the same page — at most the last 120 characters, ending exactly where the passage begins. "" if nothing precedes it.',
+    '- before: the text immediately before the passage in reading order on the same page — at most the last 80 characters, ending exactly where the passage begins. "" if nothing precedes it.',
     '- highlighted: the passage.',
-    '- after: the text immediately after the passage — at most 120 characters, starting exactly where the passage ends. "" if nothing follows.',
+    '- after: the text immediately after the passage — at most 80 characters, starting exactly where the passage ends. "" if nothing follows.',
     'before + highlighted + after must read as one continuous text with no gaps or overlaps.',
     '',
     OCR_RULES
@@ -6967,8 +6999,9 @@
       body.generationConfig.responseJsonSchema = OCR_SCHEMA;
       body.safetySettings = OCR_SAFETY;
     }
-    // なぞった範囲の見きわめには少し考えさせる。ページ全体は書き写すだけなので軽く
-    if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: job.mode === 'page' ? 'LOW' : 'MEDIUM' };
+    /* 考える量は少なめ(LOW)。以前はなぞった範囲の見きわめに MEDIUM を使っていたが、待ち時間の多くが
+       ここで、範囲は後から文字タップで直せるので、速さを優先した */
+    if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: 'LOW' };
     return body;
   }
   async function postGemini(model, body, job){
@@ -7126,10 +7159,11 @@
     scale: 1, tx: 0, ty: 0, fit: 1,        // 表示の拡大率と位置
     pointers: new Map(), drawing: null, pinch: null, pan: null, gestureLock: false,
     target: null, pendingTarget: null,     // 引用を入れる付箋(null なら新しい付箋を作る)
-    sheet: null, busy: false, job: null,
-    chars: [], selStart: 0, selEnd: 0, initSel: [0, 0], resultMode: 'marker',
-    carry: '', pendingCarry: null,         // 前のページから続く引用
-    page: '', usePage: true, model: ''
+    sheet: null,
+    session: null,                         // この撮影で読み取りを始めた付箋 { card, st }(次のページもここにつなぐ)
+    adjust: null,                          // 付箋の「範囲を直す」から開いたとき { card, st, pi }
+    chars: [], selStart: 0, selEnd: 0, initSel: [0, 0],
+    page: '', usePage: true
   };
   function captureIsOpen(){ return captureScreen.classList.contains('show'); }
 
@@ -7137,8 +7171,18 @@
   function requestQuotePhoto(target, fromLibrary){
     if(!readOcrKey()){ openOcrSetup({ kind: 'photo', target, fromLibrary }); return; }
     if(!captureIsOpen()) cap.pendingTarget = target;
-    cap.pendingCarry = null;
     (fromLibrary ? capLibraryInput : capCameraInput).click();
+  }
+  // 撮っている間に Gemini への接続だけ先に済ませておく(読み取りを押してからの待ちを少し減らす)
+  let ocrPreconnected = false;
+  function preconnectOcr(){
+    if(ocrPreconnected) return;
+    ocrPreconnected = true;
+    const link = document.createElement('link');
+    link.rel = 'preconnect';
+    link.href = 'https://generativelanguage.googleapis.com';
+    link.crossOrigin = 'anonymous';
+    document.head.appendChild(link);
   }
   [capCameraInput, capLibraryInput].forEach(input => {
     input.addEventListener('change', () => {
@@ -7171,11 +7215,11 @@
   async function openCaptureWithFile(file){
     if(!captureIsOpen()){
       cap.target = cap.pendingTarget || null;
-      cap.carry = '';
-      cap.page = '';
-      cap.usePage = true;
+      cap.session = null;
+      cap.adjust = null;
       captureScreen.classList.add('show');
       refreshOcrModelsIfStale();
+      preconnectOcr();
     }
     cap.pendingTarget = null;
     const loadingEl = document.getElementById('capPhotoLoading');
@@ -7191,38 +7235,30 @@
     }
     loadingEl.classList.remove('show');
     if(!captureIsOpen()) return;
-    capCancelJob();
+    // 「範囲を直す」から撮り直したときは、読むとその写真の分を置き換える(cap.adjust はそのまま)
     cap.work = toWorkCanvas(img);
     cap.strokes = [];
-    if(cap.pendingCarry){
-      cap.carry = cap.pendingCarry.text;
-      cap.page = cap.pendingCarry.page;
-      cap.pendingCarry = null;
-    }
     capShowSheet(null);
     capSetupCanvases();
     capRefreshControls();
   }
+  // 読み取りは付箋の側で続くので、閉じても何も失われない(force は以前の呼び出しとの互換のため)
   function closeQuoteCapture(force){
     if(!captureIsOpen()) return;
-    const unsaved = cap.carry || (cap.sheet === 'result' && cap.selEnd > cap.selStart);
-    if(!force && unsaved && !confirm('読み取った文章を引用に入れずに閉じますか？')) return;
-    capCancelJob();
     captureScreen.classList.remove('show');
     capShowSheet(null);
     capLayer.innerHTML = '';
     Object.assign(cap, {
       work: null, ink: null, inkCtx: null, strokes: [], drawing: null, pinch: null, pan: null, gestureLock: false,
-      target: null, pendingTarget: null, busy: false, job: null, chars: [], carry: '', pendingCarry: null, page: ''
+      target: null, pendingTarget: null, session: null, adjust: null, chars: [], page: ''
     });
     cap.pointers.clear();
   }
   function handleCaptureEscape(){
     if(ocrSetupOverlay.classList.contains('show')){ closeOcrSetup(); return true; }
     if(!captureIsOpen()) return false;
-    if(cap.sheet === 'loading') capCancelJob();
-    else if(cap.sheet) capShowSheet(null);
-    else closeQuoteCapture(false);
+    if(cap.sheet && cap.work) capShowSheet(null);
+    else closeQuoteCapture(true);
     return true;
   }
 
@@ -7389,7 +7425,7 @@
     capApplyView();
   }
   capStage.addEventListener('pointerdown', e => {
-    if(!cap.work || cap.busy) return;
+    if(!cap.work) return;
     e.preventDefault();
     try{ capStage.setPointerCapture(e.pointerId); }catch(err){ /* 取れなくても動く */ }
     const p = capStagePoint(e);
@@ -7458,22 +7494,22 @@
 
   function capRefreshControls(){
     const hasStrokes = cap.strokes.length > 0;
-    document.getElementById('capUndoBtn').disabled = !hasStrokes || cap.busy;
-    document.getElementById('capClearBtn').disabled = !hasStrokes || cap.busy;
-    document.getElementById('capRotateBtn').disabled = !cap.work || cap.busy;
+    document.getElementById('capUndoBtn').disabled = !hasStrokes;
+    document.getElementById('capClearBtn').disabled = !hasStrokes;
+    document.getElementById('capRotateBtn').disabled = !cap.work;
     const readBtn = document.getElementById('capReadBtn');
-    readBtn.textContent = hasStrokes ? 'なぞった所を読み取る' : 'ページ全体を読む';
-    readBtn.disabled = !cap.work || cap.busy;
-    document.getElementById('capHint').classList.toggle('hide', hasStrokes || !!cap.carry);
+    readBtn.textContent = hasStrokes ? (cap.adjust ? 'なぞった所を読み直す' : 'なぞった所を読み取る') : 'ページ全体を読む';
+    readBtn.disabled = !cap.work;
+    // ページをまたぐ引用：このページを裏で読み始めて、すぐ次のページを撮る
+    document.getElementById('capNextPageBtn').hidden = !hasStrokes || !!cap.adjust;
+    const pagesSoFar = cap.session ? cap.session.st.parts.length : 0;
+    document.getElementById('capHint').classList.toggle('hide', hasStrokes || pagesSoFar > 0);
     const banner = document.getElementById('capCarryBanner');
-    if(cap.carry){
-      const tail = Array.from(cap.carry).slice(-14).join('');
-      banner.innerHTML = '前のページの続きをなぞってください<br><span>…' + escapeHTML(tail) + '</span>';
-    }
-    banner.classList.toggle('show', !!cap.carry && !hasStrokes);
+    banner.innerHTML = '続きをなぞってください（' + (pagesSoFar + 1) + 'ページ目）<br><span>前のページは裏で読み取っています。読み取ったら続けて1つの引用にします</span>';
+    banner.classList.toggle('show', pagesSoFar > 0 && !hasStrokes && !!cap.work);
   }
   function capRotate(){
-    if(!cap.work || cap.busy) return;
+    if(!cap.work) return;
     const src = cap.work;
     const c = document.createElement('canvas');
     c.width = src.height;
@@ -7557,79 +7593,336 @@
     return {
       mode: 'marker', prompt: OCR_MARKER_PROMPT, focus: b,
       images: [
-        { label: 'Image A (whole photo, for context):', data: capRenderRegion(whole, 1280, true, 0.8), resolution: 'MEDIA_RESOLUTION_MEDIUM' },
+        // 全体は文脈とページ番号のためだけなので小さめにして、送る量を減らす
+        { label: 'Image A (whole photo, for context):', data: capRenderRegion(whole, 1024, true, 0.75), resolution: 'MEDIA_RESOLUTION_MEDIUM' },
         { label: 'Image B (high-resolution crop around the highlighted passage — read the characters from this image):', data: capRenderRegion(rect, SEND_MAX_PX, true, 0.9), resolution: 'MEDIA_RESOLUTION_ULTRA_HIGH' }
       ]
     };
   }
 
-  /* ---------- 読み取り → 結果のシート ---------- */
-  function capShowSheet(state){
-    cap.sheet = state;
-    capSheet.classList.toggle('show', !!state);
-    document.getElementById('capLoading').hidden = state !== 'loading';
-    document.getElementById('capError').hidden = state !== 'error';
-    document.getElementById('capResult').hidden = state !== 'result';
-    document.getElementById('capSheetFoot').hidden = state !== 'result';
-    if(state !== 'result') document.getElementById('capSheetTitle').textContent = state === 'error' ? '読み取れませんでした' : '読み取った文章';
-    if(cap.work){ capClampView(); capApplyView(); }
+  /* ---------- 読み取りは裏で進める ----------
+     「読み取る」を押したらすぐ付箋の画面に戻し、読み取りは裏で進める。待つあいだに
+     気づきを書いたり、次の付箋を書いたり、次のページを撮ったりできる。
+     終わったら、なぞった所をそのまま引用欄に入れ、付箋の上に「範囲を直す」を出す。
+     なぞらずにページ全体を読んだときは、引用する所を「選ぶ」で決めてもらう。
+     「次のページに続く」で何ページか続けて撮ったときは、ページの順につないで1つの引用にする。
+     状態は付箋のカードに持たせる(card._ocr = st)：
+       parts       写真1枚ごとの読み取り(status: reading / done / error)
+       base        読み取る前から引用欄にあった文章(その後ろに足す)
+       lastWritten こちらで引用欄に書いた文章。人が書き換えたら、それ以後は手を出さない
+       snap        読み取り中に編集画面を離れたとき、どの本の何枚目の付箋だったかの控え */
+  const OCR_KEEP_PHOTOS = 3;   // 「範囲を直す」で見せる写真は、新しいものからこの数だけ残す(大きいのでメモリを食う)
+  let ocrPhotoParts = [];
+  function ocrNewPart(job, work, strokes){
+    const part = {
+      job, status: 'reading', mode: job.mode, focus: job.focus || null,
+      work, strokes: strokes.slice(),
+      chars: [], selStart: 0, selEnd: 0, initSel: [0, 0], page: '', model: '',
+      error: null, slow: false, note: ''
+    };
+    ocrPhotoParts.push(part);
+    while(ocrPhotoParts.length > OCR_KEEP_PHOTOS) ocrPhotoParts.shift().work = null;
+    return part;
   }
-  function capCancelJob(){
-    const job = cap.job;
-    if(!job) return;
-    job.cancelled = true;
-    if(job.abort) job.abort();
-    cap.job = null;
-    cap.busy = false;
-    if(cap.sheet === 'loading') capShowSheet(null);
-    capRefreshControls();
-  }
-  async function capRead(){
-    if(!cap.work || cap.busy) return;
-    if(!readOcrKey()){ openOcrSetup({ kind: 'retry' }); return; }
-    const job = buildCapJob();
-    cap.job = job;
-    cap.busy = true;
-    capRefreshControls();
-    document.getElementById('capLoadingText').textContent = job.mode === 'page' ? 'ページ全体を読み取っています…' : 'なぞった所を読み取っています…';
-    capShowSheet('loading');
+  function ocrRunPart(st, part){
+    const job = part.job;
+    job.cancelled = false;
+    Object.assign(part, { status: 'reading', error: null, slow: false, note: '' });
+    renderOcrStatus(st.card);
     const slowTimer = setTimeout(() => {
-      if(cap.job === job) document.getElementById('capLoadingText').textContent = '時間がかかっています。もう少し待ってください…';
+      if(part.job === job && part.status === 'reading'){ part.slow = true; renderOcrStatus(st.card); }
     }, 15000);
-    try{
-      const res = await runOcr(job, msg => { if(cap.job === job) document.getElementById('capLoadingText').textContent = msg; });
-      if(cap.job !== job) return;
-      cap.job = null;
-      cap.busy = false;
-      capShowResult(res, job);
-    }catch(err){
-      if(cap.job !== job) return;   // やめた・閉じた
-      cap.job = null;
-      cap.busy = false;
-      document.getElementById('capErrorText').textContent = ocrErrorMessage(err);
-      document.getElementById('capErrorSetupBtn').hidden = !(err.kind === 'key' || err.kind === 'nokey');
-      document.getElementById('capErrorRetryBtn').hidden = err.kind === 'key' || err.kind === 'nokey';
-      capShowSheet('error');
-    }finally{
-      clearTimeout(slowTimer);
-      capRefreshControls();
-    }
+    runOcr(job, msg => {
+      if(part.job === job && part.status === 'reading'){ part.note = msg; renderOcrStatus(st.card); }
+    }).then(res => {
+      if(job.cancelled) return;
+      ocrFillPart(part, res);
+      part.status = 'done';
+      ocrSettle(st, false);
+    }).catch(err => {
+      if(job.cancelled || (err && err.kind === 'cancel')) return;
+      part.status = 'error';
+      part.error = err;
+      ocrSettle(st, false);
+    }).finally(() => clearTimeout(slowTimer));
   }
-  function capShowResult(res, job){
+  function ocrFillPart(part, res){
     const before = Array.from(res.before), mid = Array.from(res.highlighted), after = Array.from(res.after);
     // 範囲の両端の空白・改行は範囲の外に出す
     while(mid.length && /\s/.test(mid[0])) before.push(mid.shift());
     while(mid.length && /\s/.test(mid[mid.length - 1])) after.unshift(mid.pop());
-    cap.chars = before.concat(mid, after);
-    cap.selStart = before.length;
-    cap.selEnd = before.length + mid.length;
-    cap.initSel = [cap.selStart, cap.selEnd];
-    cap.resultMode = job.mode;
-    if(!cap.carry) cap.page = res.page;   // 前のページから続くときは、始まりのページのまま
-    cap.model = res.model;
+    part.chars = before.concat(mid, after);
+    part.selStart = before.length;
+    part.selEnd = before.length + mid.length;
+    part.initSel = [part.selStart, part.selEnd];
+    part.page = res.page;
+    part.model = res.model;
+  }
+  function ocrPartText(part){
+    return part.chars.slice(part.selStart, part.selEnd).join('').replace(/^\s+|\s+$/g, '');
+  }
+  function ocrCardInForm(card){
+    return !!card && formIsOpen() && document.getElementById('memoList').contains(card);
+  }
+  // 読み取りが1枚終わるたびに呼ぶ。全部読めていて範囲も決まっていれば引用欄に入れる
+  function ocrSettle(st, adjusted){
+    const card = st.card;
+    if(!card || card._ocr !== st) return;   // やめた・別の写真で置き換えた
+    const parts = st.parts;
+    if(parts.some(p => p.status === 'reading')){ renderOcrStatus(card); return; }
+    const failed = parts.some(p => p.status === 'error');
+    if(failed || parts.some(p => !ocrPartText(p))){
+      renderOcrStatus(card);
+      if(!ocrCardInForm(card)){
+        showToast(failed ? '写真の読み取りに失敗しました。編集画面を閉じていたので、もう一度撮ってください'
+          : 'ページ全体の読み取りが終わりましたが、編集画面を閉じていたので入れられませんでした');
+      }
+      return;
+    }
+    const text = parts.map(ocrPartText).join('');
+    const page = (parts.find(p => p.page) || {}).page || '';
+    if(ocrWrite(st, text, page) !== 'card') return;
+    renderOcrStatus(st.card);
+    st.card.classList.add('just-filled');
+    setTimeout(() => st.card.classList.remove('just-filled'), 2400);
+    showToast(adjusted ? '引用を直しました' : (page ? 'p.' + page + ' の' : '') + '引用を入れました');
+  }
+  function ocrWrite(st, text, page){
+    const list = document.getElementById('memoList');
+    if(ocrCardInForm(st.card)){
+      ocrWriteToCard(st, text, page);
+      return 'card';
+    }
+    // 読み取っている間に編集画面を離れた
+    const snap = st.snap;
+    const b = snap && snap.bookId ? books.find(x => x.id === snap.bookId) : null;
+    st.card._ocr = null;
+    if(!b){
+      showToast('本が保存される前に画面を離れたため、読み取った文章を入れられませんでした');
+      return 'lost';
+    }
+    // 同じ本の編集画面を開き直しているなら、その画面の付箋に入れる(後の自動保存で消えないように)
+    if(formIsOpen() && editingBookId === b.id){
+      let card = list.querySelectorAll('.memo-card')[snap.index];
+      if(!card || card._ocr || card.querySelector('.memo-quote-input').value.trim() !== snap.quote){
+        addMemo();
+        card = list.lastElementChild;
+      }
+      card._ocr = st;
+      st.card = card;
+      st.lastWritten = null;
+      ocrWriteToCard(st, text, page);
+      return 'card';
+    }
+    // 画面には出ていないので、保存してある本の付箋に直接入れる。
+    // 離れたときと同じ内容の付箋が見つからなければ、上書きせず新しい付箋として足す
+    const memos = Array.isArray(b.memos) ? b.memos : (b.memos = []);
+    const m = memos[snap.index];
+    if(m && (m.quote || '').trim() === snap.quote){
+      m.quote = snap.quote ? snap.quote + '\n\n' + text : text;
+      if(st.usePage && page && !m.page) m.page = page;
+    } else {
+      memos.push({ storyId: '', page: st.usePage ? page : '', date: '', quote: text, emotions: [], insight: '' });
+    }
+    saveBooks();
+    cloudSetBook(b);
+    if(currentDetailId === b.id && document.getElementById('screenDetail').classList.contains('active')) renderDetailBody(b);
+    showToast('読み取った文章を『' + (b.title || '').replace(/\n/g, ' ') + '』の付箋に入れました');
+    return 'book';
+  }
+  function ocrWriteToCard(st, text, page){
+    const card = st.card;
+    const ta = card.querySelector('.memo-quote-input');
+    // 前に書いた分を人が書き換えていなければ置き換える。書き換えていれば、その後ろに足す
+    if(st.lastWritten === null || ta.value !== st.lastWritten) st.base = ta.value.replace(/\s+$/, '');
+    const value = st.base ? st.base + '\n\n' + text : text;
+    st.lastWritten = value;
+    ta.value = value;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));   // 高さの調整と自動保存
+    const pageInput = card.querySelector('.page-field input');
+    const pageNow = pageInput.value.trim();
+    if(st.usePage && page && !pageNow){
+      pageInput.value = page;
+      st.pageFilled = page;
+      pageInput.dispatchEvent(new Event('input', { bubbles: true }));
+    } else if(!st.usePage && st.pageFilled && pageNow === st.pageFilled){
+      pageInput.value = '';
+      st.pageFilled = '';
+      pageInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+  }
+  // 読み取り中に編集画面を離れるとき(showScreen から呼ぶ)、どの本の何枚目の付箋かを控えておく
+  function ocrSnapshotCards(){
+    document.querySelectorAll('#memoList .memo-card').forEach((card, index) => {
+      const st = card._ocr;
+      if(st && st.parts.some(p => p.status === 'reading')){
+        st.snap = { bookId: editingBookId, index, quote: card.querySelector('.memo-quote-input').value.trim() };
+      }
+    });
+  }
+  function renderOcrStatus(card){
+    const box = card && card.querySelector('.memo-ocr');
+    if(!box) return;
+    const st = card._ocr;
+    const parts = st ? st.parts : [];
+    const reading = parts.filter(p => p.status === 'reading');
+    const failed = parts.filter(p => p.status === 'error');
+    const photoBtn = card.querySelector('.photo-quote-btn');
+    if(photoBtn) photoBtn.disabled = reading.length > 0;
+    if(!parts.length){
+      box.hidden = true;
+      box.className = 'memo-ocr';
+      box.innerHTML = '';
+      return;
+    }
+    const btn = (act, label, cls, part) => '<button type="button" class="memo-ocr-btn' + (cls ? ' ' + cls : '') + '" data-ocr="' + act + '"' +
+      (part != null ? ' data-part="' + part + '"' : '') + '>' + label + '</button>';
+    let tone, main, actions;
+    if(reading.length){
+      const note = reading.map(p => p.note).filter(Boolean).pop() ||
+        (reading.some(p => p.slow) ? '時間がかかっています。もう少しお待ちください' : '待つあいだに、気づきや次の付箋を書けます');
+      tone = 'reading';
+      main = '<b>' + (parts.length > 1 ? parts.length + 'ページ分を' : '') + '写真から読み取っています…</b><span>' + escapeHTML(note) + '</span>';
+      actions = btn('cancel', 'やめる', 'plain');
+    } else if(failed.length){
+      const err = failed[0].error;
+      tone = 'error';
+      main = '<b>読み取れませんでした</b><span>' + escapeHTML(ocrErrorMessage(err)) + '</span>';
+      actions = (err && (err.kind === 'key' || err.kind === 'nokey') ? btn('setup', 'キーを登録し直す', 'primary') : btn('retry', 'もう一度読む', 'primary')) +
+        btn('cancel', 'やめる', 'plain');
+    } else {
+      const need = parts.findIndex(p => !ocrPartText(p));
+      if(need >= 0){
+        tone = 'select';
+        main = '<b>読み取りました</b><span>' + (parts[need].mode === 'page'
+          ? 'ページ全体を読んだので、引用する所を選んでください' : 'なぞった所が見つからなかったので、引用する所を選んでください') + '</span>';
+        actions = btn('adjust', '選ぶ', 'primary', need) + btn('cancel', 'やめる', 'plain');
+      } else {
+        const pages = parts.map(p => p.page).filter(Boolean);
+        const first = pages[0], last = pages[pages.length - 1];
+        tone = 'done';
+        main = '<b>✓ 写真から入れました' + (first ? '（p.' + escapeHTML(first) + (last !== first ? '〜' + escapeHTML(last) : '') + '）' : '') + '</b>' +
+          '<span>' + (parts.some(p => /lite/.test(p.model)) ? '今日は軽いモデルで読んだので、読み違いがあれば直してください' : '範囲がずれていたら直せます') + '</span>';
+        actions = (parts.length === 1 ? btn('adjust', '範囲を直す', '', 0)
+          : parts.map((p, i) => btn('adjust', (i + 1) + '枚目を直す', '', i)).join('')) +
+          btn('dismiss', '閉じる', 'plain');
+      }
+    }
+    box.className = 'memo-ocr ' + tone;
+    box.innerHTML = (tone === 'reading' ? '<span class="ai-spinner"></span>' : '') +
+      '<div class="memo-ocr-main">' + main + '</div><div class="memo-ocr-actions">' + actions + '</div>';
+    box.hidden = false;
+  }
+  function ocrCardIsEmpty(card){
+    return !card.querySelector('.memo-quote-input').value.trim() &&
+      !card.querySelector('.memo-collapsible textarea').value.trim() &&
+      !card.querySelector('.page-field input').value.trim() &&
+      !card.querySelector('.emo-chip.active');
+  }
+  function ocrCancel(card){
+    const st = card._ocr;
+    if(st) st.parts.forEach(p => { p.job.cancelled = true; if(p.job.abort) p.job.abort(); });
+    card._ocr = null;
+    renderOcrStatus(card);
+    // 写真のために作った付箋が空のままなら、付箋ごと片付ける
+    if(st && st.createdCard && ocrCardIsEmpty(card)) card.remove();
+  }
+  function ocrRetry(card){
+    const st = card._ocr;
+    if(!st) return;
+    if(!readOcrKey()){ openOcrSetup({ kind: 'ocr-retry', card }); return; }
+    st.parts.filter(p => p.status === 'error').forEach(p => ocrRunPart(st, p));
+  }
+  // 読み取りを待たずに書き始められるよう、付箋を画面の真ん中に出して気づきの欄を開く
+  function ocrShowCard(card){
+    if(!card.classList.contains('expanded')){
+      const toggle = card.querySelector('.memo-toggle');
+      if(toggle) toggle.click();
+    }
+    requestAnimationFrame(() => card.scrollIntoView({ block: 'center', behavior: 'smooth' }));
+  }
+
+  /* ---------- なぞる画面から読み取りを始める ---------- */
+  function capEnsureTargetCard(){
+    const list = document.getElementById('memoList');
+    if(cap.target && list.contains(cap.target)) return { card: cap.target, created: false };
+    addMemo();
+    cap.target = list.lastElementChild;
+    return { card: cap.target, created: true };
+  }
+  function capStartRead(){
+    if(!cap.work) return null;
+    if(!readOcrKey()){ openOcrSetup({ kind: 'retry' }); return null; }
+    const part = ocrNewPart(buildCapJob(), cap.work, cap.strokes);
+    let st;
+    if(cap.adjust){
+      // 「範囲を直す」から、なぞり直した・撮り直したときは、その写真の分を置き換える
+      st = cap.adjust.st;
+      if(!st.card || st.card._ocr !== st) return null;
+      const old = st.parts[cap.adjust.pi];
+      if(old) old.job.cancelled = true;
+      st.parts[cap.adjust.pi] = part;
+    } else {
+      if(!cap.session){
+        const t = capEnsureTargetCard();
+        st = { card: t.card, parts: [], base: null, lastWritten: null, usePage: true, pageFilled: '', snap: null, createdCard: t.created };
+        t.card._ocr = st;   // 前の読み取りの状態が残っていれば、ここで新しいものに替わる
+        cap.session = { st };
+      }
+      st = cap.session.st;
+      st.parts.push(part);
+    }
+    ocrRunPart(st, part);
+    return st;
+  }
+  function capRead(){
+    const st = capStartRead();
+    if(!st) return;
+    closeQuoteCapture(true);
+    ocrShowCard(st.card);
+    showToast('裏で読み取っています。待つあいだに気づきや次の付箋を書けます');
+  }
+
+  /* ---------- 読み取った文章の範囲を直す(付箋の「範囲を直す」「選ぶ」から) ---------- */
+  function capShowSheet(state){
+    cap.sheet = state;
+    capSheet.classList.toggle('show', !!state);
+    if(cap.work){ capClampView(); capApplyView(); }
+  }
+  function ocrOpenAdjust(card, pi){
+    const st = card._ocr;
+    const part = st && st.parts[pi];
+    if(!part || part.status !== 'done') return;
+    cap.target = card;
+    cap.session = null;
+    cap.adjust = { st, pi };
+    captureScreen.classList.add('show');
+    cap.strokes = part.strokes.slice();
+    if(part.work){
+      cap.work = part.work;
+      capSetupCanvases();
+    } else {
+      cap.work = null;   // 写真はもう手元に無い(古い分は捨てている)。文字だけで直す
+      capLayer.innerHTML = '';
+    }
+    capShowPart(part, st, pi);
+    capRefreshControls();
+  }
+  function capShowPart(part, st, pi){
+    cap.chars = part.chars;
+    cap.selStart = part.selStart;
+    cap.selEnd = part.selEnd;
+    cap.initSel = part.initSel.slice();
+    cap.page = part.page;
+    cap.usePage = st.usePage;
+    const hadHighlight = part.initSel[1] > part.initSel[0];
 
     let html = '';
-    if(cap.carry) html += '<span class="cap-carry">…' + escapeHTML(Array.from(cap.carry).slice(-24).join('')) + '</span>';
+    // ページをまたぐ引用の2枚目以降は、前のページの終わりを添える
+    const prev = pi > 0 ? st.parts[pi - 1] : null;
+    if(prev && prev.status === 'done' && ocrPartText(prev)){
+      html += '<span class="cap-carry">…' + escapeHTML(Array.from(ocrPartText(prev)).slice(-24).join('')) + '</span>';
+    }
     cap.chars.forEach((ch, i) => {
       html += ch === '\n'
         ? '<span class="c nl" data-i="' + i + '">↵</span><br>'
@@ -7638,23 +7931,25 @@
     capText.innerHTML = html;
 
     const hint = document.getElementById('capResultHint');
-    if(job.mode === 'page') hint.textContent = '引用したい所の、最初の文字と最後の文字をタップしてください。';
-    else if(!mid.length) hint.textContent = 'なぞった所の文字が見つかりませんでした。引用したい所の最初の文字と最後の文字をタップしてください。';
+    if(part.mode === 'page') hint.textContent = '引用したい所の、最初の文字と最後の文字をタップしてください。';
+    else if(!hadHighlight) hint.textContent = 'なぞった所の文字が見つかりませんでした。引用したい所の最初の文字と最後の文字をタップしてください。';
     else hint.textContent = '文字をタップすると、範囲の始まり・終わりを1文字ずつ動かせます。';
-    document.getElementById('capResetSelBtn').hidden = job.mode === 'page' || !mid.length;
-    document.getElementById('capModelNote').textContent = /lite/.test(res.model)
-      ? '今日は精度の高いモデルの無料回数を使い切ったため、軽いモデル（' + res.model + '）で読みました。読み違いがあれば引用欄で直してください。'
+    document.getElementById('capResetSelBtn').hidden = part.mode === 'page' || !hadHighlight;
+    document.getElementById('capModelNote').textContent = /lite/.test(part.model)
+      ? '今日は精度の高いモデルの無料回数を使い切ったため、軽いモデル（' + part.model + '）で読みました。読み違いがあれば引用欄で直してください。'
       : '';
+    // ページ番号は、付箋にまだ入っていないか、こちらで入れたものなら選べるようにする
     const pageInput = capTargetPageInput();
+    const pageNow = pageInput ? pageInput.value.trim() : '';
     const pageChip = document.getElementById('capPageChip');
-    pageChip.hidden = !cap.page || !!(pageInput && pageInput.value.trim());
+    pageChip.hidden = !cap.page || (!!pageNow && pageNow !== st.pageFilled);
     pageChip.textContent = 'p.' + cap.page + ' を付箋に入れる';
     pageChip.classList.toggle('active', cap.usePage);
 
     capShowSheet('result');
     capUpdateSelection();
     requestAnimationFrame(() => {
-      if(job.focus) capFocusRect(job.focus);
+      if(part.focus && cap.work) capFocusRect(part.focus);
       const first = capText.querySelector('.c.sel');
       if(first){
         const body = document.getElementById('capSheetBody');
@@ -7674,12 +7969,10 @@
       const i = +el.dataset.i;
       el.classList.toggle('sel', i >= cap.selStart && i < cap.selEnd);
     });
-    const count = Array.from(cap.carry).length + Array.from(capSelectedText()).length;
+    const count = Array.from(capSelectedText()).length;
     document.getElementById('capSheetTitle').innerHTML = '読み取った文章<span class="cap-count">' + (count ? count + '字' : '') + '</span>';
-    const hasSel = capSelectedText().length > 0;
-    document.getElementById('capInsertBtn').disabled = !hasSel && !cap.carry;
-    document.getElementById('capContinueBtn').disabled = !hasSel;
-    document.getElementById('capSnapBtn').disabled = !hasSel;
+    document.getElementById('capInsertBtn').disabled = count === 0;
+    document.getElementById('capSnapBtn').disabled = count === 0;
     document.getElementById('capResetSelBtn').disabled = cap.selStart === cap.initSel[0] && cap.selEnd === cap.initSel[1];
   }
   // タップした文字が範囲の外なら範囲をそこまで広げ、内側なら近い方の端をそこまで縮める
@@ -7722,42 +8015,28 @@
     cap.selEnd = en;
     capUpdateSelection();
   }
-  function capInsert(){
-    const text = (cap.carry + capSelectedText()).replace(/^\s+|\s+$/g, '');
-    if(!text) return;
-    let card = cap.target && document.body.contains(cap.target) ? cap.target : null;
-    if(!card){
-      addMemo();
-      const cards = document.querySelectorAll('#memoList .memo-card');
-      card = cards[cards.length - 1];
+  // 「この範囲にする」：選んだ範囲を付箋の引用欄に書き直す
+  function capApplyAdjust(){
+    const a = cap.adjust;
+    if(!a || !capSelectedText()) return;
+    const part = a.st.parts[a.pi];
+    if(part){
+      part.selStart = cap.selStart;
+      part.selEnd = cap.selEnd;
     }
-    const quoteInput = card.querySelector('.memo-quote-input');
-    const current = quoteInput.value.replace(/\s+$/, '');
-    quoteInput.value = current ? current + '\n\n' + text : text;
-    quoteInput.dispatchEvent(new Event('input', { bubbles: true }));
-    const pageInput = card.querySelector('.page-field input');
-    if(cap.usePage && cap.page && !pageInput.value.trim()){
-      pageInput.value = cap.page;
-      pageInput.dispatchEvent(new Event('input', { bubbles: true }));
-    }
+    a.st.usePage = cap.usePage;
     closeQuoteCapture(true);
-    autoResizeTextarea(quoteInput);
-    card.classList.add('just-filled');
-    setTimeout(() => card.classList.remove('just-filled'), 2400);
-    card.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    showToast('引用に入れました');
+    ocrSettle(a.st, true);
   }
 
   document.getElementById('addMemoFromPhotoBtn').addEventListener('click', () => requestQuotePhoto(null, true));
-  document.getElementById('capCloseBtn').addEventListener('click', () => closeQuoteCapture(false));
+  document.getElementById('capCloseBtn').addEventListener('click', () => closeQuoteCapture(true));
   document.getElementById('capUndoBtn').addEventListener('click', () => {
-    if(cap.busy) return;
     cap.strokes.pop();
     capRedrawInk();
     capRefreshControls();
   });
   document.getElementById('capClearBtn').addEventListener('click', () => {
-    if(cap.busy) return;
     cap.strokes = [];
     capRedrawInk();
     capRefreshControls();
@@ -7766,13 +8045,19 @@
   document.getElementById('capLibraryBtn').addEventListener('click', () => requestQuotePhoto(cap.target, true));
   document.getElementById('capRotateBtn').addEventListener('click', capRotate);
   document.getElementById('capReadBtn').addEventListener('click', capRead);
-  document.getElementById('capCancelBtn').addEventListener('click', capCancelJob);
-  document.getElementById('capSheetClose').addEventListener('click', () => {
-    if(cap.sheet === 'loading') capCancelJob();
-    else capShowSheet(null);
+  // ページをまたぐ引用：このページを裏で読み始めて、そのまま次のページを撮る
+  document.getElementById('capNextPageBtn').addEventListener('click', () => {
+    if(!cap.strokes.length || cap.adjust || !capStartRead()) return;
+    cap.strokes = [];
+    capRedrawInk();
+    capRefreshControls();
+    capCameraInput.click();
   });
-  document.getElementById('capErrorRetryBtn').addEventListener('click', capRead);
-  document.getElementById('capErrorSetupBtn').addEventListener('click', () => openOcrSetup({ kind: 'retry' }));
+  // シートを閉じると、写真があればなぞり直せる(無ければ付箋に戻る)
+  document.getElementById('capSheetClose').addEventListener('click', () => {
+    if(cap.work) capShowSheet(null);
+    else closeQuoteCapture(true);
+  });
   document.getElementById('capSnapBtn').addEventListener('click', capSnapToSentence);
   document.getElementById('capResetSelBtn').addEventListener('click', () => {
     cap.selStart = cap.initSel[0];
@@ -7783,14 +8068,7 @@
     cap.usePage = !cap.usePage;
     e.currentTarget.classList.toggle('active', cap.usePage);
   });
-  document.getElementById('capInsertBtn').addEventListener('click', capInsert);
-  // ページをまたぐ引用：ここまでを覚えておき、次のページを撮って続きをなぞる
-  document.getElementById('capContinueBtn').addEventListener('click', () => {
-    const text = capSelectedText();
-    if(!text) return;
-    cap.pendingCarry = { text: cap.carry + text, page: cap.page };
-    capCameraInput.click();
-  });
+  document.getElementById('capInsertBtn').addEventListener('click', capApplyAdjust);
 
   /* ---------- 読み取りの設定(キーの登録) ---------- */
   const ocrSetupOverlay = document.getElementById('ocrSetupOverlay');
@@ -7854,7 +8132,7 @@
     if(ocrSetupPending){
       const cont = document.getElementById('ocrContinueBtn');
       cont.textContent = ocrSetupPending.kind === 'search' ? 'AI で探す'
-        : ocrSetupPending.kind === 'retry' ? 'もう一度読み取る' : (ocrSetupPending.fromLibrary ? '写真を選ぶ' : 'ページを撮る');
+        : (ocrSetupPending.kind === 'retry' || ocrSetupPending.kind === 'ocr-retry') ? 'もう一度読み取る' : (ocrSetupPending.fromLibrary ? '写真を選ぶ' : 'ページを撮る');
       cont.style.display = 'block';
     }
   }
@@ -7878,6 +8156,7 @@
     if(!pending) return;
     if(pending.kind === 'retry'){ if(captureIsOpen()) capRead(); }
     else if(pending.kind === 'search') startAiFind();
+    else if(pending.kind === 'ocr-retry') ocrRetry(pending.card);
     else requestQuotePhoto(pending.target, pending.fromLibrary);
   });
   document.getElementById('ocrDeleteKeyBtn').addEventListener('click', () => {
