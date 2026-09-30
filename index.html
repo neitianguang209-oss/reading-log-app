@@ -762,6 +762,104 @@
     border-radius:var(--pill); padding:2px 8px; margin:0 auto; max-width:100%;
     overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
+
+  /* ---------- フレーズ検索：本棚の上の「付箋・メモの中」 ---------- */
+  .phrase-section{ margin:0 0 22px; }
+  .phrase-head{ display:flex; align-items:baseline; gap:8px; margin:2px 2px 10px; }
+  .phrase-title{ font-size:15px; font-weight:600; color:var(--ink); }
+  .phrase-count{ font-size:12px; color:var(--ink-faint); }
+  .phrase-group-head{
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px;
+    font-size:12px; color:var(--accent-deep); margin:14px 2px 8px;
+  }
+  .phrase-group-head span{ color:var(--ink-faint); }
+  .phrase-head + .phrase-group-head{ margin-top:0; }
+  .phrase-card{
+    display:flex; align-items:flex-start; gap:12px; width:100%; text-align:left;
+    background:var(--surface); border:none; border-radius:var(--radius-sm); box-shadow:var(--shadow);
+    padding:12px 14px; margin:0 0 10px; font-family:inherit; color:var(--ink); cursor:pointer;
+  }
+  .phrase-card:active{ background:var(--surface-raised); }
+  .phrase-cover{
+    flex:0 0 auto; width:30px; height:43px; border-radius:2px; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .phrase-cover img{ width:100%; height:100%; object-fit:cover; }
+  .phrase-cover .mono{ font-size:13px; }
+  .phrase-main{ flex:1; min-width:0; display:flex; flex-direction:column; gap:6px; }
+  .phrase-text{
+    font-size:14px; line-height:1.75; color:var(--ink); word-break:break-word;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  }
+  .phrase-meta{ display:flex; flex-wrap:wrap; align-items:center; gap:2px 6px; font-size:12px; color:var(--ink-soft); min-width:0; }
+  .phrase-kind{
+    flex:0 0 auto; font-size:11px; color:var(--accent-deep); background:var(--accent-tint);
+    border-radius:var(--pill); padding:1px 8px;
+  }
+  .phrase-kind.ai{ color:#fff; background:var(--accent); }
+  .phrase-book, .phrase-page{ min-width:0; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .phrase-page{ color:var(--ink-faint); }
+  /* 一致した所。ぴったりは塗り、もしかして(近いだけ)は薄い塗り＋点線 */
+  mark.hl{ background:rgba(91,143,201,.28); color:inherit; border-radius:3px; padding:0 1px; }
+  mark.hl.near{
+    background:rgba(91,143,201,.1);
+    text-decoration:underline dotted var(--accent); text-decoration-thickness:1.5px; text-underline-offset:4px;
+  }
+  .phrase-more{
+    display:block; margin:2px auto 0; border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:8px 18px; font-size:13px; font-family:inherit; cursor:pointer;
+  }
+  .phrase-empty{ font-size:13px; line-height:1.8; color:var(--ink-soft); margin:2px 2px 10px; }
+  .phrase-empty.error{ color:var(--danger); }
+  .ai-find{ margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .ai-find-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--accent); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:9px 16px; font-size:14px; font-family:inherit; cursor:pointer;
+  }
+  .ai-find-btn:active{ background:var(--accent); color:#fff; }
+  .ai-find-btn svg{ width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linejoin:round; }
+  .ai-find-note{ font-size:12px; line-height:1.7; color:var(--ink-faint); margin:8px 2px 0; }
+  .ai-find-loading{ display:flex; align-items:center; gap:10px; font-size:13px; color:var(--ink-soft); padding:4px 2px; }
+  .ai-spinner{
+    flex:0 0 auto; width:16px; height:16px; border-radius:50%;
+    border:2px solid var(--line-strong); border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  .phrase-link{
+    margin-left:auto; border:none; background:none; padding:4px 2px; cursor:pointer;
+    font-family:inherit; font-size:13px; color:var(--accent-deep); text-decoration:underline;
+  }
+  .shelf-subhead{ margin-top:4px; }
+
+  /* ---------- フレーズ検索：詳細画面で候補をたどるバー ---------- */
+  .find-bar{
+    position:absolute; left:var(--side); right:var(--side); z-index:18; display:none;
+    bottom:calc(96px + env(safe-area-inset-bottom));   /* 「編集する」の上 */
+    background:var(--ink); color:#fff; border-radius:var(--radius-sm);
+    padding:6px 6px 6px 14px; align-items:center; gap:2px;
+    box-shadow:0 4px 14px rgba(26,28,30,.28);
+  }
+  .find-bar.show{ display:flex; }
+  .find-bar-info{ flex:1; min-width:0; display:flex; flex-direction:column; line-height:1.45; }
+  .find-bar-q{ font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .find-bar-n{ font-size:11px; color:rgba(255,255,255,.72); }
+  .find-bar-btn{
+    flex:0 0 auto; width:42px; height:42px; border:none; background:none; color:#fff; border-radius:50%;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .find-bar-btn svg{ width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .find-bar-btn:disabled{ opacity:.3; cursor:default; }
+  .find-bar-btn:active:not(:disabled){ background:rgba(255,255,255,.14); }
+  .finding .detail-body{ padding-bottom:200px; }   /* 最後の付箋がバーに隠れないように */
+  /* 飛んできた先を一度光らせ、そのあとも薄い枠で示しておく */
+  .find-focus{ box-shadow:0 0 0 2px rgba(91,143,201,.4); animation:find-pulse 1.6s ease-out; }
+  .find-focus:not(.memo-card):not(.info-card){ border-radius:var(--radius-sm); padding-left:8px; padding-right:8px; margin-left:-8px; margin-right:-8px; }
+  .memo-card.find-focus, .info-card.find-focus{ box-shadow:0 0 0 2px rgba(91,143,201,.4), var(--shadow); }
+  @keyframes find-pulse{
+    0%, 30%{ box-shadow:0 0 0 5px rgba(91,143,201,.55); }
+    100%{ box-shadow:0 0 0 2px rgba(91,143,201,.4); }
+  }
   .modal-sheet{
     width:100%; max-height:78%; background:var(--bg);
     border-radius:22px 22px 0 0; display:flex; flex-direction:column; overflow:hidden;
@@ -1020,7 +1118,7 @@
          場所を取りすぎないようにする（listHeader.compact） -->
     <div class="list-header" id="listHeader">
       <div class="search-wrap">
-        <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者・メモから検索">
+        <input type="text" id="searchInput" class="search-input" placeholder="タイトル・著者・付箋のフレーズで探す" enterkeyhint="search" autocomplete="off">
         <button type="button" class="search-clear" id="searchClearBtn" aria-label="検索をやめる">×</button>
       </div>
       <div class="filter-tabs" id="filterTabs">
@@ -1127,6 +1225,22 @@
       <div class="detail-status-chip" id="detailStatusChip"></div>
     </div>
     <div class="detail-body" id="detailBody"></div>
+    <!-- フレーズ検索から開いたとき：候補を前後にたどる(Ctrl+F の「次へ」) -->
+    <div class="find-bar" id="findBar">
+      <div class="find-bar-info">
+        <span class="find-bar-q" id="findBarQuery"></span>
+        <span class="find-bar-n" id="findBarCount"></span>
+      </div>
+      <button class="find-bar-btn" id="findPrevBtn" type="button" aria-label="前の候補">
+        <svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+      <button class="find-bar-btn" id="findNextBtn" type="button" aria-label="次の候補">
+        <svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      </button>
+      <button class="find-bar-btn" id="findCloseBtn" type="button" aria-label="色付けをやめる">
+        <svg viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></svg>
+      </button>
+    </div>
     <div class="detail-actionbar">
       <button class="save-btn" id="detailEditBtn" type="button">編集する</button>
     </div>
@@ -1402,7 +1516,7 @@
       </div>
       <div class="modal-list">
         <button class="menu-action-btn" id="editCategoriesBtn" type="button">大分類・小分類を編集する</button>
-        <button class="menu-action-btn" id="ocrSetupMenuBtn" type="button">写真から引用を読み取る（Gemini の設定）</button>
+        <button class="menu-action-btn" id="ocrSetupMenuBtn" type="button">写真から引用・AI でフレーズ検索（Gemini の設定）</button>
         <hr class="divider" style="margin:16px 0;">
         <button class="menu-action-btn" id="exportBtn" type="button">JSONファイルに書き出す</button>
         <button class="menu-action-btn" id="importBtn" type="button">JSONファイルから読み込む</button>
@@ -1430,11 +1544,11 @@
   <div class="modal-overlay" id="ocrSetupOverlay">
     <div class="modal-sheet">
       <div class="modal-header">
-        <span class="modal-title">写真から引用を読み取る</span>
+        <span class="modal-title" id="ocrSetupTitle">写真から引用を読み取る</span>
         <button class="modal-close" id="ocrSetupClose" type="button" aria-label="閉じる">×</button>
       </div>
       <div class="ocr-setup-body">
-        <p>本のページを撮って、引用したい所を指でなぞると、その文章を引用欄に入れます。文字の読み取りには Google の Gemini（無料）を使います。最初に一度だけ、この端末にキーを登録してください。</p>
+        <p id="ocrSetupIntro"></p>
         <div class="ocr-step">
           <div class="ocr-step-title">1. キーを作る</div>
           <a class="btn-outline" href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio を開く</a>
@@ -1450,7 +1564,7 @@
           <p class="ocr-status" id="ocrStatus"></p>
           <button class="save-btn" id="ocrContinueBtn" type="button" style="margin-top:12px; display:none;">ページを撮る</button>
         </div>
-        <p class="field-note">キーはこの端末の中にだけ保存され、同期はされません（iPhone と PC で使うときは、それぞれで登録します）。無料で使える回数には1日の上限があり、上限に達すると自動で別のモデルに切り替えて読みます。無料枠で送った写真は Google のサービス改善に使われることがあります。</p>
+        <p class="field-note">キーはこの端末の中にだけ保存され、同期はされません（iPhone と PC で使うときは、それぞれで登録します）。無料で使える回数には1日の上限があり、上限に達すると自動で別のモデルに切り替えます。無料枠で送った写真や文章は Google のサービス改善に使われることがあります。</p>
         <p class="field-note" id="ocrKeyInfo"></p>
         <button class="btn-outline" id="ocrDeleteKeyBtn" type="button" style="margin-top:6px; display:none; border-color:var(--danger); color:var(--danger);">この端末のキーを削除する</button>
       </div>
@@ -2255,6 +2369,11 @@
   let formatFilter = null;   // 判型（'shinsho' / 'tankobon' / 'bunko'）
   let styleFilter = null;    // 書き方（'long' / 'theme' など）
   let searchQuery = '';
+  let phraseShowCount = { q: '', n: 0 };   // 「ほか◯件」で広げた数(検索語が変わったら戻す)
+  let phraseList = [];            // 本棚に並べたフレーズの順(詳細画面で次の候補へ移るのに使う)
+  let aiFind = { q: '', state: 'idle', keys: [], message: '', job: null, cut: false };
+  let detailFind = null;          // 詳細画面で色を付けている検索 { pq, list, index }
+  let listReturnScroll = null;    // 詳細画面から戻ったときに本棚の位置を戻す
   let statsYear = new Date().getFullYear();
   let statsRange = 'year';              // 'year' / 'total'
   let editingBookId = null;
@@ -2320,6 +2439,11 @@
   function goToList(){
     renderList();
     showScreen('List');
+    // フレーズの候補から詳細へ行って戻ったときは、元の位置から続けて選べるように
+    if(listReturnScroll != null){
+      document.getElementById('screenList').scrollTop = listReturnScroll;
+      listReturnScroll = null;
+    }
   }
 
   /* =========================================================
@@ -2478,7 +2602,8 @@
     return arr;
   }
   /* 「あの言葉どの本だっけ」を拾えるよう、自分が書いた文章も検索対象にする。
-     タイトル・著者以外で当たったときは、どこに一致したかを本棚に出す。 */
+     タイトル・著者以外で当たったときは、どこに一致したかを本棚に出す。
+     表記ゆれ(カタカナ/ひらがな・全角/半角・記号)はフレーズ検索と同じ foldText で畳んでから比べる。 */
   const SEARCH_FIELDS = [
     ['出版社', b => [b.publisher]],
     ['きっかけ', b => [b.kikkake]],
@@ -2489,13 +2614,747 @@
     ['人物メモ', b => (b.characters || []).reduce((a, c) => a.concat([c.name, c.profile, c.reason]), [])],
     ['次にやりたいこと', b => [b.nextAction]]
   ];
-  function searchHit(b, q){
-    if(normalize(b.title).includes(q) || normalize(b.author || '').includes(q)) return { hit: true, where: '' };
-    for(let i = 0; i < SEARCH_FIELDS.length; i++){
-      const [label, pick] = SEARCH_FIELDS[i];
-      if(pick(b).some(t => t && normalize(t).includes(q))) return { hit: true, where: label };
+  // 空白で区切った言葉は、それぞれが本のどこかに入っていれば一致とする
+  function searchHit(b, terms){
+    let where = '';
+    for(let k = 0; k < terms.length; k++){
+      const term = terms[k];
+      if(foldText(b.title).str.includes(term) || foldText(b.author).str.includes(term)) continue;
+      let found = '';
+      for(let i = 0; i < SEARCH_FIELDS.length && !found; i++){
+        const [label, pick] = SEARCH_FIELDS[i];
+        if(pick(b).some(t => t && foldText(t).str.includes(term))) found = label;
+      }
+      if(!found) return { hit: false, where: '' };
+      if(!where) where = found;
     }
-    return { hit: false, where: '' };
+    return { hit: true, where };
+  }
+  function bookPassesFilters(b){
+    return (!statusFilter || b.status === statusFilter) &&
+      (!majorFilter || b.majorCategory === majorFilter) &&
+      (!minorFilter || (b.minorCategories || []).includes(minorFilter)) &&
+      (!formatFilter || b.format === formatFilter) &&
+      (!styleFilter || b.style === styleFilter);
+  }
+
+  /* =========================================================
+     2.1 フレーズ検索（Ctrl+F のように、書き残した言葉を探す）
+     「あのセリフ、どの本のどこだっけ」を探すためのもの。検索窓に打つと、
+     本棚の上に付箋(引用・気づき)や感想の中の一致箇所を色付きで並べ、
+     押すとその付箋まで飛ぶ。詳細画面の下のバーで次の候補へ移れる。
+     - 表記ゆれは先に畳む：カタカナ→ひらがな、全角/半角、小さい字(っ→つ)、
+       記号・空白、よく出る旧字体(澤→沢)。
+     - 漢字とかなの違い(やさしさ／優しさ)は、漢字の読みの表(kanji-yomi.js)で確かめながら
+       1文字ずつ並べて比べ、ぴったり一致とは分けて「もしかして」として出す。
+       変換で字が違っただけのもの(想い／思い)も、同じ読みがあれば近いとみなす。
+     - 熟字訓(今日＝きょう)や言い換え、語順の入れ替えまでは追いきれないので、
+       見つからないときは AI(Gemini) に意味から探してもらえる。
+  ========================================================= */
+  const KANJI_VARIANTS = (() => {
+    // 旧字体・異体字 → いまの字（2文字ずつ組）
+    const pairs = Array.from('髙高﨑崎嵜崎邊辺邉辺澤沢濱浜齋斎齊斉櫻桜國国學学體体會会氣気聲声戀恋樂楽實実眞真與与爲為來来' +
+      '歸帰發発變変當当驛駅圖図廣広德徳惠恵榮栄靜静黑黒醫医藝芸讀読說説顏顔晝昼燈灯萬万傳伝兩両亞亜惡悪壓圧圍囲' +
+      '爭争應応險険輕軽雜雑淺浅獨独彌弥繪絵螢蛍缺欠賣売續続辭辞舊旧竝並禮礼臺台從従戰戦關関鐵鉄效効壽寿將将單単' +
+      '團団擧挙覺覚拔抜步歩每毎卽即硏研髮髪佛仏拜拝餘余豫予聽聴廳庁鹽塩蟲虫淸清靑青黃黄巢巣曉暁溫温緣縁懷懐');
+    const map = { '𠮷': '吉' };
+    for(let i = 0; i + 1 < pairs.length; i += 2) map[pairs[i]] = pairs[i + 1];
+    return map;
+  })();
+  const SMALL_KANA = { 'ぁ':'あ', 'ぃ':'い', 'ぅ':'う', 'ぇ':'え', 'ぉ':'お', 'っ':'つ', 'ゃ':'や', 'ゅ':'ゆ', 'ょ':'よ', 'ゎ':'わ', 'ゕ':'か', 'ゖ':'け' };
+  // 濁点の有無・旧かなの違いは「近い」とみなす(ぢ/じ・づ/ず・を/お)
+  const KANA_NEAR = { 'ぢ':'じ', 'づ':'ず', 'を':'お', 'ゐ':'い', 'ゑ':'え' };
+  const DAKUTEN = String.fromCharCode(0x3099), HANDAKUTEN = String.fromCharCode(0x309A);   // 結合用の濁点・半濁点
+  const DAKUTEN_RE = new RegExp('[' + DAKUTEN + HANDAKUTEN + ']', 'g');
+  const FOLD_SKIP_RE = /[\s\p{P}\p{S}]/u;
+  const HAN_RE = /\p{Script=Han}/u;
+  const K_HAN = 1, K_KANA = 2, K_OTHER = 3;
+  const VOWELS = 'あいうえお';
+  function charKind(c){
+    const code = c.charCodeAt(0);
+    if((code >= 0x3041 && code <= 0x3096) || c === 'ー') return K_KANA;
+    return HAN_RE.test(c) ? K_HAN : K_OTHER;
+  }
+  // 濁点を外した形(が→か、ぱ→は)。連濁(かわ→がわ)や打ち間違いを「近い」とみなすのに使う
+  function kanaNearKey(s){
+    let out = '';
+    for(let c of s){
+      c = SMALL_KANA[c] || c;
+      out += (KANA_NEAR[c] || c).normalize('NFD').replace(DAKUTEN_RE, '');
+    }
+    return out;
+  }
+  /* 漢字の読み(kanji-yomi.js、KANJIDIC2 から作った約3100字の音訓)。
+     これがあると「やさしさ」と「優しさ」、「思い」と「想い」を読みで結びつけられる。
+     読み込めていないとき(オフラインで初めて開いたときなど)は、読みを確かめずに並べるだけにする。 */
+  let kanjiYomi = null;         // Map<漢字, Set<読み(濁点を外した形)>>
+  function getKanjiYomi(){
+    if(kanjiYomi) return kanjiYomi;
+    const src = window.KANJI_YOMI;
+    if(!src) return null;
+    kanjiYomi = new Map();
+    src.split('|').forEach(entry => {
+      const cs = Array.from(entry);
+      const k = cs[0];
+      if(!k || k.normalize('NFKC') !== k) return;   // 互換用の漢字は畳むと別の字になるので要らない
+      const set = new Set();
+      cs.slice(1).join('').split(',').forEach(r => {
+        if(!r) return;
+        const key = kanaNearKey(r);
+        set.add(key);
+        // 促音：学(がく)→学校(がっこう)の「がっ」。小さい字は つ に畳むので、終わりの く/き/ち/つ を つ にした形も読みとする
+        if(/[くきちつ]$/.test(r)) set.add(key.slice(0, -1) + 'つ');
+      });
+      kanjiYomi.set(k, set);
+    });
+    return kanjiYomi;
+  }
+  // 2つの漢字に同じ読みがあるか(想い/思い、聴く/聞く のように変換で字が違っただけのもの)
+  const sharedYomiCache = new Map();
+  function sharesYomi(a, b, yomi){
+    const key = a + b;
+    let v = sharedYomiCache.get(key);
+    if(v === undefined){
+      const ra = yomi.get(a), rb = yomi.get(b);
+      v = !!(ra && rb && [...ra].some(r => rb.has(r)));
+      if(sharedYomiCache.size > 20000) sharedYomiCache.clear();
+      sharedYomiCache.set(key, v);
+    }
+    return v;
+  }
+  (function loadKanjiYomi(){
+    const s = document.createElement('script');
+    s.src = 'kanji-yomi.js';
+    s.async = true;
+    s.onload = () => { kanjiYomi = null; if(searchQuery.trim()) renderList(); };   // 探している途中に届いたら探し直す
+    document.head.appendChild(s);
+  })();
+  /* 文章を比べやすい形に畳む。畳んだ1文字ごとに、元の文章の何文字目から来たか
+     (from/to、UTF-16の位置)を持っておき、一致した所に元の文章のまま色を付けられるようにする。 */
+  const foldCache = new Map();
+  function foldText(str){
+    str = String(str || '');
+    const cached = foldCache.get(str);
+    if(cached) return cached;
+    const chars = [], from = [], to = [];
+    let pos = 0;
+    for(const raw of str){
+      const start = pos;
+      pos += raw.length;
+      for(let ch of raw.normalize('NFKC')){
+        if(ch === DAKUTEN || ch === HANDAKUTEN){
+          // 半角の「ｶﾞ」は2文字に分かれているので、濁点を前の字にくっつける
+          const k = chars.length - 1;
+          if(k >= 0){ chars[k] = (chars[k] + ch).normalize('NFC'); to[k] = pos; }
+          continue;
+        }
+        ch = ch.toLowerCase();
+        const code = ch.charCodeAt(0);
+        if(code >= 0x30A1 && code <= 0x30F6) ch = String.fromCharCode(code - 0x60);
+        ch = SMALL_KANA[ch] || KANJI_VARIANTS[ch] || ch;
+        if((ch === '々' || ch === 'ゝ') && chars.length) ch = chars[chars.length - 1];
+        if(FOLD_SKIP_RE.test(ch)) continue;
+        chars.push(ch); from.push(start); to.push(pos);
+      }
+    }
+    const kinds = new Uint8Array(chars.length);
+    const near = new Array(chars.length);
+    const set = new Set(chars);
+    const s = chars.join('');
+    const u2c = new Int32Array(s.length);
+    for(let i = 0, u = 0; i < chars.length; i++){
+      kinds[i] = charKind(chars[i]);
+      near[i] = kinds[i] === K_KANA ? kanaNearKey(chars[i]) : '';
+      for(let k = 0; k < chars[i].length; k++) u2c[u++] = i;
+    }
+    const folded = { chars, from, to, kinds, near, set, str: s, u2c };
+    if(foldCache.size > 5000) foldCache.clear();
+    foldCache.set(str, folded);
+    return folded;
+  }
+  // ぴったり一致する所をすべて（重ならないように）
+  function exactRanges(q, t){
+    const out = [];
+    let u = t.str.indexOf(q.str);
+    while(u !== -1){
+      const a = t.u2c[u];
+      out.push([a, a + q.chars.length]);
+      u = t.str.indexOf(q.str, u + q.str.length);
+    }
+    return out;
+  }
+  // 近さを測るときの1文字ごとの点数
+  const FZ = {
+    exact: 1,        // 同じ字
+    near: 0.7,       // 濁点違い・ー と母音など
+    sameYomi: 0.5,   // 別の漢字だが同じ読みがある(想い/思い)。変換で字が違っただけのことが多い
+    hanHan: -0.3,    // 読みも違う別の漢字
+    miss: -0.6,      // 違う字
+    skipQuery: -0.6, // 打った字が本文に無い
+    skipText: -0.3,  // 本文に余分な字がある(「人生は短い」→「人生はあまりにも短い」)
+    // 漢字 ⇔ かな：辞書の読みと合えば、ほぼ同じ字として数える(かな1字あたり)
+    yomiHit: 0.9,
+    // 辞書にある漢字なのに読みが合わない。当て字・熟字訓(今日＝きょう)もあるので、罰にはせず橋渡しだけ
+    yomiMiss: 0.05,
+    /* 辞書に無い漢字は読みを確かめられない。点を高くすると「優しさに救われた」が
+       「やる人は言われた」に当たるような、でたらめな並べ方が勝ってしまうので低くしてある */
+    hanToKana: [0, 0.25, 0.7, 0.9],   // 本文の漢字1字 ＝ 打ったかな1〜3字
+    kanaToHan: [0, 0.35, 0.45, 0.3]   // 打った漢字1字 ＝ 本文のかな1〜3字(読みは2字が多いので同点なら2字)
+  };
+  const YOMI_MAX = 4;   // 漢字1字の読みとして見るかなの長さ(こころ・たましい まで)
+  // 並べる表は行 i-4〜i しか使わないので、5本を使い回す(毎回作ると重い)
+  let fzBuf = null;
+  function fzRows(n){
+    if(!fzBuf || fzBuf.n < n){
+      const size = Math.max(n, 256) + 1;
+      fzBuf = { n: size - 1, D: [], S: [], E: [] };
+      for(let r = 0; r < 5; r++){ fzBuf.D.push(new Float32Array(size)); fzBuf.S.push(new Int32Array(size)); fzBuf.E.push(new Int16Array(size)); }
+    }
+    return fzBuf;
+  }
+  /* 打った言葉(q)の全体を、本文(t)のどこか一続きの所に並べて、どれだけ近いかを測る。
+     1文字ごとの点数を足し、打った文字数で割った値を「近さ」とする(1.0 がぴったり)。
+     exact は手がかりの数(同じ字＋辞書で読みが合ったかな)。 */
+  function fuzzyAlign(q, t){
+    const m = q.chars.length, n = t.chars.length;
+    if(!m || !n) return null;
+    const yomi = getKanjiYomi();
+    const { D, S, E } = fzRows(n);
+    for(let j = 0; j <= n; j++){ D[0][j] = 0; S[0][j] = j; E[0][j] = 0; }   // どこから始めてもよい
+    for(let i = 1; i <= m; i++){
+      const Dc = D[i % 5], Sc = S[i % 5], Ec = E[i % 5];
+      const Dp = D[(i - 1) % 5], Sp = S[(i - 1) % 5], Ep = E[(i - 1) % 5];
+      const qc = q.chars[i - 1], qk = q.kinds[i - 1], qn = q.near[i - 1];
+      // 打った字の i で終わるかなの並び(1〜4字)と、その読みの形
+      const runKeys = [''];
+      for(let k = 1; k <= YOMI_MAX && i - k >= 0 && q.kinds[i - k] === K_KANA; k++) runKeys.push(q.near[i - k] + runKeys[k - 1]);
+      const qReads = (qk === K_HAN && yomi) ? yomi.get(qc) : null;
+      Dc[0] = Dp[0] + FZ.skipQuery; Sc[0] = 0; Ec[0] = Ep[0];
+      for(let j = 1; j <= n; j++){
+        const tc = t.chars[j - 1], tk = t.kinds[j - 1];
+        let sub, ex = 0;
+        if(qc === tc){ sub = FZ.exact; ex = 1; }
+        else if(qk === K_KANA && tk === K_KANA &&
+          (qn === t.near[j - 1] || (qc === 'ー' && VOWELS.includes(tc)) || (tc === 'ー' && VOWELS.includes(qc)))) sub = FZ.near;
+        else if(qk === K_HAN && tk === K_HAN) sub = (yomi && sharesYomi(qc, tc, yomi)) ? FZ.sameYomi : FZ.hanHan;
+        else sub = FZ.miss;
+        let best = Dp[j - 1] + sub, bs = Sp[j - 1], be = Ep[j - 1] + ex;
+        let v = Dp[j] + FZ.skipQuery;
+        if(v > best){ best = v; bs = Sp[j]; be = Ep[j]; }
+        v = Dc[j - 1] + FZ.skipText;
+        if(v > best){ best = v; bs = Sc[j - 1]; be = Ec[j - 1]; }
+        // 本文の漢字1字 ＝ 打ったかな k 字
+        if(tk === K_HAN && runKeys.length > 1){
+          const reads = yomi ? yomi.get(tc) : null;
+          for(let k = 1; k < runKeys.length; k++){
+            let gain, anc = 0;
+            if(reads){
+              if(reads.has(runKeys[k])){ gain = FZ.yomiHit * k; anc = k; } else gain = FZ.yomiMiss * k;
+            } else {
+              if(k > 3) break;
+              gain = FZ.hanToKana[k];
+            }
+            const r = (i - k) % 5;
+            v = D[r][j - 1] + gain;
+            if(v > best){ best = v; bs = S[r][j - 1]; be = E[r][j - 1] + anc; }
+          }
+        }
+        // 打った漢字1字 ＝ 本文のかな k 字
+        if(qk === K_HAN){
+          let key = '';
+          for(let k = 1; k <= YOMI_MAX && j - k >= 0 && t.kinds[j - k] === K_KANA; k++){
+            key = t.near[j - k] + key;
+            let gain, anc = 0;
+            if(qReads){
+              if(qReads.has(key)){ gain = FZ.yomiHit; anc = 1; } else gain = FZ.yomiMiss;
+            } else {
+              if(k > 3) break;
+              gain = FZ.kanaToHan[k];
+            }
+            v = Dp[j - k] + gain;
+            if(v > best){ best = v; bs = Sp[j - k]; be = Ep[j - k] + anc; }
+          }
+        }
+        Dc[j] = best; Sc[j] = bs; Ec[j] = be;
+      }
+    }
+    const last = m % 5;
+    let bestJ = 1;
+    for(let j = 2; j <= n; j++) if(D[last][j] > D[last][bestJ]) bestJ = j;
+    const start = S[last][bestJ];
+    if(start >= bestJ) return null;
+    return { score: D[last][bestJ] / m, exact: E[last][bestJ], start, end: bestJ };
+  }
+  /* 並べて比べるまでもない文章を先に外す。手がかりになりうる字(同じ字・本文の漢字の読みに
+     含まれるかな・打った漢字の読みの頭が本文にある)が足りなければ、近いことはありえない。 */
+  function yomiCharsOf(t, yomi){
+    if(t.yomiFor === yomi) return t.yomiChars;
+    const chars = new Set(), nearSet = new Set();
+    for(let i = 0; i < t.chars.length; i++){
+      if(t.kinds[i] === K_KANA) nearSet.add(t.near[i]);
+      else if(t.kinds[i] === K_HAN && yomi){
+        const reads = yomi.get(t.chars[i]);
+        if(reads) reads.forEach(r => { for(const c of r) chars.add(c); });
+      }
+    }
+    t.yomiChars = { chars, nearSet };
+    t.yomiFor = yomi;
+    return t.yomiChars;
+  }
+  function possibleAnchors(q, t){
+    const yomi = getKanjiYomi();
+    const yc = yomiCharsOf(t, yomi);
+    let count = 0;
+    for(let i = 0; i < q.chars.length; i++){
+      const c = q.chars[i];
+      if(t.set.has(c)) count++;
+      else if(q.kinds[i] === K_KANA){ if(yc.chars.has(q.near[i])) count++; }
+      else if(q.kinds[i] === K_HAN && yomi){
+        const reads = yomi.get(c);
+        if(reads && [...reads].some(r => yc.nearSet.has(r.charAt(0)))) count++;
+      }
+    }
+    return count;
+  }
+  // 短い言葉ほど偶然似やすいので、近さの基準を厳しくする
+  function fuzzyThreshold(m){ return m >= 8 ? 0.6 : m >= 5 ? 0.66 : m >= 3 ? 0.8 : 0.9; }
+  // 手がかりがいくつ要るか
+  function fuzzyAnchors(m){ return Math.max(2, Math.ceil(m * 0.4)); }
+  function preparePhraseQuery(raw){
+    raw = String(raw || '').trim();
+    // 日本語は空白で区切った言葉をそれぞれ探す。英語は単語の間の空白ごと1つの言葉として探す
+    const hasJa = /[぀-ヿ㐀-鿿豈-﫿ｦ-ﾟ]/.test(raw);
+    const terms = (hasJa ? raw.split(/[\s　]+/) : [raw]).map(foldText).filter(f => f.chars.length);
+    return { raw, terms, total: terms.reduce((a, f) => a + f.chars.length, 0) };
+  }
+  /* 1つの文章に対して、打った言葉が入っているか。
+     ぴったり一致(exact)なら一致した所すべて、近いだけなら一番近い所に色を付ける。 */
+  function matchPassage(text, pq){
+    if(!pq.terms.length || !text) return null;
+    const t = foldText(text);
+    if(!t.chars.length) return null;
+    const ranges = [];
+    let allExact = true, scoreSum = 0;
+    for(let k = 0; k < pq.terms.length; k++){
+      const q = pq.terms[k];
+      const ex = exactRanges(q, t);
+      if(ex.length){
+        ex.forEach(([a, b]) => ranges.push({ s: t.from[a], e: t.to[b - 1], near: false }));
+        scoreSum += 1;
+        continue;
+      }
+      allExact = false;
+      const m = q.chars.length;
+      // 2字は偶然似やすいので、漢字を含み読みを確かめられるとき(言葉 → ことば)だけ
+      if(m < 2 || (m === 2 && !(getKanjiYomi() && (q.kinds[0] === K_HAN || q.kinds[1] === K_HAN)))) return null;
+      const need = fuzzyAnchors(m);
+      if(possibleAnchors(q, t) < need) return null;
+      const al = fuzzyAlign(q, t);
+      if(!al || al.score < fuzzyThreshold(m) - 1e-4 || al.exact < need) return null;   // 1e-4 は小数の誤差の分
+      ranges.push({ s: t.from[al.start], e: t.to[al.end - 1], near: true });
+      scoreSum += al.score;
+    }
+    return { exact: allExact, score: scoreSum / pq.terms.length, ranges };
+  }
+  // AI が選んだ文章は言い回しが違うことがあるので、近そうな所をゆるく探して薄く示す
+  function looseMatch(text, pq){
+    const t = foldText(text);
+    let best = null;
+    pq.terms.forEach(q => {
+      const al = fuzzyAlign(q, t);
+      if(al && al.exact >= 1 && al.score >= 0.3 && (!best || al.score > best.score)) best = al;
+    });
+    return best ? { exact: false, score: best.score, ranges: [{ s: t.from[best.start], e: t.to[best.end - 1], near: true }] } : null;
+  }
+
+  /* ---------- 探す対象の文章 ---------- */
+  const PASSAGE_RANK = { quote: 0, insight: 1, story: 2, impression: 2, character: 3, kikkake: 4, next: 4 };
+  function collectPassages(){
+    const out = [];
+    books.forEach(b => {
+      if(!bookPassesFilters(b)) return;
+      const stories = b.stories || [];
+      const add = (kind, field, label, text, focus, extra) => {
+        if(!text || !String(text).trim()) return;
+        out.push(Object.assign({ book: b, kind, label, text: String(text), focus, key: b.id + '|' + focus + '|' + field, page: '', story: '' }, extra || {}));
+      };
+      (b.memos || []).forEach((m, i) => {
+        const si = m.storyId ? stories.findIndex(st => st.id === m.storyId) : -1;
+        const extra = { page: m.page ? String(m.page) : '', story: si >= 0 ? storyLabel(si, stories[si].title) : '' };
+        add('quote', 'quote', '引用', m.quote, 'memo:' + i, extra);
+        add('insight', 'insight', '気づき', m.insight, 'memo:' + i, extra);
+      });
+      (b.impressions || []).forEach((imp, i) => add('impression', 'text', '感想', imp && imp.text, 'impression:' + i));
+      stories.forEach((st, i) => add('story', 'impression', 'この話の感想', st.impression, 'story:' + i, { story: storyLabel(i, st.title) }));
+      (b.characters || []).forEach((c, i) => {
+        const who = c.name || '人物';
+        add('character', 'profile', who + '（どんな人物か）', c.profile, 'character:' + i);
+        add('character', 'reason', who + '（印象に残った理由）', c.reason, 'character:' + i);
+      });
+      add('kikkake', 'text', 'きっかけ・期待', b.kikkake, 'kikkake');
+      add('next', 'text', '次にやりたいこと', b.nextAction, 'next');
+    });
+    return out;
+  }
+  function focusOrder(p){
+    const n = parseInt(String(p.focus).split(':')[1], 10);
+    return isNaN(n) ? 0 : n;
+  }
+  function comparePassages(a, b){
+    const pa = parseInt(a.page, 10), pb = parseInt(b.page, 10);
+    return (PASSAGE_RANK[a.kind] - PASSAGE_RANK[b.kind]) ||
+      (sortTimeOf(b.book) - sortTimeOf(a.book)) ||
+      (a.book.id < b.book.id ? -1 : a.book.id > b.book.id ? 1 : 0) ||
+      ((isNaN(pa) ? Infinity : pa) - (isNaN(pb) ? Infinity : pb)) ||
+      (focusOrder(a) - focusOrder(b));
+  }
+  function searchPhrases(raw){
+    const pq = preparePhraseQuery(raw);
+    if(pq.total < 2) return null;   // 1文字ではほとんどの文章に当たってしまう
+    const exact = [], near = [];
+    collectPassages().forEach(p => {
+      const r = matchPassage(p.text, pq);
+      if(!r) return;
+      p.match = r;
+      (r.exact ? exact : near).push(p);
+    });
+    exact.sort(comparePassages);
+    near.sort((a, b) => (b.match.score - a.match.score) || comparePassages(a, b));
+    return { pq, exact, near: near.slice(0, 30) };
+  }
+
+  /* ---------- 色付けして表示する ---------- */
+  function markedHTML(text, ranges, flat){
+    const esc = s => flat ? escapeHTML(s).replace(/\s*\n+\s*/g, ' ') : escapeHTML(s).replace(/\n/g, '<br>');
+    const rs = (ranges || []).filter(r => r.e > r.s).sort((a, b) => (a.s - b.s) || (a.near - b.near));
+    let html = '', pos = 0;
+    rs.forEach(r => {
+      const s = Math.max(r.s, pos);
+      if(s >= r.e) return;
+      html += esc(text.slice(pos, s)) + '<mark class="hl' + (r.near ? ' near' : '') + '">' + esc(text.slice(s, r.e)) + '</mark>';
+      pos = r.e;
+    });
+    return html + esc(text.slice(pos));
+  }
+  // 長い文章は一致した所の前後だけを切り出す
+  const SNIPPET_MAX = 90;
+  function snippetHTML(text, ranges){
+    let a = 0, z = text.length;
+    if(text.length > SNIPPET_MAX){
+      const first = (ranges || []).reduce((m, r) => (!m || r.s < m.s) ? r : m, null);
+      a = first ? Math.max(0, first.s - 24) : 0;
+      z = Math.min(text.length, a + SNIPPET_MAX);
+      a = Math.max(0, z - SNIPPET_MAX);
+      if(/[\uDC00-\uDFFF]/.test(text.charAt(a))) a++;
+      if(/[\uD800-\uDBFF]/.test(text.charAt(z - 1))) z--;
+    }
+    const shifted = (ranges || []).map(r => ({ s: Math.max(0, r.s - a), e: Math.min(z, r.e) - a, near: r.near }));
+    return (a > 0 ? '…' : '') + markedHTML(text.slice(a, z), shifted, true) + (z < text.length ? '…' : '');
+  }
+  function miniCoverHTML(b){
+    return '<span class="phrase-cover" style="' + coverBgStyle(b) + '">' +
+      (b.cover ? '<img src="' + b.cover + '" alt="" loading="lazy" decoding="async">' : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>') +
+      '</span>';
+  }
+  function buildPhraseCard(p, index, aiPicked){
+    const meta = [p.page ? 'p.' + escapeHTML(p.page) : '', p.story ? escapeHTML(p.story) : ''].filter(Boolean).join(' ・ ');
+    return '<button type="button" class="phrase-card" data-phrase-index="' + index + '">' +
+      miniCoverHTML(p.book) +
+      '<span class="phrase-main">' +
+        '<span class="phrase-text">' + snippetHTML(p.text, p.match ? p.match.ranges : []) + '</span>' +
+        '<span class="phrase-meta">' +
+          '<span class="phrase-kind">' + escapeHTML(p.label) + '</span>' +
+          (aiPicked ? '<span class="phrase-kind ai">AI</span>' : '') +
+          '<span class="phrase-book">『' + escapeHTML((p.book.title || '').replace(/\n/g, ' ')) + '』</span>' +
+          (meta ? '<span class="phrase-page">' + meta + '</span>' : '') +
+        '</span>' +
+      '</span>' +
+    '</button>';
+  }
+  /* 本棚の上に出す「付箋・メモの中」の欄。
+     ぴったり一致 → もしかして(表記が少し違う) → AI の候補 の順に並べ、
+     その順番のまま詳細画面の「次の候補」でたどれるようにする。 */
+  const PHRASE_PREVIEW = 5;   // 最初に見せる数
+  const PHRASE_STEP = 30;     // 「ほか◯件」を押すたびに増やす数
+  function showMorePhrases(){
+    const q = preparePhraseQuery(searchQuery).raw;
+    const n = phraseShowCount.q === q ? phraseShowCount.n : PHRASE_PREVIEW;
+    phraseShowCount = { q, n: n + PHRASE_STEP };
+    renderList();
+  }
+  function buildPhraseSection(res, bookCount){
+    const q = res.pq.raw;
+    const ai = aiFind.q === q ? aiFind : null;
+    const local = res.exact.concat(res.near);
+    res.exact.forEach(p => { p.via = 'exact'; });
+    res.near.forEach(p => { p.via = 'near'; });
+    const aiPicked = new Set();
+    const aiItems = [];
+    let aiOverlap = 0;
+    if(ai && ai.state === 'done'){
+      const shownKeys = new Set(local.map(p => p.key));
+      const byKey = new Map(collectPassages().map(p => [p.key, p]));
+      ai.keys.forEach(k => {
+        aiPicked.add(k);
+        if(shownKeys.has(k)){ aiOverlap++; return; }
+        const p = byKey.get(k);
+        if(!p) return;
+        p.match = matchPassage(p.text, res.pq) || looseMatch(p.text, res.pq);
+        p.via = 'ai';
+        aiItems.push(p);
+      });
+    }
+    phraseList = local.concat(aiItems);
+    // タイトル・著者などで本が見つかっていて、フレーズが無いなら欄ごと出さない
+    if(!local.length && !ai && bookCount > 0) return null;
+
+    const limit = phraseShowCount.q === q ? phraseShowCount.n : PHRASE_PREVIEW;
+    let shown = 0;
+    const group = (items, offset, title, note) => {
+      const visible = items.slice(0, Math.max(0, limit - shown));
+      if(!visible.length) return '';
+      shown += visible.length;
+      return '<div class="phrase-group-head">' + title + (note ? '<span>' + note + '</span>' : '') + '</div>' +
+        visible.map((p, i) => buildPhraseCard(p, offset + i, aiPicked.has(p.key))).join('');
+    };
+    let html = '<div class="phrase-head"><span class="phrase-title">付箋・メモの中</span>' +
+      (local.length ? '<span class="phrase-count">' + local.length + '件</span>' : '') + '</div>';
+    html += group(res.exact, 0, 'この言葉が入っている', '');
+    html += group(res.near, res.exact.length, 'もしかして、これ？', '漢字・かなの違いなど、少し違う書き方');
+    if(local.length > shown){
+      const rest = local.length - shown;
+      html += '<button type="button" class="phrase-more" data-phrase-more>' +
+        (rest > PHRASE_STEP ? 'ほか ' + rest + '件（' + PHRASE_STEP + '件ずつ表示）' : 'ほか ' + rest + '件を表示') + '</button>';
+    }
+    if(!local.length){
+      html += '<p class="phrase-empty">' + (bookCount > 0 ? '付箋やメモの中には見つかりませんでした。' :
+        '一致する本・フレーズは見つかりませんでした。<br>言葉を短くするか、覚えている別の部分で試してみてください。') + '</p>';
+    }
+    html += buildAiFindHTML(ai, aiItems, local.length, aiOverlap);
+    const sec = document.createElement('section');
+    sec.className = 'phrase-section';
+    sec.innerHTML = html;
+    return sec;
+  }
+
+  /* ---------- AI にも探してもらう ----------
+     読みの辞書が無いので、漢字だけで書かれた所(しあわせ／幸せ)や、意味だけ覚えている
+     言い換えは手元では見つけきれない。そのときは付箋・メモの文章を Gemini に渡して選んでもらう。
+     キーは「写真から引用」と同じもの。AI には文章の番号だけを返させ、本文は手元のものを出す。 */
+  const AI_FIND_MAX_CHARS = 120000;
+  const AI_FIND_SYSTEM = 'You help a reader find a passage in their own reading notes (quotes copied from books, and their own comments). Reply only with the requested JSON.';
+  const AI_FIND_SCHEMA = {
+    type: 'object',
+    properties: { ids: { type: 'array', items: { type: 'string' } } },
+    required: ['ids']
+  };
+  const SPARKLE_SVG = '<svg viewBox="0 0 24 24"><path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9L12 17.5l-1.9-5.1L5 10.5l5.1-1.9Z"/><path d="M18.5 15.5l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8Z"/></svg>';
+  function buildAiFindHTML(ai, aiItems, offset, overlap){
+    if(ai && ai.state === 'loading'){
+      return '<div class="ai-find"><div class="ai-find-loading"><span class="ai-spinner"></span>AI が付箋・メモを読んで探しています…' +
+        '<button type="button" class="phrase-link" data-ai-cancel>やめる</button></div></div>';
+    }
+    if(ai && ai.state === 'done'){
+      let h = '<div class="ai-find">';
+      if(aiItems.length){
+        h += '<div class="phrase-group-head">AI の候補<span>言い回しや書き方が違っても、意味から選んだもの</span></div>' +
+          aiItems.map((p, i) => buildPhraseCard(p, offset + i, true)).join('');
+      }
+      if(overlap){
+        h += '<p class="ai-find-note">上の候補のうち ' + overlap + '件も AI が選びました（「AI」の印）。</p>';
+      } else if(!aiItems.length){
+        h += '<p class="phrase-empty">AI でも見つけられませんでした。覚えている別の部分で試してみてください。</p>';
+      }
+      if(ai.cut) h += '<p class="ai-find-note">文章が多いので、引用・気づきを優先して一部だけを AI に渡しました。</p>';
+      return h + '</div>';
+    }
+    return '<div class="ai-find">' +
+      (ai && ai.state === 'error' ? '<p class="phrase-empty error">' + escapeHTML(ai.message) + '</p>' : '') +
+      '<button type="button" class="ai-find-btn" data-ai-find>' + SPARKLE_SVG +
+        (ai && ai.state === 'error' ? 'もう一度 AI で探す' : 'AI にも探してもらう') + '</button>' +
+      '<p class="ai-find-note">うろ覚えや言い換えでも、意味から探します。付箋やメモの文章を Gemini に送ります。</p>' +
+      '</div>';
+  }
+  function cancelAiFind(){
+    if(aiFind.job){
+      aiFind.job.cancelled = true;
+      if(aiFind.job.abort) aiFind.job.abort();
+    }
+    aiFind = { q: '', state: 'idle', keys: [], message: '', job: null, cut: false };
+  }
+  function aiFindErrorMessage(err){
+    switch(err && err.kind){
+      case 'offline':
+      case 'network': return '通信できませんでした。電波の良いところでもう一度試してください。';
+      case 'timeout': return 'AI の返事に時間がかかりすぎました。もう一度試してください。';
+      case 'nokey':
+      case 'key': return 'Gemini のキーが使えないようです。設定から登録し直してください。';
+      case 'quota': return '今日、無料で使える回数を使い切ったようです。日本時間の16〜17時ごろに回復します。';
+      case 'server': return 'Gemini が混み合っています。少し待ってからもう一度試してください。';
+      case 'blocked': return '内容の制限で、AI に探してもらえませんでした。';
+      default: return 'AI で探せませんでした。もう一度試してください。';
+    }
+  }
+  function parseAiFindResponse(data){
+    const cand = data && data.candidates && data.candidates[0];
+    if(!cand) return { ok: false, kind: (data && data.promptFeedback && data.promptFeedback.blockReason) ? 'blocked' : 'empty' };
+    const reason = cand.finishReason || '';
+    if(/SAFETY|PROHIBITED|BLOCKLIST|SPII/.test(reason)) return { ok: false, kind: 'blocked' };
+    const text = ((cand.content && cand.content.parts) || [])
+      .filter(p => p && typeof p.text === 'string' && !p.thought)
+      .map(p => p.text).join('');
+    let obj = null;
+    try{ obj = JSON.parse(text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')); }catch(e){ /* 下で扱う */ }
+    if(!obj || !Array.isArray(obj.ids)) return { ok: false, kind: reason === 'MAX_TOKENS' ? 'toolong' : 'badjson' };
+    return { ok: true, value: { ids: obj.ids.map(x => String(x).trim()) } };
+  }
+  function startAiFind(){
+    const q = preparePhraseQuery(searchQuery).raw;
+    if(!q) return;
+    if(!readOcrKey()){ openOcrSetup({ kind: 'search' }); return; }
+    cancelAiFind();
+    // 引用 → 気づき → そのほか の順に、入りきるだけ渡す
+    const passages = collectPassages().sort((a, b) => PASSAGE_RANK[a.kind] - PASSAGE_RANK[b.kind]);
+    const lines = [], idToKey = {};
+    let used = 0, cut = false;
+    passages.forEach((p, i) => {
+      const body = p.text.replace(/\s+/g, ' ').trim().slice(0, 300);
+      const line = 'p' + i + '\t『' + (p.book.title || '').replace(/\s+/g, ' ').slice(0, 40) + '』' + p.label + '：' + body;
+      if(used + line.length > AI_FIND_MAX_CHARS){ cut = true; return; }
+      used += line.length + 1;
+      lines.push(line);
+      idToKey['p' + i] = p.key;
+    });
+    if(!lines.length){
+      aiFind = { q, state: 'error', keys: [], message: '探す対象の付箋・メモがありません。', job: null, cut: false };
+      renderList();
+      return;
+    }
+    const prompt = [
+      'The reader wants to find one passage in the notes below, but remembers it only vaguely.',
+      'What they typed: 「' + q + '」',
+      'The real wording may differ: kanji vs. hiragana/katakana spelling (e.g. やさしさ = 優しさ, しあわせ = 幸せ), typos, different particles or word order, only part of the phrase, or only the gist said in other words.',
+      '',
+      'Notes, one per line as "id<TAB>『book title』kind：text":',
+      lines.join('\n'),
+      '',
+      'Return JSON {"ids": [...]}: the ids of the notes that most plausibly contain what the reader is looking for, most likely first, at most 8.',
+      'Prefer notes that contain the phrase itself (in any spelling) over notes that are only loosely related. Return an empty list if nothing fits.'
+    ].join('\n');
+    const job = {
+      cancelled: false, abort: null,
+      buildBody(level){
+        const body = {
+          systemInstruction: { parts: [{ text: AI_FIND_SYSTEM }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 4096 }
+        };
+        if(level <= 1){
+          body.generationConfig.responseJsonSchema = AI_FIND_SCHEMA;
+          body.safetySettings = OCR_SAFETY;
+        }
+        if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: 'LOW' };
+        return body;
+      },
+      parse: parseAiFindResponse
+    };
+    aiFind = { q, state: 'loading', keys: [], message: '', job, cut };
+    renderList();
+    refreshOcrModelsIfStale();
+    runOcr(job, null).then(res => {
+      if(aiFind.job !== job) return;
+      const keys = [];
+      (res.ids || []).forEach(id => { const k = idToKey[id]; if(k && !keys.includes(k)) keys.push(k); });
+      aiFind = { q, state: 'done', keys: keys.slice(0, 8), message: '', job: null, cut };
+      // AI が選んだものが「ほか◯件」に隠れていたら、見えるように開く
+      const res2 = searchPhrases(q);
+      if(res2){
+        const last = res2.exact.concat(res2.near).reduce((mx, p, i) => keys.includes(p.key) ? i : mx, -1);
+        const shownNow = phraseShowCount.q === q ? phraseShowCount.n : PHRASE_PREVIEW;
+        if(last >= shownNow) phraseShowCount = { q, n: last + 1 };
+      }
+      renderList();
+    }).catch(err => {
+      if(aiFind.job !== job || (err && err.kind === 'cancel')) return;
+      aiFind = { q, state: 'error', keys: [], message: aiFindErrorMessage(err), job: null, cut: false };
+      renderList();
+    });
+  }
+
+  /* ---------- 詳細画面：一致した所に色を付け、候補を順にたどる ---------- */
+  function findTextHTML(text){
+    text = String(text || '');
+    if(detailFind && text){
+      const r = matchPassage(text, detailFind.pq);
+      if(r) return markedHTML(text, r.ranges, false);
+      const cur = detailFind.list[detailFind.index];
+      if(cur && cur.match && cur.text === text) return markedHTML(text, cur.match.ranges, false);
+    }
+    return escapeHTML(text).replace(/\n/g, '<br>');
+  }
+  function openPhraseResult(index){
+    if(!phraseList[index]) return;
+    listReturnScroll = document.getElementById('screenList').scrollTop;
+    detailFind = { pq: preparePhraseQuery(searchQuery), list: phraseList.slice(), index };
+    showFindItem();
+  }
+  function showFindItem(){
+    const f = detailFind;
+    const p = f && f.list[f.index];
+    if(!p) return;
+    const b = books.find(x => x.id === p.book.id);
+    if(!b) return;
+    const detailEl = document.getElementById('screenDetail');
+    if(currentDetailId !== b.id || !detailEl.classList.contains('active')){
+      renderDetail(b);
+      if(!detailEl.classList.contains('active')) showScreen('Detail');
+      else detailEl.scrollTop = 0;
+    } else {
+      renderDetailBody(b);   // 薄く示す所(AI の候補)が候補ごとに変わるので描き直す
+    }
+    updateFindBar();
+    requestAnimationFrame(() => focusFindTarget(p, false));
+  }
+  function focusFindTarget(p, retried){
+    const el = document.querySelector('#detailBody [data-find-key="' + p.focus + '"]');
+    if(!el){
+      // 感情タグで絞り込んでいて隠れているときは、絞り込みを外して描き直す
+      const b = books.find(x => x.id === p.book.id);
+      if(!retried && b){ renderDetail(b); requestAnimationFrame(() => focusFindTarget(p, true)); }
+      return;
+    }
+    document.querySelectorAll('#detailBody .find-focus').forEach(x => x.classList.remove('find-focus'));
+    if(el.classList.contains('memo-card')) el.classList.add('expanded');
+    void el.offsetWidth;   // 同じ所をもう一度光らせるため
+    el.classList.add('find-focus');
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }
+  const FIND_VIA_LABEL = { exact: '', near: 'もしかして', ai: 'AI の候補' };
+  function updateFindBar(){
+    const f = detailFind;
+    document.getElementById('screenDetail').classList.toggle('finding', !!f);
+    document.getElementById('findBar').classList.toggle('show', !!f);
+    if(!f) return;
+    const p = f.list[f.index];
+    document.getElementById('findBarQuery').textContent = '「' + f.pq.raw + '」';
+    const via = FIND_VIA_LABEL[p.via] || '';
+    document.getElementById('findBarCount').textContent = (f.index + 1) + ' / ' + f.list.length + '件目' + (via ? ' ・ ' + via : '');
+    document.getElementById('findPrevBtn').disabled = f.index <= 0;
+    document.getElementById('findNextBtn').disabled = f.index >= f.list.length - 1;
+  }
+  function stepFind(delta){
+    if(!detailFind) return;
+    const next = detailFind.index + delta;
+    if(next < 0 || next >= detailFind.list.length) return;
+    detailFind.index = next;
+    showFindItem();
+  }
+  function closeFind(){
+    if(!detailFind) return;
+    detailFind = null;
+    updateFindBar();
+    const b = books.find(x => x.id === currentDetailId);
+    if(b) renderDetailBody(b);
   }
   function renderList(){
     renderFilterTabs();
@@ -2505,20 +3364,34 @@
     let filtered = books;
     const hitWhere = new Map();
     if(isSearching){
-      const q = normalize(searchQuery);
+      const terms = preparePhraseQuery(searchQuery).terms.map(f => f.str);
       filtered = filtered.filter(b => {
-        const r = searchHit(b, q);
+        const r = searchHit(b, terms);
         if(r.hit && r.where) hitWhere.set(b.id, r.where);
         return r.hit;
       });
     }
-    if(statusFilter) filtered = filtered.filter(b => b.status === statusFilter);
-    if(majorFilter) filtered = filtered.filter(b => b.majorCategory === majorFilter);
-    if(minorFilter) filtered = filtered.filter(b => (b.minorCategories || []).includes(minorFilter));
-    if(formatFilter) filtered = filtered.filter(b => b.format === formatFilter);
-    if(styleFilter) filtered = filtered.filter(b => b.style === styleFilter);
-    filtered = sortBooks(filtered);
+    filtered = sortBooks(filtered.filter(bookPassesFilters));
     wrap.innerHTML = '';
+    // 付箋・メモの中の一致箇所(フレーズ)を本棚の上に並べる
+    const phrases = isSearching ? searchPhrases(searchQuery) : null;
+    const phraseEl = phrases ? buildPhraseSection(phrases, filtered.length) : null;
+    if(!phraseEl) phraseList = [];
+    if(phraseEl){
+      wrap.appendChild(phraseEl);
+      document.getElementById('shelfMeta').innerHTML = '';
+      if(filtered.length){
+        const head = document.createElement('div');
+        head.className = 'phrase-head shelf-subhead';
+        head.innerHTML = '<span class="phrase-title">本</span><span class="phrase-count">' + filtered.length + '冊</span>';
+        wrap.appendChild(head);
+        const grid = document.createElement('div');
+        grid.className = 'shelf-grid';
+        filtered.forEach(b => grid.appendChild(buildBookCard(b, hitWhere.get(b.id))));
+        wrap.appendChild(grid);
+      }
+      return;
+    }
     if(filtered.length === 0){
       const msg = books.length === 0
         ? 'まだ本が登録されていません。<br>右下の「＋」から追加しましょう。'
@@ -3101,31 +3974,32 @@
     );
   }
   // 話の順のときは見出しで分けるので、各カードに話の名前は出さない
-  function buildGroupedMemoHTML(memos, stories){
+  function buildGroupedMemoHTML(memos, stories, allMemos){
     const validIds = new Set(stories.map(st => st.id));
     const groups = stories.map((st, i) => ({ label: storyLabel(i, st.title), items: memos.filter(m => m.storyId === st.id) }));
     groups.push({ label: '話の指定なし', items: memos.filter(m => !validIds.has(m.storyId)) });
     return groups.filter(g => g.items.length).map(g =>
       '<div class="memo-group-heading">' + escapeHTML(g.label) + '</div>' +
-      g.items.map(m => buildDetailMemoCard(m, '')).join('')
+      g.items.map(m => buildDetailMemoCard(m, '', allMemos.indexOf(m))).join('')
     ).join('');
   }
-  function buildDetailMemoCard(memo, storyText){
+  // index は b.memos の中の位置。フレーズ検索から飛んできたときの目印(data-find-key)にする
+  function buildDetailMemoCard(memo, storyText, index){
     const emosHTML = (memo.emotions && memo.emotions.length)
       ? memo.emotions.map(e => '<div class="emo-chip active" style="cursor:default;">' + escapeHTML(e) + '</div>').join('')
       : '<span class="no-emo">タグなし</span>';
     const dateHTML = memo.date ? '<span class="memo-date-badge">' + escapeHTML(formatDate(memo.date)) + '</span>' : '';
     const insightHTML = memo.insight
-      ? '<div class="memo-insight-text memo-insight-compact">' + escapeHTML(memo.insight).replace(/\n/g, '<br>') + '</div>'
+      ? '<div class="memo-insight-text memo-insight-compact">' + findTextHTML(memo.insight) + '</div>'
       : '';
     return (
-      '<div class="memo-card compact">' +
+      '<div class="memo-card compact" data-find-key="memo:' + index + '">' +
         '<div class="memo-top-compact">' +
           '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
           dateHTML +
         '</div>' +
         (storyText ? '<div class="memo-story-tag">' + escapeHTML(storyText) + '</div>' : '') +
-        '<div class="memo-quote">' + (memo.quote ? escapeHTML(memo.quote).replace(/\n/g, '<br>') : '（引用未入力）') + '</div>' +
+        '<div class="memo-quote">' + (memo.quote ? findTextHTML(memo.quote) : '（引用未入力）') + '</div>' +
         '<div class="emo-row">' + emosHTML + '</div>' +
         insightHTML +
       '</div>'
@@ -3157,8 +4031,8 @@
         '</div></div>';
     }
     if(b.kikkake){
-      html += '<div class="info-card"><div class="ic-label">きっかけ・期待</div><div class="ic-text">' +
-        escapeHTML(b.kikkake).replace(/\n/g, '<br>') + '</div></div>';
+      html += '<div class="info-card" data-find-key="kikkake"><div class="ic-label">きっかけ・期待</div><div class="ic-text">' +
+        findTextHTML(b.kikkake) + '</div></div>';
     }
     if(b.connection){
       const linkedBook = b.connection.id ? books.find(x => x.id === b.connection.id) : null;
@@ -3176,10 +4050,10 @@
       html += '<div class="info-card"><div class="ic-label">収録されている話</div>';
       stories.forEach((st, i) => {
         const memoCount = (b.memos || []).filter(m => m.storyId === st.id).length;
-        html += '<div class="character-entry">' +
+        html += '<div class="character-entry" data-find-key="story:' + i + '">' +
           '<div class="story-entry-head"><div class="character-entry-name">' + escapeHTML(storyLabel(i, st.title)) + '</div>' +
           (st.rating > 0 ? miniStarsHTML(st.rating) : '') + '</div>' +
-          (st.impression ? '<div class="character-entry-sub">この話の感想</div><div class="ic-text">' + escapeHTML(st.impression).replace(/\n/g, '<br>') + '</div>' : '') +
+          (st.impression ? '<div class="character-entry-sub">この話の感想</div><div class="ic-text">' + findTextHTML(st.impression) + '</div>' : '') +
           (st.summary ? '<div class="ic-text">' + escapeHTML(st.summary).replace(/\n/g, '<br>') + '</div>' : '') +
           (memoCount ? '<div class="character-entry-sub">付箋 ' + memoCount + '枚</div>' : '') +
           '</div>';
@@ -3194,9 +4068,9 @@
       };
       let gridHTML = '';
       if(memoSortOrder === 'story' && stories.length){
-        gridHTML = buildGroupedMemoHTML(visibleMemos, stories);
+        gridHTML = buildGroupedMemoHTML(visibleMemos, stories, b.memos);
       } else {
-        gridHTML = visibleMemos.map(m => buildDetailMemoCard(m, storyNameOf(m))).join('');
+        gridHTML = visibleMemos.map(m => buildDetailMemoCard(m, storyNameOf(m), b.memos.indexOf(m))).join('');
       }
       html += '<div class="section-label" style="margin:4px 2px 10px;"><span class="txt">付箋メモ</span></div>' +
         buildMemoToolbarHTML(stories.length > 0) +
@@ -3216,23 +4090,23 @@
         html += '<div class="ic-label">' + (b.style === 'short' && stories.length ? '全体の感想' : '感想') + '</div>';
         impressionsToShow.forEach((imp, i) => {
           const label = (i + 1) + '回目の感想' + (imp.date ? '（' + formatDate(imp.date) + '）' : '');
-          html += '<div class="impression-entry"><div class="impression-entry-label">' + escapeHTML(label) + '</div>' +
-            '<div class="ic-text">' + escapeHTML(imp.text).replace(/\n/g, '<br>') + '</div></div>';
+          html += '<div class="impression-entry" data-find-key="impression:' + i + '"><div class="impression-entry-label">' + escapeHTML(label) + '</div>' +
+            '<div class="ic-text">' + findTextHTML(imp.text) + '</div></div>';
         });
       }
       if(b.nextAction){
-        html += '<div class="ic-label" style="margin-top:10px;">次にやりたいこと</div><div class="ic-text">' +
-          escapeHTML(b.nextAction).replace(/\n/g, '<br>') + '</div>';
+        html += '<div data-find-key="next"><div class="ic-label" style="margin-top:10px;">次にやりたいこと</div><div class="ic-text">' +
+          findTextHTML(b.nextAction) + '</div></div>';
       }
       html += '</div>';
     }
     if(b.characters && b.characters.length){
       html += '<div class="info-card"><div class="ic-label">印象に残った人物</div>';
-      b.characters.forEach(c => {
-        html += '<div class="character-entry">' +
+      b.characters.forEach((c, i) => {
+        html += '<div class="character-entry" data-find-key="character:' + i + '">' +
           '<div class="character-entry-name">' + escapeHTML(c.name || '（名前未記入）') + '</div>' +
-          (c.profile ? '<div class="character-entry-sub">どんな人物か</div><div class="ic-text">' + escapeHTML(c.profile).replace(/\n/g, '<br>') + '</div>' : '') +
-          (c.reason ? '<div class="character-entry-sub">印象に残った理由</div><div class="ic-text">' + escapeHTML(c.reason).replace(/\n/g, '<br>') + '</div>' : '') +
+          (c.profile ? '<div class="character-entry-sub">どんな人物か</div><div class="ic-text">' + findTextHTML(c.profile) + '</div>' : '') +
+          (c.reason ? '<div class="character-entry-sub">印象に残った理由</div><div class="ic-text">' + findTextHTML(c.reason) + '</div>' : '') +
           '</div>';
       });
       html += '</div>';
@@ -3299,6 +4173,11 @@
   function openDetail(id){
     const b = books.find(x => x.id === id);
     if(!b) return;
+    if(document.getElementById('screenList').classList.contains('active')){
+      listReturnScroll = document.getElementById('screenList').scrollTop;
+    }
+    detailFind = null;   // ふつうに開いたときは検索の色付けをしない
+    updateFindBar();
     renderDetail(b);
     showScreen('Detail');
   }
@@ -4414,26 +5293,72 @@
   document.getElementById('searchClearBtn').addEventListener('click', () => {
     const input = document.getElementById('searchInput');
     input.value = '';
-    searchQuery = '';
-    document.getElementById('searchClearBtn').classList.remove('show');
-    renderList();
+    setSearchQuery('');
     input.focus();
   });
   // Escで開いているものを閉じる(PCで使うとき用)
   document.addEventListener('keydown', e => {
+    // Ctrl+F / ⌘F：本棚では検索窓へ(付箋のフレーズも探せるので、ブラウザの検索より早い)
+    if((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'f' || e.key === 'F') &&
+      document.getElementById('screenList').classList.contains('active') && !document.querySelector('.modal-overlay.show')){
+      e.preventDefault();
+      const input = document.getElementById('searchInput');
+      document.getElementById('screenList').scrollTop = 0;
+      input.focus();
+      input.select();
+      return;
+    }
+    // 詳細画面で候補をたどっている間は、Enter / Shift+Enter で次・前へ
+    if(e.key === 'Enter' && detailFind && !e.isComposing && document.getElementById('screenDetail').classList.contains('active') &&
+      !document.querySelector('.modal-overlay.show') && !/^(INPUT|TEXTAREA|SELECT|BUTTON)$/.test(document.activeElement && document.activeElement.tagName)){
+      e.preventDefault();
+      stepFind(e.shiftKey ? -1 : 1);
+      return;
+    }
     if(e.key !== 'Escape') return;
     if(handleCaptureEscape()) return;
     const editor = document.getElementById('fullscreenEditor');
     if(editor.classList.contains('show')){ closeFullscreenEditor(); return; }
     const overlays = document.querySelectorAll('.modal-overlay.show');
     if(overlays.length){ overlays[overlays.length - 1].classList.remove('show'); return; }
+    if(detailFind && document.getElementById('screenDetail').classList.contains('active')){ closeFind(); return; }
     if(selectMode) exitSelectMode();
   });
-  document.getElementById('searchInput').addEventListener('input', e => {
-    searchQuery = e.target.value;
-    document.getElementById('searchClearBtn').classList.toggle('show', e.target.value !== '');
+  /* 打つたびに探し直す。漢字に変換する前のひらがなの段階でも「もしかして」が出るので、
+     変換中も止めない(打つ手が止まったところで描き直す) */
+  let searchTimer = null;
+  function setSearchQuery(value){
+    clearTimeout(searchTimer);
+    searchQuery = value;
+    document.getElementById('searchClearBtn').classList.toggle('show', value !== '');
+    const q = preparePhraseQuery(value).raw;
+    if(phraseShowCount.q !== q) phraseShowCount = { q: '', n: 0 };
+    if(aiFind.q && aiFind.q !== q) cancelAiFind();   // 言葉を変えたら AI の結果は前の言葉のもの
     renderList();
+  }
+  document.getElementById('searchInput').addEventListener('input', e => {
+    const value = e.target.value;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => setSearchQuery(value), 90);
   });
+  // Enter(検索)でキーボードを閉じて、結果を広く見せる
+  document.getElementById('searchInput').addEventListener('keydown', e => {
+    if(e.key === 'Enter' && !e.isComposing && e.keyCode !== 229){   // 229 は Safari の変換確定
+      e.preventDefault();
+      setSearchQuery(e.target.value);
+      e.target.blur();
+    }
+  });
+  document.getElementById('shelfWrap').addEventListener('click', e => {
+    const card = e.target.closest('.phrase-card');
+    if(card){ openPhraseResult(parseInt(card.dataset.phraseIndex, 10)); return; }
+    if(e.target.closest('[data-phrase-more]')){ showMorePhrases(); return; }
+    if(e.target.closest('[data-ai-find]')){ startAiFind(); return; }
+    if(e.target.closest('[data-ai-cancel]')){ cancelAiFind(); renderList(); }
+  });
+  document.getElementById('findPrevBtn').addEventListener('click', () => stepFind(-1));
+  document.getElementById('findNextBtn').addEventListener('click', () => stepFind(1));
+  document.getElementById('findCloseBtn').addEventListener('click', closeFind);
   // 下にスクロールしたら固定ヘッダーを縮める（上に戻すと検索窓も戻る）
   const listScreenEl = document.getElementById('screenList');
   listScreenEl.addEventListener('scroll', () => {
@@ -6127,10 +7052,12 @@
       let retried = false;
       for(;;){
         if(job.cancelled) throw new OcrError('cancel');
-        const r = await postGemini(model, buildOcrBody(job, level, spaced), job);
+        // 読み取り以外(フレーズを AI で探す)でも、モデルの切り替えや回数切れの扱いは同じなのでここを通す
+        const body = job.buildBody ? job.buildBody(level, spaced) : buildOcrBody(job, level, spaced);
+        const r = await postGemini(model, body, job);
         if(job.cancelled) throw new OcrError('cancel');
         if(r.status === 200){
-          const out = parseOcrResponse(r.data, spaced);
+          const out = (job.parse || parseOcrResponse)(r.data, spaced);
           if(out.ok){
             updateOcrState(s => { s.level = s.level || {}; s.level[model] = level; });
             return Object.assign({ model }, out.value);
@@ -6885,7 +7812,13 @@
   function openOcrSetup(pending){
     ocrSetupPending = pending || null;
     ocrKeyInput.value = '';
-    setOcrStatus(pending && pending.kind === 'photo' ? '写真から読み取るには、最初に一度だけキーの登録が必要です。' : '', '');
+    const forSearch = !!(pending && pending.kind === 'search');
+    document.getElementById('ocrSetupTitle').textContent = forSearch ? 'AI でフレーズを探す' : (pending ? '写真から引用を読み取る' : 'Gemini の設定');
+    document.getElementById('ocrSetupIntro').textContent = forSearch
+      ? 'うろ覚えのフレーズを、AI が付箋やメモの中から意味で探します。Google の Gemini（無料）を使うので、最初に一度だけ、この端末にキーを登録してください（写真から引用を読み取るときと同じキーです）。'
+      : '本のページを撮って、引用したい所を指でなぞると、その文章を引用欄に入れます。同じキーで、うろ覚えのフレーズを AI に探してもらうこともできます。どちらも Google の Gemini（無料）を使うので、最初に一度だけ、この端末にキーを登録してください。';
+    setOcrStatus(pending && pending.kind === 'photo' ? '写真から読み取るには、最初に一度だけキーの登録が必要です。'
+      : forSearch ? 'AI で探すには、最初に一度だけキーの登録が必要です。' : '', '');
     document.getElementById('ocrContinueBtn').style.display = 'none';
     refreshOcrSetupUI();
     closeDataMenu();
@@ -6916,11 +7849,12 @@
     }
     writeOcrState({ models: r.models, checkedAt: Date.now(), exhausted: {}, level: {} });
     ocrKeyInput.value = '';
-    setOcrStatus('✓ 登録しました。写真から読み取れます。', 'ok');
+    setOcrStatus('✓ 登録しました。' + (ocrSetupPending && ocrSetupPending.kind === 'search' ? 'AI で探せます。' : '写真から読み取れます。'), 'ok');
     refreshOcrSetupUI();
     if(ocrSetupPending){
       const cont = document.getElementById('ocrContinueBtn');
-      cont.textContent = ocrSetupPending.kind === 'retry' ? 'もう一度読み取る' : (ocrSetupPending.fromLibrary ? '写真を選ぶ' : 'ページを撮る');
+      cont.textContent = ocrSetupPending.kind === 'search' ? 'AI で探す'
+        : ocrSetupPending.kind === 'retry' ? 'もう一度読み取る' : (ocrSetupPending.fromLibrary ? '写真を選ぶ' : 'ページを撮る');
       cont.style.display = 'block';
     }
   }
@@ -6943,6 +7877,7 @@
     closeOcrSetup();
     if(!pending) return;
     if(pending.kind === 'retry'){ if(captureIsOpen()) capRead(); }
+    else if(pending.kind === 'search') startAiFind();
     else requestQuotePhoto(pending.target, pending.fromLibrary);
   });
   document.getElementById('ocrDeleteKeyBtn').addEventListener('click', () => {
