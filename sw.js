@@ -7,16 +7,16 @@
    控えを使う(network-first)。以前PWAで「古い版がキャッシュに残り続けて
    更新が届かない」事故があったため、本体は必ず新しい方を優先する。
    アイコンなど変わらないものは控えを先に使う(cache-first)。 */
-const CACHE_NAME = 'reading-log-v3';
+const CACHE_NAME = 'reading-log-v4';
 const APP_SHELL = [
   './',
   './index.html',
   './manifest.json',
   './kanji-yomi.js',   // フレーズ検索の漢字の読み(変わらないので控えを使う)
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32.png',
+  './icons/icon-192.png?v=2',
+  './icons/icon-512.png?v=2',
+  './icons/apple-touch-icon.png?v=2',
+  './icons/favicon-32.png?v=2',
 ].map(p => new URL(p, self.registration.scope).toString());
 
 const INDEX_URL = new URL('./index.html', self.registration.scope).toString();
