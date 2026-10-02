@@ -1,64 +1,31 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- 読書記録 アイコンの元絵: 朝の青空と丘、草の上に開いた本、めくれかけのページ、しおり紐、小鳥
+  <!-- 読書記録 アイコンの元絵: 深い緑の地に、開いた本としおり紐だけ
        PNG は icons/render-icons.ps1 で作る(Edge で描いて縮小) -->
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#3d9be6" />
-      <stop offset="0.42" stop-color="#7cc2f2" />
-      <stop offset="0.7" stop-color="#c3e6fa" />
-      <stop offset="0.82" stop-color="#eaf6fc" />
-    </linearGradient>
-    <radialGradient id="sunGlow" cx="780" cy="230" r="460" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#fffbe6" stop-opacity="1" />
-      <stop offset="0.16" stop-color="#fff2c8" stop-opacity="0.6" />
-      <stop offset="0.45" stop-color="#fff6e0" stop-opacity="0.18" />
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0" />
+    <radialGradient id="bg" cx="0.3" cy="0.2" r="1.1">
+      <stop offset="0" stop-color="#3f6a5f" />
+      <stop offset="1" stop-color="#1f3d37" />
     </radialGradient>
-    <linearGradient id="cloud" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ffffff" />
-      <stop offset="1" stop-color="#ddeefa" />
-    </linearGradient>
-    <linearGradient id="hillBack" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#bfe59a" />
-      <stop offset="1" stop-color="#8fcb72" />
-    </linearGradient>
-    <linearGradient id="hillFront" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#7cc463" />
-      <stop offset="1" stop-color="#4f9a45" />
-    </linearGradient>
     <linearGradient id="pageL" x1="1" y1="0" x2="0" y2="0">
-      <stop offset="0" stop-color="#e9dfcb" />
-      <stop offset="0.14" stop-color="#fbf6ec" />
-      <stop offset="1" stop-color="#fffdf8" />
+      <stop offset="0" stop-color="#d9ccb5" />
+      <stop offset="0.18" stop-color="#efe6d6" />
+      <stop offset="1" stop-color="#fbf7ef" />
     </linearGradient>
     <linearGradient id="pageR" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#e3d7c0" />
-      <stop offset="0.14" stop-color="#f7f1e4" />
-      <stop offset="1" stop-color="#fdf9f1" />
-    </linearGradient>
-    <linearGradient id="turn" x1="0" y1="1" x2="1" y2="0">
-      <stop offset="0" stop-color="#e6dbc5" />
-      <stop offset="0.35" stop-color="#fbf7ef" />
-      <stop offset="1" stop-color="#ffffff" />
+      <stop offset="0" stop-color="#d3c5ac" />
+      <stop offset="0.18" stop-color="#ebe1cf" />
+      <stop offset="1" stop-color="#f7f1e6" />
     </linearGradient>
     <linearGradient id="cover" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#2f6aa8" />
-      <stop offset="1" stop-color="#1d4677" />
+      <stop offset="0" stop-color="#c99a52" />
+      <stop offset="1" stop-color="#a87a3a" />
     </linearGradient>
     <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#c8392f" />
-      <stop offset="1" stop-color="#e65a45" />
+      <stop offset="0" stop-color="#a8432f" />
+      <stop offset="1" stop-color="#cf6247" />
     </linearGradient>
-    <g id="c1"><circle cx="150" cy="300" r="62" /><circle cx="230" cy="262" r="84" /><circle cx="318" cy="306" r="58" /><circle cx="282" cy="330" r="40" /><rect x="88" y="300" width="290" height="64" rx="32" /></g>
-    <g id="c2"><circle cx="560" cy="440" r="34" /><circle cx="604" cy="420" r="48" /><circle cx="652" cy="444" r="32" /><rect x="526" y="440" width="160" height="36" rx="18" /></g>
-    <clipPath id="c1c"><circle cx="150" cy="300" r="62" /><circle cx="230" cy="262" r="84" /><circle cx="318" cy="306" r="58" /><circle cx="282" cy="330" r="40" /><rect x="88" y="300" width="290" height="64" rx="32" /></clipPath>
-    <clipPath id="c2c"><circle cx="560" cy="440" r="34" /><circle cx="604" cy="420" r="48" /><circle cx="652" cy="444" r="32" /><rect x="526" y="440" width="160" height="36" rx="18" /></clipPath>
-    <filter id="blur" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="14" />
-    </filter>
-    <filter id="sunBlur" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="20" /></filter>
-    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="6" />
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22" />
     </filter>
     <filter id="grain" x="0" y="0" width="100%" height="100%">
       <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="3" />
@@ -66,83 +33,30 @@
     </filter>
   </defs>
 
-  <!-- 空と朝日 -->
-  <rect width="1024" height="1024" fill="url(#sky)" />
-  <rect width="1024" height="1024" fill="url(#sunGlow)" />
-  <circle cx="780" cy="230" r="112" fill="#fff3c4" opacity="0.8" filter="url(#sunBlur)" />
-  <circle cx="780" cy="230" r="80" fill="#fffcf0" />
+  <rect width="1024" height="1024" fill="url(#bg)" />
 
-  <!-- 雲 -->
-  <use href="#c1" fill="#a9cdee" opacity="0.5" transform="translate(6 12)" filter="url(#soft)" />
-  <use href="#c1" fill="#c9e0f4" />
-  <g clip-path="url(#c1c)"><use href="#c1" fill="url(#cloud)" transform="translate(-8 -12)" /></g>
-  <g opacity="0.9">
-    <use href="#c2" fill="#c9e0f4" />
-    <g clip-path="url(#c2c)"><use href="#c2" fill="url(#cloud)" transform="translate(-5 -8)" /></g>
-  </g>
-
-  <!-- 小鳥 -->
-  <g fill="#2b4f7c">
-    <path d="M388 176 C 404 160 422 160 432 174 C 442 156 462 152 478 164 C 458 164 444 176 434 192 C 426 178 410 172 388 176 Z" />
-    <path d="M470 236 C 482 224 496 224 504 234 C 512 220 528 218 540 226 C 524 228 514 236 506 248 C 500 238 488 234 470 236 Z" opacity="0.85" />
-    <path d="M330 232 C 340 222 352 222 358 230 C 364 220 376 218 386 224 C 374 226 366 232 360 242 C 354 234 344 230 330 232 Z" opacity="0.7" />
-  </g>
-
-  <!-- 丘 -->
-  <path d="M0 640 C 180 596 360 600 520 632 C 700 668 860 640 1024 604 L 1024 1024 L 0 1024 Z" fill="url(#hillBack)" />
-  <path d="M0 820 C 220 772 420 780 600 806 C 800 834 920 812 1024 796 L 1024 1024 L 0 1024 Z" fill="url(#hillFront)" />
-  <g fill="#ffffff" opacity="0.9">
-    <circle cx="96" cy="930" r="7" /><circle cx="120" cy="952" r="5" /><circle cx="906" cy="914" r="7" />
-    <circle cx="936" cy="944" r="5" /><circle cx="872" cy="960" r="5" />
-  </g>
-  <g fill="#ffd95a">
-    <circle cx="96" cy="930" r="2.8" /><circle cx="906" cy="914" r="2.8" />
-  </g>
-
-  <!-- 本の影 -->
-  <ellipse cx="512" cy="900" rx="420" ry="46" fill="#2f6b2d" opacity="0.45" filter="url(#blur)" />
-
-  <!-- しおり紐 -->
-  <path d="M508 868 C 500 900 528 924 516 962 L 536 990 L 548 958 C 560 920 532 896 540 868 Z" fill="url(#ribbon)" />
+  <g transform="translate(512 560) scale(1.16) translate(-512 -600)">
+  <!-- 影 -->
+  <path d="M512 470 C 440 430 320 422 196 442 L 196 742 C 320 726 440 734 512 778 C 584 734 704 726 828 742 L 828 442 C 704 422 584 430 512 470 Z" fill="#0f2622" opacity="0.55" filter="url(#shadow)" transform="translate(14 34)" />
 
   <!-- 表紙 -->
-  <path d="M512 680 C 448 628 318 612 152 632 L 126 860 C 290 842 440 852 512 900 C 584 852 734 842 898 860 L 872 632 C 706 612 576 628 512 680 Z" fill="url(#cover)" />
+  <path d="M512 436 C 442 396 322 388 192 408 L 192 724 C 322 708 442 716 512 758 C 582 716 702 708 832 724 L 832 408 C 702 388 582 396 512 436 Z" fill="url(#cover)" />
   <!-- ページの厚み -->
-  <path d="M512 670 C 448 620 322 606 160 626 L 138 846 C 296 830 440 840 512 884 C 584 840 728 830 886 846 L 864 626 C 702 606 576 620 512 670 Z" fill="#eadfc8" />
-  <g fill="none" stroke="#cdbd9e" stroke-width="2" opacity="0.8">
-    <path d="M140 840 C 298 824 440 834 512 878 C 584 834 726 824 884 840" />
-    <path d="M142 834 C 300 818 440 828 512 872 C 584 828 724 818 882 834" />
+  <path d="M512 426 C 444 386 326 378 206 398 L 206 708 C 326 692 444 700 512 742 C 580 700 698 692 818 708 L 818 398 C 698 378 580 386 512 426 Z" fill="#e2d6c0" />
+  <g fill="none" stroke="#c4b496" stroke-width="2.5">
+    <path d="M206 700 C 326 684 444 692 512 734 C 580 692 698 684 818 700" />
+    <path d="M206 692 C 326 676 444 684 512 726 C 580 684 698 676 818 692" />
   </g>
   <!-- 開いたページ -->
-  <path d="M512 660 C 450 610 330 596 170 618 L 150 830 C 300 812 440 822 512 862 Z" fill="url(#pageL)" />
-  <path d="M512 660 C 574 610 694 596 854 618 L 874 830 C 724 812 584 822 512 862 Z" fill="url(#pageR)" />
-  <!-- 文字の行 -->
-  <g id="lines" fill="none" stroke="#9fb3c8" stroke-width="7" stroke-linecap="round" opacity="0.55">
-    <path d="M478 682 C 440 640 330 630 212 647" />
-    <path d="M478 702 C 440 661 330 651 212 669" />
-    <path d="M478 722 C 440 682 330 672 212 690" />
-    <path d="M478 742 C 440 703 330 693 212 711" />
-    <path d="M478 762 C 440 724 330 714 300 727" />
-  </g>
-  <use href="#lines" transform="translate(1024 0) scale(-1 1)" />
-  <path d="M512 660 L 512 862" stroke="#cbbb9c" stroke-width="3" opacity="0.7" />
+  <path d="M512 418 C 470 360 330 350 214 384 L 214 684 C 330 668 446 676 512 718 Z" fill="url(#pageL)" />
+  <path d="M512 418 C 554 360 694 350 810 384 L 810 684 C 694 668 578 676 512 718 Z" fill="url(#pageR)" />
+  <path d="M512 418 L 512 718" stroke="#bfae8e" stroke-width="3" />
 
-  <!-- めくれかけのページ -->
-  <path d="M512 662 C 560 600 640 490 718 420 C 722 500 732 590 744 652 C 660 690 566 770 512 860 Z" fill="#000" opacity="0.12" filter="url(#soft)" transform="translate(16 14)" />
-  <path d="M512 662 C 552 586 626 488 704 424 C 708 506 718 590 730 652 C 648 690 562 770 512 860 Z" fill="url(#turn)" />
-  <path d="M704 424 C 708 506 718 590 730 652" fill="none" stroke="#e2d4ba" stroke-width="3" />
-  <g fill="none" stroke="#9fb3c8" stroke-width="6.5" stroke-linecap="round" opacity="0.45">
-    <path d="M548 650 C 586 590 630 534 676 494" />
-    <path d="M556 676 C 594 616 638 562 684 524" />
-    <path d="M564 702 C 602 644 646 590 692 554" />
-    <path d="M574 728 C 610 674 644 632 668 612" />
+  <!-- しおり紐 -->
+  <path d="M500 712 L 500 846 L 516 826 L 532 846 L 532 704 Z" fill="url(#ribbon)" />
+  <path d="M500 712 L 532 704 L 532 716 L 500 724 Z" fill="#7d2c1e" opacity="0.35" />
+
   </g>
 
-  <!-- きらめき -->
-  <g fill="#ffffff">
-    <path d="M770 470 L 778 494 L 802 502 L 778 510 L 770 534 L 762 510 L 738 502 L 762 494 Z" />
-    <path d="M436 520 L 441 535 L 456 540 L 441 545 L 436 560 L 431 545 L 416 540 L 431 535 Z" opacity="0.85" />
-  </g>
-
-  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.06" style="mix-blend-mode:overlay" />
+  <rect width="1024" height="1024" filter="url(#grain)" opacity="0.05" style="mix-blend-mode:overlay" />
 </svg>
