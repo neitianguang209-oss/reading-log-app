@@ -335,9 +335,9 @@
   .legend-bar{ width:8px; height:8px; border-radius:2px; background:var(--accent); }
   .legend-line{ width:14px; height:2px; background:var(--ink-faint); }
   .chart-svg{ display:block; width:100%; }
-  .status-cols{ display:flex; gap:12px; margin-bottom:15px; }
+  .status-cols{ display:flex; gap:8px; margin-bottom:15px; }
   .status-col{
-    flex:1; min-width:0; height:96px; padding:14px;
+    flex:1; min-width:0; height:96px; padding:12px;
     background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow);
     display:flex; flex-direction:column; justify-content:center;
   }
@@ -1141,6 +1141,7 @@
       <div class="filter-tabs" id="filterTabs">
         <div class="filter-chip" data-status="done">読了</div>
         <div class="filter-chip" data-status="reading">読書中</div>
+        <div class="filter-chip" data-status="stay">ステイ</div>
         <div class="filter-chip" data-status="tsundoku">積読</div>
       </div>
       <div class="cat-filter-row" id="majorFilterRow">
@@ -1370,9 +1371,10 @@
         <div class="status-row" id="statusRow">
           <div class="status-chip" data-status="reading">読書中</div>
           <div class="status-chip" data-status="done">読了</div>
+          <div class="status-chip" data-status="stay">ステイ</div>
           <div class="status-chip" data-status="tsundoku">積読</div>
         </div>
-        <p class="field-note">積読は、買った・借りたけれどまだ読み始めていない本です。</p>
+        <p class="field-note">ステイは、読み始めたけれど今はひと休みしている本。積読は、買った・借りたけれどまだ読み始めていない本です。</p>
       </div>
 
       <hr class="divider">
@@ -1943,22 +1945,24 @@
 
   // 表紙画像が無いときのモノグラム背景（アクセントと同系のブルーグレー）
   const palette = ['#5B8FC9','#7E93A8','#8FA6B8','#6E88A5','#A3B2BE','#7FA9D6'];
-  const statusLabelMap = {reading:'読書中', done:'読了', tsundoku:'積読'};
-  const statusColorMap = {reading:'#5B8FC9', done:'#5BC0A0', tsundoku:'#9BA1A5'};
+  const statusLabelMap = {reading:'読書中', done:'読了', stay:'ステイ', tsundoku:'積読'};
+  const statusColorMap = {reading:'#5B8FC9', done:'#5BC0A0', stay:'#C2A878', tsundoku:'#9BA1A5'};
 
-  /* ---------- 積読の保存形式 ----------
-     画面の中では status:'tsundoku' として扱うが、保存するときは
-     status:'reading' ＋ tsundoku:true にする。
+  /* ---------- 積読・ステイの保存形式 ----------
+     画面の中では status:'tsundoku' / 'stay'（読み始めたが一時停止中）として
+     扱うが、保存するときは status:'reading' ＋ tsundoku:true / stay:true にする。
      キャッシュに残った古い版のアプリは「読書中／読了」以外のステータスを
      見つけると読書中に直してクラウドへ書き戻すため、そのまま 'tsundoku' を
      保存すると、古い版が開いている端末があるだけで積読が全部消えてしまう。 */
   function toStoredBook(b){
     const isTsundoku = b.status === 'tsundoku';
-    return Object.assign({}, b, { status: isTsundoku ? 'reading' : b.status, tsundoku: isTsundoku });
+    const isStay = b.status === 'stay';
+    return Object.assign({}, b, { status: (isTsundoku || isStay) ? 'reading' : b.status, tsundoku: isTsundoku, stay: isStay });
   }
   function readStoredStatus(raw){
     if(raw.status === 'done') return 'done';
     if(raw.status === 'tsundoku' || (raw.status === 'reading' && raw.tsundoku === true)) return 'tsundoku';
+    if(raw.status === 'stay' || (raw.status === 'reading' && raw.stay === true)) return 'stay';
     return 'reading';
   }
 
@@ -2461,7 +2465,7 @@
      2. 一覧画面
   ========================================================= */
   function buildCardDateLabel(b){
-    if(b.status === 'reading' && b.startDate){
+    if((b.status === 'reading' || b.status === 'stay') && b.startDate){
       return formatDate(b.startDate) + ' 〜';
     }
     if(b.status === 'done' && (b.startDate || b.endDate)){
@@ -2482,11 +2486,15 @@
   }
   function buildCoverBadgesHTML(b){
     const ratingHTML = b.rating > 0 ? '<div class="book-rating-mini">★ ' + b.rating.toFixed(1) + '</div>' : '';
-    // 読書中は何日目か、積読は積読であることを出す。読了は評価だけでよい
+    // 読書中は何日目か、ステイ・積読はそれであることを出す。読了は評価だけでよい
     let stateHTML = '';
     if(b.status === 'reading'){
-      const days = b.startDate ? Math.max(1, Math.round((Date.now() - dateToTime(b.startDate)) / 86400000) + 1) : 0;
+      // 読み始めた日を1日目として、日付（暦）で数える。今の時刻から引くと、
+      // 当日でも半日たつと四捨五入で「2日目」になってしまう
+      const days = b.startDate ? Math.max(1, Math.round((dateToTime(todayStr()) - dateToTime(b.startDate)) / 86400000) + 1) : 0;
       stateHTML = '<div class="book-state-mini">' + (days ? days + '日目' : '読書中') + '</div>';
+    } else if(b.status === 'stay'){
+      stateHTML = '<div class="book-state-mini">ステイ</div>';
     } else if(b.status === 'tsundoku'){
       stateHTML = '<div class="book-state-mini">積読</div>';
     }
@@ -2596,9 +2604,9 @@
     }
     return b.createdAt || 0;
   }
-  // 読了 → 読書中 → 積読 の順にまとめる（並び替えはそれぞれのまとまりの中で効く）
+  // 読了 → 読書中 → ステイ → 積読 の順にまとめる（並び替えはそれぞれのまとまりの中で効く）
   function statusRank(b){
-    return b.status === 'done' ? 0 : b.status === 'reading' ? 1 : 2;
+    return b.status === 'done' ? 0 : b.status === 'reading' ? 1 : b.status === 'stay' ? 2 : 3;
   }
   function sortBooks(list){
     const arr = list.slice();
@@ -3812,7 +3820,7 @@
   }
   // 本棚全体の状況（年や期間に関係なく、今の冊数）
   function buildShelfStatusRow(){
-    const cols = [['読書中', 'reading'], ['積読', 'tsundoku'], ['読了', 'done']];
+    const cols = [['読書中', 'reading'], ['ステイ', 'stay'], ['積読', 'tsundoku'], ['読了', 'done']];
     const tsundoku = books.filter(b => b.status === 'tsundoku' && b.createdAt)
       .sort((a, b) => a.createdAt - b.createdAt)[0];
     let note = '';
@@ -4444,7 +4452,7 @@
   }
   function applyStatus(status){
     currentStatus = status;
-    if(status === 'reading' || status === 'tsundoku'){
+    if(status === 'reading' || status === 'stay' || status === 'tsundoku'){
       endDateInput.disabled = true;
       endDateInput.value = '';
       endDateLabel.innerHTML = '読み終わった日<span class="opt">読了後に入力できます</span>';
@@ -4969,7 +4977,7 @@
   titleInputEl.addEventListener('input', autoResizeTitle);
   /* 同じ本をもう一度登録しようとしていたら教える（読み終えた本を
      また買ってしまう・二重に記録する、を防ぐ） */
-  const STATUS_TEXT = { done: '読了', reading: '読書中', tsundoku: '積読' };
+  const STATUS_TEXT = { done: '読了', reading: '読書中', stay: 'ステイ', tsundoku: '積読' };
   function checkDuplicateTitle(){
     const box = document.getElementById('duplicateWarning');
     const text = document.getElementById('duplicateWarningText');

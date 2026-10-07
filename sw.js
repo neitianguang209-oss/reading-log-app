@@ -7,7 +7,7 @@
    控えを使う(network-first)。以前PWAで「古い版がキャッシュに残り続けて
    更新が届かない」事故があったため、本体は必ず新しい方を優先する。
    アイコンなど変わらないものは控えを先に使う(cache-first)。 */
-const CACHE_NAME = 'reading-log-v6';
+const CACHE_NAME = 'reading-log-v7';
 const APP_SHELL = [
   './',
   './index.html',
