@@ -7,7 +7,8 @@
    控えを使う(network-first)。以前PWAで「古い版がキャッシュに残り続けて
    更新が届かない」事故があったため、本体は必ず新しい方を優先する。
    アイコンなど変わらないものは控えを先に使う(cache-first)。 */
-const CACHE_NAME = 'reading-log-v7';
+const CACHE_NAME = 'reading-log-v8';
+const FONT_CACHE = 'reading-log-fonts';   // 書体は版を上げても消さない
 const APP_SHELL = [
   './',
   './index.html',
@@ -33,7 +34,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
+      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME && k !== FONT_CACHE).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
@@ -43,6 +44,20 @@ self.addEventListener('fetch', event => {
   if(req.method !== 'GET') return;
 
   const url = new URL(req.url);
+  // 見出しの明朝(Google Fonts)だけは別のサイトでも控えを持つ。
+  // 一度読めば、機内モードでも同じ書体で開ける(控えが無ければ端末の明朝になる)
+  if(url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com'){
+    event.respondWith(
+      caches.open(FONT_CACHE).then(cache => cache.match(req).then(hit => {
+        const net = fetch(req).then(res => {
+          if(res && (res.ok || res.type === 'opaque')) cache.put(req, res.clone());
+          return res;
+        }).catch(() => hit);
+        return hit || net;
+      }))
+    );
+    return;
+  }
   // 別のサイト(Firebase・書誌検索・表紙画像など)には手を出さない。
   // オフラインのときは普通に失敗させ、アプリ側のオフライン処理に任せる。
   if(url.origin !== self.location.origin) return;
