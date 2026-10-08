@@ -701,7 +701,6 @@
     border-radius:var(--pill); padding:4px 12px; font-size:12px; font-family:inherit; cursor:pointer;
   }
   .to-diary-btn:active{ background:var(--accent); color:var(--paper); }
-  .to-diary-btn.sent{ background:var(--accent-tint); border-color:transparent; color:var(--accent-deep); }
   .app-toast{
     position:fixed; left:50%; top:14px; transform:translateX(-50%) translateY(-8px);
     background:var(--ink); color:var(--paper); font-size:13px; line-height:1.6; padding:10px 16px;
@@ -4686,10 +4685,7 @@
         const isQuote = btn.dataset.toDiary === 'quote';
         const target = isQuote ? quoteInput : card.querySelector('.memo-collapsible textarea');
         const page = card.querySelector('.page-field input').value.trim();
-        if(sendToDiary(target.value, isQuote ? '引用' : '気づき', page)){
-          btn.textContent = '送信済み';
-          btn.classList.add('sent');
-        }
+        openInDiary(target.value, isQuote ? '引用' : '気づき', page);
       });
     });
     return card;
@@ -4717,11 +4713,15 @@
     }));
   }
 
-  /* ---------- 思考メモ(日記)へ下書きを送る ----------
-     読書記録も思考メモも同じ github.io のページなので localStorage を共有できる。
-     ここでは受け取り箱に足すだけで、確認して消すのは思考メモ側の役目。
-     (ローカルのserve.ps1どうしはポートが違う＝別オリジンなので届かない) */
-  const DIARY_INBOX_KEY = 'shikou-memo:inbox';
+  /* ---------- 思考メモ(日記)で開く ----------
+     以前は localStorage の受け取り箱に置いて待つ方式だったが、iPhoneのホーム画面に
+     置いたアプリはそれぞれ保存場所が別なので、思考メモからは見えず届かなかった。
+     いまは文章をリンクの # 以降に入れて思考メモを開き、向こうで今日の日付の
+     入力画面をすぐ出してもらう。# 以降はサーバーに送られず、思考メモが読んだら消す。
+     思考メモが開いた先の保存場所が空でも、向こうはクラウドと同期するので問題ない。 */
+  const DIARY_URL = /^(localhost|127\.0\.0\.1)$/.test(location.hostname)
+    ? 'http://localhost:5504/'   // 手元の serve.ps1 で試すとき
+    : new URL('../shikou-memo/', location.href).href;
   let toastTimer = null;
   function showToast(message){
     const el = document.getElementById('appToast');
@@ -4730,25 +4730,19 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => el.classList.remove('show'), 2400);
   }
-  function readDiaryInbox(){
-    try{
-      const raw = localStorage.getItem(DIARY_INBOX_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed : [];
-    }catch(e){
-      return [];   // 壊れていたら空として扱う(送信自体は続ける)
-    }
+  // 日本語を含むJSONを、URLにそのまま入れられる文字(base64url)にする
+  function toBase64Url(str){
+    const bytes = new TextEncoder().encode(str);
+    let bin = '';
+    for(let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
-  function sendToDiary(text, fieldLabel, page){
+  function openInDiary(text, fieldLabel, page){
     const trimmed = (text || '').trim();
-    if(!trimmed){ showToast('先に書いてから送ってください'); return false; }
-    const list = readDiaryInbox();
-    // 同じ文面を二重に送らない(押し間違い対策)
-    if(list.some(d => d && d.text === trimmed && d.source && d.source.field === fieldLabel)){
-      showToast('この文章はもう送ってあります');
-      return true;
-    }
-    list.push({
+    if(!trimmed){ showToast('先に書いてから押してください'); return; }
+    // 開いた先から戻ってこない場合に備えて、いまの編集内容を先に保存しておく
+    autosaveNow();
+    const draft = {
       id: 'rl-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
       text: trimmed,
       createdAt: new Date().toISOString(),
@@ -4760,15 +4754,11 @@
         page: page || '',
         field: fieldLabel
       }
-    });
-    try{
-      localStorage.setItem(DIARY_INBOX_KEY, JSON.stringify(list));
-    }catch(e){
-      showToast('思考メモに送れませんでした');
-      return false;
-    }
-    showToast('思考メモに下書きとして送りました');
-    return true;
+    };
+    const url = DIARY_URL + '#from-reading=' + toBase64Url(JSON.stringify(draft));
+    // 押した直後(待ち時間なし)に開かないと、ブラウザに新しい画面を止められる
+    const win = window.open(url, 'shikou-memo');
+    if(!win) location.href = url;
   }
 
   /* ---------- 感想（読むたびに複数追加できる） ---------- */
