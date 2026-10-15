@@ -40,7 +40,11 @@
     --accent-deep:#22443B;
     --accent-tint:rgba(47,90,79,.10);
     --accent-line:rgba(47,90,79,.38);   /* 選んでいないチップの枠 */
-    --ochre:#C9A45B;          /* 黄土：ステイ・グラフの補助線 */
+    --ochre:#C9A45B;          /* 黄土：ステイ・グラフの補助線・巻末(解説・あとがき)の付箋 */
+    --ochre-ink:#87672A;      /* 黄土の上や横に置く文字(紙の上で読める濃さ) */
+    --ochre-tint:rgba(201,164,91,.16);
+    --ochre-line:rgba(201,164,91,.55);
+    --ochre-wash:#FAF3E4;     /* 巻末の付箋カードの地：少し黄ばんだ紙 */
     --ribbon:#A8473A;         /* しおりの赤：★・読書中のしおり紐 */
     --line:rgba(90,70,50,.15);
     --line-strong:rgba(90,70,50,.30);
@@ -453,6 +457,14 @@
   .rate-row{ display:flex; align-items:center; gap:10px; margin-top:12px; }
   .rate-name{ width:118px; flex:0 0 118px; font-size:14px; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .stat-hint{ font-size:12px; font-weight:400; color:var(--ink-faint); line-height:1.7; margin:12px 0 0; }
+  .genre-bulk{
+    display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+    margin-top:14px; padding:10px 12px; border-radius:var(--radius-sm); background:var(--surface-raised);
+    font-size:13px; color:var(--ink-soft);
+  }
+  .genre-bulk b{ color:var(--ink); font-weight:600; }
+  .genre-bulk .auto-pick-btn{ margin-top:0; background:var(--surface); }
+  .genre-bulk .ai-spinner{ width:12px; height:12px; border-width:2px; }
   .col-note{ font-size:11px; color:var(--ink-faint); margin-top:4px; line-height:1.5; }
   /* 「◯日で読んだ」のような、本へ飛べる行 */
   .stat-line{
@@ -525,6 +537,28 @@
   }
   .info-card .ic-label{ font-family:var(--serif); font-size:14px; font-weight:600; color:var(--ink-soft); letter-spacing:.06em; margin-bottom:8px; }
   .info-card .ic-text{ font-size:15px; font-weight:400; line-height:1.85; color:var(--ink); }
+  /* 本の情報：図書カードのように、左に項目名・右に中身を罫線で区切って並べる */
+  .spec-card{ padding:4px 16px; }
+  .spec-row{ display:flex; align-items:baseline; gap:14px; padding:13px 0; }
+  .spec-row + .spec-row{ border-top:1px solid var(--line); }
+  .spec-k{
+    flex:0 0 84px; font-family:var(--serif); font-size:13px; font-weight:600;
+    color:var(--ink-faint); letter-spacing:.06em;
+  }
+  .spec-v{ flex:1; min-width:0; font-size:15px; color:var(--ink); line-height:1.6; font-variant-numeric:tabular-nums; }
+  .spec-tags{ display:flex; flex-wrap:wrap; align-items:center; gap:6px 6px; }
+  .spec-major{ font-family:var(--serif); font-weight:600; font-size:15px; color:var(--ink); margin-right:4px; }
+  .spec-major::after{ content:'›'; margin-left:9px; color:var(--ink-faint); font-weight:400; }
+  .spec-major:last-child::after{ content:none; }
+  .spec-genre{
+    display:inline-flex; align-items:center; height:26px; padding:0 11px; border-radius:var(--pill);
+    background:var(--accent-tint); color:var(--accent-deep); font-size:13px;
+  }
+  .spec-empty{ font-size:13px; color:var(--ink-faint); }
+  .spec-auto{ margin-top:0; margin-left:2px; }
+  .spec-auto .ai-spinner{ width:12px; height:12px; border-width:2px; }
+  .spec-arrow{ margin:0 8px; color:var(--ink-faint); }
+  .spec-note{ display:inline-block; white-space:nowrap; margin-left:10px; font-size:12.5px; color:var(--ink-soft); padding:1px 8px; border-radius:3px; background:var(--surface-raised); }
   .date-row{ display:flex; gap:28px; font-size:15px; }
   .date-row .d-item .d-label{ font-size:12px; color:var(--ink-faint); margin-bottom:2px; }
   /* 下の本文が透けて読みにくくならないよう、操作バーは半透明にせず塗りつぶす */
@@ -631,6 +665,28 @@
     display:flex; align-items:center; justify-content:center;
   }
   .tag-input-wrap{ display:flex; align-items:center; }
+  /* 小説のジャンル：見出しの右の「おまかせで選ぶ」と、調べた結果の一言 */
+  .genre-label-row{ align-items:center; }
+  .genre-label-row .field-label{ flex:1; min-width:0; }
+  .auto-pick-btn{
+    flex:0 0 auto; display:inline-flex; align-items:center; gap:5px; margin-top:9px;
+    border:1px solid var(--accent-line); background:transparent; color:var(--accent);
+    border-radius:var(--pill); padding:5px 12px 5px 10px; font-family:inherit; font-size:12.5px; cursor:pointer;
+  }
+  .auto-pick-btn svg{ width:14px; height:14px; fill:var(--ochre); stroke:none; }
+  .auto-pick-btn:active{ background:var(--accent-tint); }
+  .auto-pick-btn:disabled{ opacity:.5; cursor:default; }
+  .genre-auto-note{
+    display:flex; align-items:flex-start; gap:8px; margin:-2px 0 10px;
+    padding:9px 12px; border-radius:var(--radius-sm);
+    background:var(--surface); box-shadow:var(--shadow);
+    font-size:12.5px; line-height:1.65; color:var(--ink-soft);
+  }
+  .genre-auto-note[hidden]{ display:none; }
+  .genre-auto-note .ai-spinner{ width:14px; height:14px; margin-top:2px; }
+  .genre-auto-note .mark{ flex:0 0 auto; width:14px; height:14px; margin-top:3px; fill:var(--ochre); }
+  .genre-auto-note b{ color:var(--accent-deep); font-weight:600; }
+  .genre-auto-note.error{ color:var(--ink-faint); }
 
   /* ---------- ステータス／選択チップ ---------- */
   .status-row{ display:flex; gap:8px; flex-wrap:wrap; }
@@ -689,6 +745,68 @@
     border:1px solid var(--line); border-radius:8px; padding:5px 8px;
     font-size:12px; color:var(--ink-soft); font-family:inherit; background:var(--surface-raised);
   }
+  /* 付箋の「どこ」：本編／あとがき／解説 と ページを1つの枠に入れる。
+     巻末を選ぶと枠が黄土になり、カードも少し黄ばんだ紙になる */
+  .memo-top{ flex-wrap:wrap; row-gap:8px; column-gap:7px; }
+  .memo-top .where-field .where-page input{ width:40px; }
+  .memo-top .page-field.where-field{ padding:0; gap:0; height:36px; overflow:hidden; transition:background .15s ease, border-color .15s ease; }
+  .memo-top .page-field.where-field:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+  /* 見た目は「本編 ▾」の文字。上に透明な選択欄を重ねる（16px未満の選択欄はiPhoneで押すと画面が拡大されるため） */
+  .memo-top .where-field .sec-pick{
+    position:relative; display:inline-flex; align-items:center; gap:5px; height:100%;
+    padding:0 8px 0 10px; font-size:13px; color:var(--ink-soft); cursor:pointer;
+  }
+  .memo-top .where-field .sec-pick svg{ width:9px; height:6px; fill:none; stroke:var(--ink-faint); stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; }
+  .where-field .memo-section{
+    position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0;
+    -webkit-appearance:none; appearance:none; border:none; background:transparent;
+    opacity:0; font-size:16px; cursor:pointer;
+  }
+  .memo-top .where-field .where-sep{ width:1px; height:18px; background:var(--line-strong); flex:0 0 auto; }
+  .memo-top .where-field .where-page{ display:flex; align-items:center; gap:3px; padding:0 8px 0 9px; height:100%; }
+  .memo-top .where-field .where-page input:focus{ box-shadow:none; }
+  .memo-top .page-field.where-field.extra{ background:var(--ochre-tint); border-color:var(--ochre-line); }
+  .memo-top .where-field.extra .sec-pick, .memo-top .where-field.extra .sec-text{ color:var(--ochre-ink); font-weight:600; }
+  .memo-top .where-field.extra .sec-pick svg{ stroke:var(--ochre-ink); }
+  .memo-top .where-field.extra .where-sep{ background:var(--ochre-line); }
+  /* 日付は「9/20」と短く見せる札。上に透明な日付欄を重ねて、押すといつものカレンダーが開く */
+  .memo-date-chip{
+    position:relative; flex:0 0 auto; display:inline-flex; align-items:center; gap:6px;
+    height:36px; padding:0 11px 0 10px; border:1px solid var(--line); border-radius:8px;
+    background:var(--surface-raised); color:var(--ink-soft); font-size:13px; cursor:pointer;
+    font-variant-numeric:tabular-nums;
+  }
+  .memo-date-chip svg{ width:14px; height:14px; fill:none; stroke:var(--ink-faint); stroke-width:1.6; flex:0 0 auto; }
+  .memo-date-chip.empty .memo-date-text{ color:var(--ink-faint); }
+  .memo-date-chip:focus-within{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
+  .memo-date-chip .memo-date-input{
+    position:absolute; inset:0; width:100%; height:100%; margin:0; padding:0;
+    opacity:0; border:none; cursor:pointer; font-size:16px;
+  }
+  .memo-date-chip .memo-date-input::-webkit-calendar-picker-indicator{ position:absolute; inset:0; width:auto; height:auto; opacity:0; cursor:pointer; }
+  .memo-card.sec-extra .memo-date-chip{ background:#F6EEDB; }
+  /* 巻末の付箋は、本の最後の紙のように少し黄ばませ、上の縁に黄土の線を引く */
+  .memo-card.sec-extra{ background:var(--ochre-wash); }
+  .memo-card.sec-extra::before{
+    content:''; position:absolute; left:16px; right:16px; top:0; height:2px;
+    background:var(--ochre); border-radius:0 0 2px 2px; opacity:.8;
+  }
+  .memo-card.sec-extra textarea, .memo-card.sec-extra input[type=text]{ background:#F6EEDB; }
+  /* 詳細の付箋：場所の札。巻末は黄土で「解説 p.512」 */
+  .page-field-display.extra{ color:var(--ochre-ink); background:var(--ochre-tint); }
+  .page-field-display.extra b{ font-weight:600; margin-right:3px; }
+  .page-field-display.extra.only{ padding:2px 10px; }
+  /* 詳細の付箋をページ順に並べたとき、本編と巻末の間に入る章見出し */
+  .memo-section-heading{
+    grid-column:1 / -1; display:flex; align-items:center; gap:12px;
+    margin:10px 0 0; font-family:var(--serif); font-size:14px; font-weight:600; letter-spacing:.18em;
+    color:var(--ink-soft);
+  }
+  .memo-section-heading:first-child{ margin-top:0; }
+  .memo-section-heading::before, .memo-section-heading::after{ content:''; flex:1; height:1px; background:var(--line-strong); }
+  .memo-section-heading .n{ font-family:var(--latin); font-size:14px; font-weight:500; letter-spacing:0; font-variant-numeric:lining-nums; color:var(--ink-faint); margin-left:-6px; }
+  .memo-section-heading.extra{ color:var(--ochre-ink); }
+  .memo-section-heading.extra::before, .memo-section-heading.extra::after{ background:var(--ochre-line); }
   .impression-index-label{ font-size:14px; font-weight:600; color:var(--ink); }
   .memo-del{ margin-left:auto; white-space:nowrap; border:none; background:none; color:var(--ink-soft); font-size:13px; cursor:pointer; text-decoration:underline; }
   .memo-card textarea, .memo-card input[type=text]{ background:var(--surface-raised); }
@@ -735,10 +853,29 @@
   .memo-collapsible{ max-height:0; overflow:hidden; opacity:0; transition:max-height .3s ease, opacity .25s ease, margin-top .3s ease; }
   .memo-card.expanded .memo-collapsible{ max-height:600px; opacity:1; margin-top:6px; }
   .memo-insight-text{ font-size:14px; line-height:1.85; white-space:pre-wrap; color:var(--ink); }
-  .memo-toolbar{ display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+  .memo-toolbar{ display:flex; flex-direction:column; gap:10px; margin:4px 0 14px; }
   .memo-toolbar-row{ display:flex; flex-wrap:wrap; gap:8px; }
   .memo-toolbar .filter-chip{ height:34px; padding:0 14px; font-size:13px; }
   .memo-toolbar .emo-chip{ padding:5px 12px; font-size:12px; }
+  /* 詳細の付箋メモの頭：左に見出しと枚数、右に並び順の切り替え */
+  .memo-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 2px; }
+  .memo-head .section-label{ margin:0; }
+  .memo-head .section-label .sub{ margin-left:2px; font-family:var(--latin); font-size:15px; font-variant-numeric:lining-nums; color:var(--ink-soft); }
+  .seg{ display:inline-flex; flex:0 0 auto; padding:3px; border-radius:var(--pill); background:var(--surface-alt); }
+  .seg-btn{
+    border:none; background:transparent; font-family:inherit; font-size:12.5px; color:var(--ink-soft);
+    padding:5px 11px; border-radius:var(--pill); cursor:pointer; white-space:nowrap;
+    transition:background .15s ease, color .15s ease;
+  }
+  .seg-btn.active{ background:var(--surface); color:var(--accent-deep); font-weight:600; box-shadow:0 1px 2px rgba(90,70,50,.18); }
+  /* 感情タグの絞り込みは1行にして、はみ出す分は横にすべらせる */
+  .emo-filter-row{
+    display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch;
+    margin:0 calc(-1 * var(--side)); padding:1px var(--side);
+  }
+  .emo-filter-row::-webkit-scrollbar{ display:none; }
+  .emo-filter-row .emo-chip{ flex:0 0 auto; }
+  .emo-filter-row .emo-filter-label{ flex:0 0 auto; align-self:center; font-size:12px; color:var(--ink-faint); margin-right:2px; }
 
   /* 詳細画面：付箋メモの2列グリッド */
   .memo-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:18px; }
@@ -1428,8 +1565,15 @@
         </div>
         <p class="field-note">タップして選択します。もう一度タップすると選択解除できます。<br>線引き：知識やしくみを学ぶ本は教養、手法・ノウハウが中心ならビジネス・実用、考え方・習慣が中心なら自己啓発。</p>
 
-        <label class="field-label">小分類<span class="opt">任意・複数選択可</span></label>
+        <div class="field-label-row genre-label-row">
+          <label class="field-label" id="minorFieldLabel">小分類<span class="opt">任意・複数選択可</span></label>
+          <button class="auto-pick-btn" id="genreAutoBtn" type="button" hidden>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+            おまかせで選ぶ
+          </button>
+        </div>
         <div class="chip-row" id="minorChipRow"></div>
+        <div class="genre-auto-note" id="genreAutoNote" hidden></div>
         <div class="tag-input-wrap" style="gap:8px;">
           <input type="text" id="newMinorInput" placeholder="新しい小分類を追加（例：ミステリー）" style="flex:1;" disabled>
         </div>
@@ -2017,6 +2161,24 @@
     const found = STYLES.find(s => s[0] === value);
     return found ? found[1] : '';
   }
+  /* ---------- 付箋の場所（本編／あとがき／解説） ----------
+     文庫の巻末にある解説やあとがきから書き留めた付箋を、振り返るときに
+     本編と見分けるための印。本編は '' のまま保存する（それまでの記録と同じ形）。 */
+  const MEMO_SECTIONS = [['', '本編'], ['afterword', 'あとがき'], ['commentary', '解説']];
+  function memoSectionLabel(value){
+    const found = MEMO_SECTIONS.find(s => s[0] === (value || ''));
+    return found ? found[1] : '本編';
+  }
+  function memoSectionOrder(value){
+    const i = MEMO_SECTIONS.findIndex(s => s[0] === (value || ''));
+    return i < 0 ? 0 : i;
+  }
+  // 「p.45」「解説 p.512」「解説」のような、付箋の場所の一言
+  function memoWhereText(m){
+    const sec = m && m.section ? memoSectionLabel(m.section) : '';
+    const page = m && m.page ? 'p.' + m.page : '';
+    return [sec, page].filter(Boolean).join(' ');
+  }
   // 「印象に残った人物」を書く欄を出す大分類か（既定は小説）
   function majorHasCharacters(majorId){
     const major = majorId ? findMajor(majorId) : null;
@@ -2206,7 +2368,8 @@
       memos: (Array.isArray(raw.memos) ? raw.memos : []).map(m => ({
         page: m.page || '', date: m.date || '', quote: m.quote || '',
         emotions: Array.isArray(m.emotions) ? m.emotions : [], insight: m.insight || '',
-        storyId: m.storyId || ''
+        storyId: m.storyId || '',
+        section: MEMO_SECTIONS.some(s => s[0] && s[0] === m.section) ? m.section : ''
       })),
       impressions: (Array.isArray(raw.impressions) && raw.impressions.length)
         ? raw.impressions
@@ -3096,7 +3259,7 @@
       };
       (b.memos || []).forEach((m, i) => {
         const si = m.storyId ? stories.findIndex(st => st.id === m.storyId) : -1;
-        const extra = { page: m.page ? String(m.page) : '', story: si >= 0 ? storyLabel(si, stories[si].title) : '' };
+        const extra = { page: m.page ? String(m.page) : '', section: m.section || '', story: si >= 0 ? storyLabel(si, stories[si].title) : '' };
         add('quote', 'quote', '引用', m.quote, 'memo:' + i, extra);
         add('insight', 'insight', '気づき', m.insight, 'memo:' + i, extra);
       });
@@ -3121,6 +3284,7 @@
     return (PASSAGE_RANK[a.kind] - PASSAGE_RANK[b.kind]) ||
       (sortTimeOf(b.book) - sortTimeOf(a.book)) ||
       (a.book.id < b.book.id ? -1 : a.book.id > b.book.id ? 1 : 0) ||
+      (memoSectionOrder(a.section) - memoSectionOrder(b.section)) ||
       ((isNaN(pa) ? Infinity : pa) - (isNaN(pb) ? Infinity : pb)) ||
       (focusOrder(a) - focusOrder(b));
   }
@@ -3173,7 +3337,7 @@
       '</span>';
   }
   function buildPhraseCard(p, index, aiPicked){
-    const meta = [p.page ? 'p.' + escapeHTML(p.page) : '', p.story ? escapeHTML(p.story) : ''].filter(Boolean).join(' ・ ');
+    const meta = [escapeHTML(memoWhereText(p)), p.story ? escapeHTML(p.story) : ''].filter(Boolean).join(' ・ ');
     return '<button type="button" class="phrase-card" data-phrase-index="' + index + '">' +
       miniCoverHTML(p.book) +
       '<span class="phrase-main">' +
@@ -3776,7 +3940,7 @@
         (memo.quote ? '<div class="recall-quote">' + escapeHTML(memo.quote).replace(/\n/g, '<br>') + '</div>' : '') +
         (memo.insight ? '<div class="recall-insight">' + escapeHTML(memo.insight).replace(/\n/g, '<br>') + '</div>' : '') +
         '<div class="recall-from">『' + escapeHTML((book.title || '').replace(/\n/g, ' ')) + '』' +
-          (memo.page ? ' p.' + escapeHTML(String(memo.page)) : '') + '</div>' +
+          (memoWhereText(memo) ? ' ' + escapeHTML(memoWhereText(memo)) : '') + '</div>' +
       '</div>' +
       '<div class="recall-actions"><button class="recall-again" type="button" id="recallAgainBtn">別のメモを引く</button></div>' +
       '</div>';
@@ -3881,18 +4045,57 @@
     }
     const inMajor = target.filter(b => b.majorCategory === statsGenreMajor);
     const counts = {};
+    const noneLabel = isNovelMajor(findMajor(statsGenreMajor)) ? 'ジャンル未設定' : '小分類なし';
     inMajor.forEach(b => {
       const labels = minorLabelsOf(b);
-      (labels.length ? labels : ['小分類なし']).forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+      (labels.length ? labels : [noneLabel]).forEach(l => { counts[l] = (counts[l] || 0) + 1; });
     });
     const entries = Object.keys(counts).map(name => ({ name: name, count: counts[name] }))
-      .sort((a, b) => (a.name === '小分類なし') - (b.name === '小分類なし') || b.count - a.count || a.name.localeCompare(b.name, 'ja'));
+      .sort((a, b) => (a.name === noneLabel) - (b.name === noneLabel) || b.count - a.count || a.name.localeCompare(b.name, 'ja'));
     const tabs = '<div class="stats-chip-row">' + majors.map(m =>
       '<span class="filter-chip' + (m.id === statsGenreMajor ? ' active' : '') + '" data-genre-major="' + escapeHTML(m.id) + '">' +
         escapeHTML(m.label) + '</span>'
     ).join('') + '</div>';
+    // ジャンルが空の小説があれば、ここからまとめておまかせで付けられる（期間に関係なく本棚全体で数える）
+    let bulkHTML = '';
+    if(isNovelMajor(findMajor(statsGenreMajor))){
+      const empty = genrelessNovels();
+      if(empty.length){
+        bulkHTML = '<div class="genre-bulk"><span>本棚に、ジャンル未設定の小説が <b>' + empty.length + '冊</b></span>' +
+          '<button class="auto-pick-btn" type="button" id="genreBulkBtn"' + (genreBulkRunning ? ' disabled' : '') + '>' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>' +
+          (genreBulkRunning ? '調べています…' : 'おまかせで付ける') + '</button></div>';
+      }
+    }
     return buildDonutCard(label, entries, inMajor.length + '冊', '', 6, tabs,
-      '<p class="stat-hint">小分類を複数付けた本は、それぞれのジャンルに数えています。</p>');
+      bulkHTML + '<p class="stat-hint">小分類を複数付けた本は、それぞれのジャンルに数えています。</p>');
+  }
+  function genrelessNovels(){
+    return books.filter(b => isNovelMajor(findMajor(b.majorCategory)) && !minorLabelsOf(b).length);
+  }
+  // 1冊ずつ順に調べる（Wikipedia などへ一度にたくさん問い合わせない）
+  let genreBulkRunning = false;
+  async function runGenreBulk(){
+    if(genreBulkRunning) return;
+    const list = genrelessNovels();
+    if(!list.length) return;
+    genreBulkRunning = true;
+    let done = 0, filled = 0;
+    const setLabel = text => {
+      const btn = document.getElementById('genreBulkBtn');
+      if(btn){ btn.disabled = true; btn.innerHTML = '<span class="ai-spinner"></span>' + text; }
+    };
+    for(const b of list){
+      setLabel((done + 1) + ' / ' + list.length + ' 冊目…');
+      try{ if((await autoGenreForSavedBook(b)).ok) filled++; }catch(e){ console.warn('ジャンルの推定に失敗しました', e); }
+      done++;
+    }
+    genreBulkRunning = false;
+    if(document.getElementById('screenStats').classList.contains('active')) renderStats();
+    const missed = list.length - filled;
+    showToast(filled
+      ? filled + '冊にジャンルを付けました' + (missed ? '（' + missed + '冊は手がかりが見つからず、そのまま）' : '')
+      : (navigator.onLine === false ? 'オフラインなので調べられませんでした' : '手がかりが見つからず、ジャンルを付けられませんでした'));
   }
   // ジャンルごとの平均評価（評価を付けた本だけ）。好きなジャンルが見えるように高い順に並べる
   function buildGenreRatingCard(target){
@@ -4036,6 +4239,8 @@
         renderStats();
       });
     });
+    const genreBulkBtn = body.querySelector('#genreBulkBtn');
+    if(genreBulkBtn) genreBulkBtn.addEventListener('click', runGenreBulk);
 
     body.querySelectorAll('.stat-goal-input').forEach(input => {
       input.addEventListener('change', () => {
@@ -4066,6 +4271,9 @@
     }
     if(memoSortOrder === 'page' || memoSortOrder === 'story'){
       list.sort((a, b) => {
+        // 本の並びどおり、本編 → あとがき → 解説 の順に置く
+        const sa = memoSectionOrder(a.m.section), sb = memoSectionOrder(b.m.section);
+        if(sa !== sb) return sa - sb;
         const pa = parseInt(a.m.page, 10);
         const pb = parseInt(b.m.page, 10);
         const va = isNaN(pa) ? Infinity : pa;
@@ -4076,47 +4284,75 @@
     }
     return list.map(x => x.m);
   }
+  // 本編のあとに、あとがき・解説の付箋を章見出しで区切って並べる（巻末の付箋がある本だけ）
+  function buildSectionedMemoHTML(memos, cardOf){
+    if(!memos.some(m => m.section)) return memos.map(cardOf).join('');
+    return MEMO_SECTIONS.map(([value, label]) => {
+      const items = memos.filter(m => (m.section || '') === value);
+      if(!items.length) return '';
+      return '<div class="memo-section-heading' + (value ? ' extra' : '') + '">' + escapeHTML(label) +
+        '<span class="n">' + items.length + '</span></div>' + items.map(cardOf).join('');
+    }).join('');
+  }
   function storyLabel(index, title){
     return '第' + (index + 1) + '話' + (title ? ' ' + title : '');
   }
-  function buildMemoToolbarHTML(hasStories){
+  // 見出し「付箋メモ 4」と並び順の切り替えを1行に、感情タグの絞り込みをその下の1行に
+  function buildMemoToolbarHTML(hasStories, shown, total){
     const sortKeys = (hasStories ? [['story','話の順']] : []).concat([['page','ページ順'], ['written','書いた順']]);
     const sortHTML = sortKeys.map(([key, label]) =>
-      '<span class="filter-chip' + (memoSortOrder === key ? ' active' : '') + '" data-sort="' + key + '">' + label + '</span>'
+      '<button type="button" class="seg-btn' + (memoSortOrder === key ? ' active' : '') + '" data-sort="' + key + '">' + label + '</button>'
     ).join('');
     const emoHTML = emoOptions.map(e =>
       '<span class="emo-chip' + (memoEmotionFilter.has(e) ? ' active' : '') + '" data-emo-filter="' + escapeHTML(e) + '">' + escapeHTML(e) + '</span>'
     ).join('');
+    const count = shown === total ? String(total) : shown + ' / ' + total;
     return (
       '<div class="memo-toolbar">' +
-        '<div class="memo-toolbar-row">' + sortHTML + '</div>' +
-        '<div class="memo-toolbar-row">' + emoHTML + '</div>' +
+        '<div class="memo-head">' +
+          '<div class="section-label"><span class="txt">付箋メモ</span><span class="sub">' + count + '</span></div>' +
+          '<div class="seg" role="group" aria-label="並び順">' + sortHTML + '</div>' +
+        '</div>' +
+        '<div class="emo-filter-row">' + emoHTML + '</div>' +
       '</div>'
     );
   }
   // 話の順のときは見出しで分けるので、各カードに話の名前は出さない
   function buildGroupedMemoHTML(memos, stories, allMemos){
     const validIds = new Set(stories.map(st => st.id));
-    const groups = stories.map((st, i) => ({ label: storyLabel(i, st.title), items: memos.filter(m => m.storyId === st.id) }));
-    groups.push({ label: '話の指定なし', items: memos.filter(m => !validIds.has(m.storyId)) });
-    return groups.filter(g => g.items.length).map(g =>
+    // 解説・あとがきの付箋は、どの話かより「巻末」であることを優先して最後にまとめる
+    const body = memos.filter(m => !m.section);
+    const groups = stories.map((st, i) => ({ label: storyLabel(i, st.title), items: body.filter(m => m.storyId === st.id) }));
+    groups.push({ label: '話の指定なし', items: body.filter(m => !validIds.has(m.storyId)) });
+    const html = groups.filter(g => g.items.length).map(g =>
       '<div class="memo-group-heading">' + escapeHTML(g.label) + '</div>' +
       g.items.map(m => buildDetailMemoCard(m, '', allMemos.indexOf(m))).join('')
     ).join('');
+    return html + MEMO_SECTIONS.filter(s => s[0]).map(([value, label]) => {
+      const items = memos.filter(m => m.section === value);
+      if(!items.length) return '';
+      return '<div class="memo-section-heading extra">' + escapeHTML(label) + '<span class="n">' + items.length + '</span></div>' +
+        items.map(m => buildDetailMemoCard(m, '', allMemos.indexOf(m))).join('');
+    }).join('');
   }
   // index は b.memos の中の位置。フレーズ検索から飛んできたときの目印(data-find-key)にする
   function buildDetailMemoCard(memo, storyText, index){
     const emosHTML = (memo.emotions && memo.emotions.length)
       ? memo.emotions.map(e => '<div class="emo-chip active" style="cursor:default;">' + escapeHTML(e) + '</div>').join('')
       : '<span class="no-emo">タグなし</span>';
-    const dateHTML = memo.date ? '<span class="memo-date-badge">' + escapeHTML(formatDate(memo.date)) + '</span>' : '';
+    const dateHTML = memo.date ? '<span class="memo-date-badge">' + escapeHTML(shortDateText(memo.date)) + '</span>' : '';
     const insightHTML = memo.insight
       ? '<div class="memo-insight-text memo-insight-compact">' + findTextHTML(memo.insight) + '</div>'
       : '';
+    // 巻末の付箋は「解説 p.512」と黄土の札にして、本編の付箋と見分けられるようにする
+    const whereHTML = memo.section
+      ? '<div class="page-field-display extra' + (memo.page ? '' : ' only') + '" style="margin:0;"><b>' + escapeHTML(memoSectionLabel(memo.section)) + '</b>' +
+          (memo.page ? 'p.' + escapeHTML(String(memo.page)) : '') + '</div>'
+      : '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>';
     return (
-      '<div class="memo-card compact" data-find-key="memo:' + index + '">' +
+      '<div class="memo-card compact' + (memo.section ? ' sec-extra' : '') + '" data-find-key="memo:' + index + '">' +
         '<div class="memo-top-compact">' +
-          '<div class="page-field-display" style="margin:0;">p.' + escapeHTML(String(memo.page || '—')) + '</div>' +
+          whereHTML +
           dateHTML +
         '</div>' +
         (storyText ? '<div class="memo-story-tag">' + escapeHTML(storyText) + '</div>' : '') +
@@ -4126,31 +4362,78 @@
       '</div>'
     );
   }
+  /* ---------- 詳細：本の情報（ジャンル・判型と書き方・読んだ期間） ---------- */
+  function specDateText(str){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str || '');
+    return m ? m[1] + '.' + parseInt(m[2], 10) + '.' + parseInt(m[3], 10) : '';
+  }
+  function buildSpecRows(b){
+    const row = (key, valueHTML) => '<div class="spec-row"><div class="spec-k">' + key + '</div><div class="spec-v">' + valueHTML + '</div></div>';
+    let rows = '';
+    const major = b.majorCategory ? findMajor(b.majorCategory) : null;
+    if(major){
+      const minors = (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean);
+      const novel = isNovelMajor(major);
+      let value = '<span class="spec-major">' + escapeHTML(major.label) + '</span>';
+      if(minors.length){
+        value += minors.map(m => '<span class="spec-genre">' + escapeHTML(m.label) + '</span>').join('');
+      } else if(novel){
+        // ジャンルが空の小説は、ここからおまかせで付けられる
+        value += '<span class="spec-empty">ジャンル未設定</span>' +
+          '<button class="auto-pick-btn spec-auto" type="button" data-genre-auto="' + escapeHTML(b.id) + '">' +
+          '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>' +
+          'おまかせで付ける</button>';
+      }
+      rows += row(novel ? 'ジャンル' : '分類', '<div class="spec-tags">' + value + '</div>');
+    }
+    const shape = [formatLabel(b.format), styleLabel(b.style)].filter(Boolean);
+    if(shape.length) rows += row('判型・書き方', escapeHTML(shape.join(' ・ ')));
+    // 読んだ期間：読了は「9.1 → 9.20（20日間）」、読書中は「9.1 から ・ 12日目」
+    if(b.startDate || b.endDate){
+      const days = (b.startDate && b.endDate && b.endDate >= b.startDate)
+        ? Math.round((dateToTime(b.endDate) - dateToTime(b.startDate)) / 86400000) + 1 : 0;
+      let value;
+      if(b.status === 'done' && b.endDate){
+        // 同じ年に読み終えたなら、終わりの日付の年は省く（2026.9.1 → 9.20）
+        const endText = (b.startDate && b.startDate.slice(0, 4) === b.endDate.slice(0, 4))
+          ? specDateText(b.endDate).replace(/^\d{4}\./, '') : specDateText(b.endDate);
+        value = (b.startDate ? specDateText(b.startDate) + '<span class="spec-arrow">→</span>' : '') + endText +
+          (days ? '<span class="spec-note">' + days + '日間</span>' : '');
+      } else if(b.startDate){
+        const now = Math.max(1, Math.round((dateToTime(todayStr()) - dateToTime(b.startDate)) / 86400000) + 1);
+        value = specDateText(b.startDate) + ' から' +
+          (b.status === 'reading' ? '<span class="spec-note">' + now + '日目</span>' : b.status === 'stay' ? '<span class="spec-note">ひと休み中</span>' : '');
+      } else {
+        value = '〜 ' + specDateText(b.endDate);
+      }
+      rows += row(b.status === 'done' ? '読んだ期間' : '読み始め', value);
+    }
+    return rows;
+  }
+  // ジャンルが空の小説に、詳細画面からおまかせでジャンルを付ける
+  async function autoGenreForSavedBook(b){
+    const res = await estimateNovelGenres({ title: b.title, author: b.author, publisher: b.publisher, excludeId: b.id });
+    const major = findMajor(b.majorCategory);
+    if(!res.labels.length || !isNovelMajor(major) || (b.minorCategories || []).length) return { ok: false, res };
+    const ids = [];
+    res.labels.forEach(label => {
+      const r = ensureMinor(major, label);
+      if(r.added){ saveCategories(); cloudSaveSettings(); }
+      if(!ids.includes(r.minor.id)) ids.push(r.minor.id);
+    });
+    b.minorCategories = ids.slice(0, 3);
+    if(res.style && !b.style) b.style = res.style;
+    saveBooks();
+    cloudSetBook(b);
+    return { ok: true, res };
+  }
   function renderDetailBody(b){
     const el = document.getElementById('detailBody');
     let html = '';
 
-    const detailMajor = b.majorCategory ? findMajor(b.majorCategory) : null;
-    if(detailMajor){
-      const minors = (b.minorCategories || []).map(id => findMinor(b.majorCategory, id)).filter(Boolean);
-      html += '<div class="info-card"><div class="ic-label">大分類・小分類</div><div class="chip-row" style="margin:0;">' +
-        '<span class="chip" style="padding:6px 14px;">' + escapeHTML(detailMajor.label) + '</span>' +
-        minors.map(m => '<span class="chip" style="padding:6px 14px;background:var(--accent-tint);border-color:var(--accent-tint);color:var(--accent-deep);">' + escapeHTML(m.label) + '</span>').join('') +
-        '</div></div>';
-    }
-    // 判型（本の形）と書き方（中身の組み立て）は別々に並べる
-    if(b.format || b.style){
-      html += '<div class="info-card"><div class="date-row">' +
-        '<div class="d-item"><div class="d-label">判型</div><div>' + escapeHTML(formatLabel(b.format) || '—') + '</div></div>' +
-        '<div class="d-item"><div class="d-label">書き方</div><div>' + escapeHTML(styleLabel(b.style) || '—') + '</div></div>' +
-        '</div></div>';
-    }
-    if(b.startDate || b.endDate){
-      html += '<div class="info-card"><div class="ic-label">日付</div><div class="date-row">' +
-        '<div class="d-item"><div class="d-label">開始</div><div>' + formatDate(b.startDate) + '</div></div>' +
-        '<div class="d-item"><div class="d-label">終了</div><div>' + formatDate(b.endDate) + '</div></div>' +
-        '</div></div>';
-    }
+    // 分類・判型と書き方・読んだ期間は、図書カードのように1枚にまとめて見せる
+    const specRows = buildSpecRows(b);
+    if(specRows) html += '<div class="info-card spec-card">' + specRows + '</div>';
     if(b.kikkake){
       html += '<div class="info-card" data-find-key="kikkake"><div class="ic-label">きっかけ・期待</div><div class="ic-text">' +
         findTextHTML(b.kikkake) + '</div></div>';
@@ -4188,13 +4471,15 @@
         return i >= 0 ? storyLabel(i, stories[i].title) : '';
       };
       let gridHTML = '';
+      const cardOf = m => buildDetailMemoCard(m, storyNameOf(m), b.memos.indexOf(m));
       if(memoSortOrder === 'story' && stories.length){
         gridHTML = buildGroupedMemoHTML(visibleMemos, stories, b.memos);
+      } else if(memoSortOrder === 'page'){
+        gridHTML = buildSectionedMemoHTML(visibleMemos, cardOf);
       } else {
-        gridHTML = visibleMemos.map(m => buildDetailMemoCard(m, storyNameOf(m), b.memos.indexOf(m))).join('');
+        gridHTML = visibleMemos.map(cardOf).join('');
       }
-      html += '<div class="section-label" style="margin:4px 2px 10px;"><span class="txt">付箋メモ</span></div>' +
-        buildMemoToolbarHTML(stories.length > 0) +
+      html += buildMemoToolbarHTML(stories.length > 0, visibleMemos.length, b.memos.length) +
         (visibleMemos.length
           ? '<div class="memo-grid">' + gridHTML + '</div>'
           : '<p class="field-note" style="margin:0 2px 18px;">選択した感情タグに一致するメモはありません。</p>');
@@ -4237,6 +4522,19 @@
     }
     el.innerHTML = html;
 
+    const genreAutoEl = el.querySelector('[data-genre-auto]');
+    if(genreAutoEl){
+      genreAutoEl.addEventListener('click', async () => {
+        genreAutoEl.disabled = true;
+        genreAutoEl.innerHTML = '<span class="ai-spinner"></span>調べています…';
+        let r = { ok: false };
+        try{ r = await autoGenreForSavedBook(b); }catch(e){ console.warn('ジャンルの推定に失敗しました', e); }
+        if(currentDetailId === b.id) renderDetailBody(b);
+        showToast(r.ok
+          ? '「' + minorLabelsOf(b).join('・') + '」を付けました。違っていたら編集で直せます'
+          : (navigator.onLine === false ? 'オフラインなので調べられませんでした' : '手がかりが見つからず、ジャンルを付けられませんでした。編集画面で選べます'));
+      });
+    }
     const connCardEl = el.querySelector('.conn-card[data-conn-id]');
     if(connCardEl){
       connCardEl.addEventListener('click', () => openDetail(connCardEl.dataset.connId));
@@ -4407,16 +4705,119 @@
         if(selectedStyle && !allowedStyles(selectedMajorId).some(s => s[0] === selectedStyle)) selectedStyle = null;
         renderMajorChips();
         renderMinorChips();
+        // 小説にしたら、題名からジャンルを調べて選んでおく
+        if(isNovelMajor(findMajor(selectedMajorId))) autoPickNovelGenres('major');
       });
       row.appendChild(chip);
     });
   }
+
+  /* ---------- 小説のジャンルを自動で選ぶ（フォーム） ----------
+     いつ動くか
+       ・自動入力（バーコード・題名検索）で小説と分かったとき（'lookup'）
+       ・大分類で「小説」を選んだとき、題名を入れ終えたとき（ジャンルが空なら。'major' / 'title'）
+       ・「おまかせで選ぶ」を押したとき（今の選択を入れ替える。'button'）
+     調べている間に自分でジャンルを選んだ・大分類を変えたときは、その選択を優先して何もしない。 */
+  let genreAutoToken = 0;
+  function hideGenreNote(){
+    const el = document.getElementById('genreAutoNote');
+    el.hidden = true;
+    el.innerHTML = '';
+  }
+  function showGenreNote(kind, html){
+    const el = document.getElementById('genreAutoNote');
+    const icon = kind === 'loading' ? '<span class="ai-spinner"></span>'
+      : kind === 'ok' ? '<svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/></svg>'
+      : '';
+    el.className = 'genre-auto-note' + (kind === 'error' ? ' error' : '');
+    el.innerHTML = icon + '<span>' + html + '</span>';
+    el.hidden = false;
+  }
+  function resetGenreAuto(){
+    genreAutoToken++;
+    hideGenreNote();
+    const btn = document.getElementById('genreAutoBtn');
+    if(btn) btn.disabled = false;
+  }
+  async function autoPickNovelGenres(reason, extra){
+    const major = selectedMajorId ? findMajor(selectedMajorId) : null;
+    if(!isNovelMajor(major)) return;
+    const title = document.getElementById('titleInput').value.replace(/\s*\n\s*/g, '').trim();
+    if(!title){
+      if(reason === 'button') showGenreNote('error', '先にタイトルを入れると、ジャンルを調べられます。');
+      return;
+    }
+    // 自分で選んだジャンルがあるときは、自動では触らない（「おまかせ」と自動入力のときだけ）
+    if((reason === 'major' || reason === 'title') && selectedMinorIds.length) return;
+    const token = ++genreAutoToken;
+    const formSession = lookupToken;
+    const before = selectedMinorIds.join(',');
+    const btn = document.getElementById('genreAutoBtn');
+    btn.disabled = true;
+    showGenreNote('loading', '「' + escapeHTML(title) + '」のジャンルを調べています…');
+    let res;
+    try{
+      res = await estimateNovelGenres(Object.assign({
+        title,
+        author: document.getElementById('authorInput').value,
+        publisher: document.getElementById('publisherInput').value,
+        excludeId: editingBookId
+      }, extra || {}));
+    }catch(e){
+      console.warn('ジャンルの推定に失敗しました', e);
+      res = { labels: [], style: null, via: [] };
+    }
+    if(token !== genreAutoToken || formSession !== lookupToken || !formIsOpen()) return;
+    btn.disabled = false;
+    const nowMajor = selectedMajorId ? findMajor(selectedMajorId) : null;
+    if(!isNovelMajor(nowMajor) || selectedMinorIds.join(',') !== before){ hideGenreNote(); return; }
+    if(!res.labels.length){
+      showGenreNote('error', navigator.onLine === false
+        ? 'オフラインなので調べられませんでした。当てはまるジャンルをタップしてください。'
+        : '手がかりが見つからず、ジャンルを選べませんでした。当てはまるものをタップしてください。');
+      return;
+    }
+    // 自動入力のときは、書誌の分類から先に入れた「海外文学」などを残して足す
+    const keep = reason === 'lookup' ? selectedMinorIds.slice() : [];
+    const ids = keep.slice();
+    res.labels.forEach(label => {
+      if(ids.length >= 3) return;
+      const r = ensureMinor(nowMajor, label);
+      if(r.added){ saveCategories(); cloudSaveSettings(); }
+      if(!ids.includes(r.minor.id)) ids.push(r.minor.id);
+    });
+    const styleWasAuto = autoFilled.category !== null && autoFilled.category === categoryKeyNow();
+    selectedMinorIds = ids;
+    // 書き方は、空か自動で入れたものだけ、分かったものに入れ替える（短編集の各話欄もこれで出る）
+    if(res.style && (!selectedStyle || styleWasAuto)) selectedStyle = res.style;
+    renderMinorChips();
+    if(styleWasAuto) autoFilled.category = categoryKeyNow();
+    const via = res.via.includes('AI') ? 'AI（Gemini）の判断で' : res.via.length ? res.via.join('・') + 'から' : '';
+    showGenreNote('ok', via + '<b>' + ids.map(id => escapeHTML((findMinor(nowMajor.id, id) || {}).label || '')).join('・') + '</b>を選びました。' +
+      (res.style ? '書き方は' + escapeHTML(styleLabel(res.style)) + '。' : '') + '違っていたらタップで外せます。');
+    scheduleAutosave();
+  }
+  function categoryKeyNow(){
+    return [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
+  }
+  document.getElementById('genreAutoBtn').addEventListener('click', () => autoPickNovelGenres('button'));
+  // 題名を入れ終えたとき（小説を先に選んでいた場合）
+  document.getElementById('titleInput').addEventListener('change', () => {
+    if(isNovelMajor(findMajor(selectedMajorId)) && !selectedMinorIds.length) autoPickNovelGenres('title');
+  });
   function renderMinorChips(){
     const row = document.getElementById('minorChipRow');
     const input = document.getElementById('newMinorInput');
     const note = document.getElementById('minorFieldNote');
     row.innerHTML = '';
     const major = selectedMajorId ? findMajor(selectedMajorId) : null;
+    // 小説の小分類は「ジャンル」と呼び、おまかせで選べるようにする
+    const novel = isNovelMajor(major);
+    document.getElementById('minorFieldLabel').innerHTML = novel
+      ? 'ジャンル<span class="opt">小分類・複数選択可</span>'
+      : '小分類<span class="opt">任意・複数選択可</span>';
+    document.getElementById('genreAutoBtn').hidden = !novel;
+    if(!novel) hideGenreNote();
     if(!major){
       input.disabled = true;
       note.textContent = '先に大分類を選択すると、その中の小分類を追加・選択できます。';
@@ -4426,8 +4827,8 @@
     }
     input.disabled = false;
     // 小説はジャンルを複数付けられる。それ以外の本は「1冊1ジャンル」で、いちばん中心のテーマを1つ選ぶ
-    const multi = isNovelMajor(major);
-    note.textContent = (multi ? '複数選択できます。' : '1冊に1つ、いちばん中心のテーマを選びます。') + '候補になければ入力してEnterで新規追加できます。';
+    const multi = novel;
+    note.textContent = (multi ? '複数選択できます（2〜3個がおすすめ）。' : '1冊に1つ、いちばん中心のテーマを選びます。') + '候補になければ入力してEnterで新規追加できます。';
     major.minors.forEach(minor => {
       const chip = document.createElement('div');
       chip.className = 'status-chip' + (selectedMinorIds.includes(minor.id) ? ' active' : '');
@@ -4603,14 +5004,56 @@
       chip.addEventListener('click', () => chip.classList.toggle('active'));
     });
   }
+  /* ---------- 付箋・感想の日付の札 ----------
+     日付欄そのままだと横幅を取り、付箋の場所（本編・解説とページ）と1行に並ばない。
+     見た目は「9/20」（今年でなければ「2025/9/20」）の札にして、透明な日付欄を重ねる。 */
+  function shortDateText(value){
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value || '');
+    if(!m) return '日付';
+    const md = parseInt(m[2], 10) + '/' + parseInt(m[3], 10);
+    return parseInt(m[1], 10) === new Date().getFullYear() ? md : m[1] + '/' + md;
+  }
+  function dateChipHTML(value){
+    return '<label class="memo-date-chip' + (value ? '' : ' empty') + '">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/></svg>' +
+      '<span class="memo-date-text">' + escapeHTML(shortDateText(value)) + '</span>' +
+      '<input type="date" class="memo-date-input" aria-label="日付" value="' + escapeHTML(value || '') + '">' +
+      '</label>';
+  }
+  function attachDateChip(card){
+    const chip = card.querySelector('.memo-date-chip');
+    if(!chip) return;
+    const input = chip.querySelector('.memo-date-input');
+    const sync = () => {
+      chip.querySelector('.memo-date-text').textContent = shortDateText(input.value);
+      chip.classList.toggle('empty', !input.value);
+    };
+    input.addEventListener('input', sync);
+    input.addEventListener('change', sync);
+    // パソコンのブラウザは日付欄の文字の上を押してもカレンダーが開かないので、こちらで開く
+    input.addEventListener('click', () => {
+      if(typeof input.showPicker === 'function'){ try{ input.showPicker(); }catch(e){ /* 開けなくても手で入力できる */ } }
+    });
+  }
   function buildFormMemoCard(memo, expanded){
     const card = document.createElement('div');
     card.className = 'memo-card' + (expanded ? ' expanded' : '');
     const selected = new Set((memo && memo.emotions) || []);
+    const section = (memo && memo.section) || '';
+    if(section) card.classList.add('sec-extra');
     card.innerHTML =
       '<div class="memo-top">' +
-        '<div class="page-field"><span>p.</span><input type="number" value="' + (memo && memo.page != null ? escapeHTML(String(memo.page)) : '') + '"></div>' +
-        '<input type="date" class="memo-date-input" value="' + escapeHTML(memo && memo.date || '') + '">' +
+        '<div class="page-field where-field' + (section ? ' extra' : '') + '">' +
+          '<span class="sec-pick"><span class="sec-text">' + escapeHTML(memoSectionLabel(section)) + '</span>' +
+            '<svg viewBox="0 0 10 6" aria-hidden="true"><path d="M1 1l4 4 4-4"/></svg>' +
+            '<select class="memo-section" aria-label="本編・あとがき・解説のどこか">' +
+              MEMO_SECTIONS.map(s => '<option value="' + s[0] + '"' + (s[0] === section ? ' selected' : '') + '>' + s[1] + '</option>').join('') +
+            '</select>' +
+          '</span>' +
+          '<span class="where-sep"></span>' +
+          '<span class="where-page"><span>p.</span><input type="number" inputmode="numeric" aria-label="ページ" value="' + (memo && memo.page != null ? escapeHTML(String(memo.page)) : '') + '"></span>' +
+        '</div>' +
+        dateChipHTML(memo && memo.date || '') +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
       '<div class="memo-story-banner"></div>' +
@@ -4642,6 +5085,15 @@
         '<textarea placeholder="なぜそのタグを選んだか、具体的な気づき">' + escapeHTML(memo && memo.insight || '') + '</textarea>' +
       '</div>';
     card.querySelector('.memo-del').addEventListener('click', () => card.remove());
+    attachDateChip(card);
+    // 解説・あとがきを選んだら、枠とカードの色で巻末の付箋だと分かるようにする
+    const sectionSelect = card.querySelector('.memo-section');
+    sectionSelect.addEventListener('change', () => {
+      const extra = !!sectionSelect.value;
+      card.querySelector('.sec-text').textContent = memoSectionLabel(sectionSelect.value);
+      card.classList.toggle('sec-extra', extra);
+      card.querySelector('.where-field').classList.toggle('extra', extra);
+    });
     const storyRow = card.querySelector('.memo-story-row');
     storyRow.addEventListener('click', e => {
       const chip = e.target.closest('.story-chip');
@@ -4685,17 +5137,20 @@
         const isQuote = btn.dataset.toDiary === 'quote';
         const target = isQuote ? quoteInput : card.querySelector('.memo-collapsible textarea');
         const page = card.querySelector('.page-field input').value.trim();
-        openInDiary(target.value, isQuote ? '引用' : '気づき', page);
+        openInDiary(target.value, isQuote ? '引用' : '気づき', page, sectionSelect.value);
       });
     });
     return card;
   }
   function addMemo(){
-    // 短編集は続けて同じ話の付箋を書くことが多いので、直前の付箋と同じ話を選んでおく
-    const prevRows = document.querySelectorAll('#memoList .memo-story-row');
-    const prevStoryId = prevRows.length ? prevRows[prevRows.length - 1].dataset.storyId : '';
+    // 短編集は続けて同じ話の付箋を書くことが多いので、直前の付箋と同じ話を選んでおく。
+    // 解説・あとがきも、読み進めると続けて書くことになるので、直前の付箋に合わせる
+    const prevCards = document.querySelectorAll('#memoList .memo-card');
+    const prev = prevCards.length ? prevCards[prevCards.length - 1] : null;
+    const prevStoryId = prev ? prev.querySelector('.memo-story-row').dataset.storyId : '';
+    const prevSection = prev ? prev.querySelector('.memo-section').value : '';
     // 高さは画面に入れてからでないと測れないので、追加してから測り直す
-    const card = buildFormMemoCard({ storyId: prevStoryId }, true);
+    const card = buildFormMemoCard({ storyId: prevStoryId, section: prevSection, date: todayStr() }, true);
     document.getElementById('memoList').appendChild(card);
     autoResizeTextarea(card.querySelector('.memo-quote-input'));
     refreshMemoStorySelects();
@@ -4706,6 +5161,7 @@
       // 削除した話を指したままの付箋は「話の指定なし」に戻す
       storyId: storyIds.has(card.querySelector('.memo-story-row').dataset.storyId) ? card.querySelector('.memo-story-row').dataset.storyId : '',
       page: card.querySelector('.page-field input').value,
+      section: card.querySelector('.memo-section').value,
       date: card.querySelector('.memo-date-input').value,
       quote: card.querySelector('.memo-quote-input').value.trim(),
       emotions: Array.from(card.querySelectorAll('.emo-chip.active')).map(e => e.textContent.trim()),
@@ -4737,8 +5193,13 @@
     for(let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
     return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
-  function openInDiary(text, fieldLabel, page){
+  function openInDiary(text, fieldLabel, page, section){
     const trimmed = (text || '').trim();
+    // 思考メモには「『書名』 p.512（解説）」の形で残る。ページが無ければ「解説の引用」にする
+    if(section){
+      if(page) page = page + '（' + memoSectionLabel(section) + '）';
+      else fieldLabel = memoSectionLabel(section) + 'の' + fieldLabel;
+    }
     if(!trimmed){ showToast('先に書いてから押してください'); return; }
     // 開いた先から戻ってこない場合に備えて、いまの編集内容を先に保存しておく
     autosaveNow();
@@ -4768,11 +5229,12 @@
     card.innerHTML =
       '<div class="memo-top">' +
         '<span class="impression-index-label"></span>' +
-        '<input type="date" class="memo-date-input" value="' + escapeHTML(impression && impression.date || '') + '">' +
+        dateChipHTML(impression && impression.date || '') +
         '<button class="memo-del" type="button">削除</button>' +
       '</div>' +
       '<textarea placeholder="読み終えて感じたこと">' + escapeHTML(impression && impression.text || '') + '</textarea>';
     card.querySelector('.memo-del').addEventListener('click', () => { card.remove(); renumberImpressions(); });
+    attachDateChip(card);
     makeFieldOpenFullscreen(card.querySelector('textarea'), () => card.querySelector('.impression-index-label').textContent || '感想');
     return card;
   }
@@ -6221,6 +6683,7 @@
   function resetLookupUI(){
     lookupToken++;
     autoFilled = { cover: null, category: null };
+    resetGenreAuto();
     const note = document.getElementById('lookupNote');
     note.textContent = LOOKUP_NOTE_DEFAULT;
     note.classList.remove('ok');
@@ -6277,10 +6740,17 @@
   /* ---------- 国立国会図書館サーチ ---------- */
   async function fetchNdl(params){
     const url = NDL_OPENSEARCH + '?' + new URLSearchParams(params).toString();
-    const res = await fetch(url);
-    if(!res.ok) throw new Error('NDL ' + res.status);
-    const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
-    return Array.from(xml.getElementsByTagName('item')).map(parseNdlItem);
+    // 返事が来ないまま「探しています…」で止まらないよう、12秒で打ち切って次の調べ先へ進む
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 12000);
+    try{
+      const res = await fetch(url, { signal: ctrl.signal });
+      if(!res.ok) throw new Error('NDL ' + res.status);
+      const xml = new DOMParser().parseFromString(await res.text(), 'application/xml');
+      return Array.from(xml.getElementsByTagName('item')).map(parseNdlItem);
+    }finally{
+      clearTimeout(timer);
+    }
   }
   function parseNdlItem(item){
     const all = (ns, tag) => Array.from(item.getElementsByTagNameNS(XML_NS[ns], tag));
@@ -6576,25 +7046,34 @@
   }
 
   /* ---------- 小説のジャンル ----------
-     書誌の分類(NDC 913.6 など)では「日本の小説」までしか分からないので、
-     ①同じ著者の登録済みの本に付けた小分類 ②紹介文・タイトルの言葉 から推定する。
-     違っていれば登録画面で外せる。 */
-  const NOVEL_GENRE_KEYWORDS = [
-    ['ミステリー', /ミステリ|推理|探偵|殺人|事件|謎解き|トリック|犯人|刑事|密室/],
-    ['サスペンス・犯罪', /サスペンス|犯罪|誘拐|逃亡|復讐|テロ|詐欺/],
-    ['社会派', /社会派|政治|選挙|格差|差別|貧困|報道|権力/],
-    ['恋愛', /恋愛|恋人|初恋|ラブストーリー|婚約|婚活/],
-    ['青春', /青春|高校生|中学生|部活|同級生|十代/],
-    ['家族', /家族|親子|兄弟|姉妹|夫婦/],
-    ['お仕事', /お仕事|職場|業界|新入社員/],
-    ['SF', /SF|宇宙|近未来|人工知能|ロボット|タイムトラベル|タイムリープ|クローン/],
-    ['ファンタジー', /ファンタジー|魔法|異世界|王国|ドラゴン|妖怪/],
-    ['歴史・時代', /時代小説|歴史小説|江戸|戦国|幕末|武士|侍/],
-    ['ホラー', /ホラー|怪談|幽霊|呪い|怪異/],
-    ['経済・金融', /経済小説|金融|銀行|ファンド|企業買収/],
-    ['純文学', /芥川賞|純文学/],
-    ['ヒューマンドラマ', /感動|人間ドラマ|生きる意味|再生の物語/]
+     書誌の分類(NDC 913.6 など)では「日本の小説」までしか分からない。そこで
+       ① Wikipedia の作品の記事に付いた分類（「日本の推理小説」「高等学校を舞台とした小説」
+          「家族を題材とした小説」など）と、記事の書き出し（「〜による日本の恋愛小説」）
+       ② 版元の内容紹介(openBD)・Google Books の説明
+       ③ 同じ著者の登録済みの本に付けたジャンル
+     からジャンルごとに点を付け、上位3つまでを選ぶ（estimateNovelGenres）。
+     Gemini のキーを登録した端末では、集めた材料ごと AI にも選んでもらい、そちらを優先する
+     （よく知られた作品なら中身を知っていることが多い）。
+     選ぶのはその端末の「小説」の小分類にあるものだけ。違っていれば登録画面で外せる。
+     [ジャンル, Wikipediaの分類・書き出しに出る言葉, 紹介文・題名に出る言葉] */
+  const NOVEL_GENRE_RULES = [
+    ['ミステリー', /推理|ミステリ|探偵|本格/, /ミステリ|推理|探偵|謎解き|トリック|密室|名探偵|真相/],
+    ['サスペンス・犯罪', /サスペンス|犯罪|誘拐|殺人|復讐|テロ|詐欺|警察/, /サスペンス|犯罪|誘拐|逃亡|復讐|テロ|詐欺|殺人|刑事|警察/],
+    ['社会派', /社会派|政治小説|政治ドラマ|選挙|冤罪|差別|貧困|格差|報道|いじめ|虐待/, /社会派|政治|選挙|格差|差別|貧困|報道|権力|冤罪|社会問題|虐待/],
+    ['恋愛', /恋愛/, /恋愛|恋人|初恋|恋に落ち|ラブストーリー|婚約|片思い|片想い|愛し合/],
+    ['青春', /青春|高等学校を舞台|中学校を舞台|学校を舞台|大学を舞台|部活|学園/, /青春|高校生|中学生|部活|同級生|十代|放課後|甲子園|クラスメイト|学園/],
+    ['家族', /家族|親子|母親|父親|兄弟|姉妹|夫婦|家庭/, /家族|親子|母親|父親|兄弟|姉妹|夫婦|家庭|祖母|祖父/],
+    ['お仕事', /職業|お仕事|企業を舞台|会社を舞台|病院を舞台|書店を舞台|出版社を舞台|業界/, /お仕事|職場|業界|新入社員|会社員|働く|書店員|編集者|看護師|スピーチライター/],
+    ['SF', /SF|サイエンス・フィクション|タイムトラベル|ロボット|人工知能|宇宙|ディストピア/, /SF|宇宙|近未来|人工知能|ロボット|タイムトラベル|タイムリープ|クローン|ディストピア/],
+    ['ファンタジー', /ファンタジー|魔法|異世界|妖怪|神話/, /ファンタジー|魔法|異世界|王国|ドラゴン|妖怪|魔女|精霊/],
+    ['歴史・時代', /時代小説|歴史小説|江戸時代|戦国時代|幕末|安土桃山|平安時代|鎌倉時代|室町時代/, /時代小説|歴史小説|江戸|戦国|幕末|武士|侍|藩士|将軍/],
+    ['ホラー', /ホラー|怪談|幽霊|怪異/, /ホラー|怪談|幽霊|呪い|怪異/],
+    ['経済・金融', /経済小説|企業小説|金融|銀行|株式/, /経済小説|金融|銀行|ファンド|企業買収|証券|融資/],
+    ['純文学', /芥川龍之介賞|純文学|文學界|文藝賞|群像新人|新潮新人賞|すばる文学賞|三島由紀夫賞|野間文芸新人賞/, /芥川賞|純文学/],
+    ['ヒューマンドラマ', /ヒューマンドラマ|ドラマ映画|ドラマ小説|障害を題材|病気を題材|死を題材|難病/, /人間ドラマ|感動|再生の物語|生きる意味|喪失と再生|余命/]
   ];
+  // Wikipedia の「アメリカ合衆国のSF小説」のような分類は、海外の作品
+  const OVERSEAS_NOVEL_CAT = /(アメリカ合衆国|イギリス|フランス|ドイツ|ロシア|中国|韓国|台湾|イタリア|スペイン|カナダ|オーストラリア|アイルランド|インド|コロンビア|アルゼンチン|チリ|メキシコ|スウェーデン|ノルウェー|デンマーク|フィンランド|チェコ|ポーランド|オーストリア|ベルギー|オランダ|イスラエル|トルコ|ナイジェリア|南アフリカ)の\S*小説/;
   // 同じ著者の登録済みの本から、いちばん多い大分類とその中の小分類
   function authorHistory(book){
     const names = (book.authors || []).map(normalizeAuthorName).filter(Boolean);
@@ -6608,11 +7087,6 @@
     });
     const minorLabels = Object.keys(minorCounts).sort((a, b) => minorCounts[b] - minorCounts[a]).slice(0, 2);
     return { majorLabel: topMajor ? topMajor.label : null, minorLabels: minorLabels };
-  }
-  function guessNovelGenres(book, history){
-    const text = [book.title, book.series, book.description].join('\n');
-    const fromText = NOVEL_GENRE_KEYWORDS.filter(k => k[1].test(text)).map(k => k[0]);
-    return history.minorLabels.concat(fromText);
   }
   // 紹介文（openBDの内容紹介 → Google Books の説明）。ジャンルと書き方の推定にだけ使う
   async function fetchDescription(isbn){
@@ -6629,6 +7103,228 @@
       })).catch(() => {})
     ]);
     return texts.join('\n');
+  }
+  function withTimeoutValue(promise, ms, fallback){
+    return Promise.race([promise, new Promise(resolve => setTimeout(() => resolve(fallback), ms))]);
+  }
+  // ISBN が分からない(手で入力した)本は、国会図書館で題名と著者から ISBN を探してから紹介文を取る
+  async function fetchDescriptionByTitle(title, author){
+    const params = { title: title, cnt: 10, mediatype: 'books' };
+    if(author) params.creator = author;
+    const items = await fetchNdl(params);
+    // 同じ著者の別の本（アンソロジーや翻訳版）を拾わないよう、題名が一致する日本の本だけを使う
+    const want = foldForMatch(title);
+    const same = items.filter(it => it.isbn && foldForMatch(it.title) === want);
+    const hit = same.find(it => it.paper && /^9784/.test(it.isbn)) || same.find(it => /^9784/.test(it.isbn)) || same[0];
+    return hit ? fetchDescription(hit.isbn) : '';
+  }
+
+  /* ---------- Wikipedia の作品の記事 ---------- */
+  const WIKI_API = 'https://ja.wikipedia.org/w/api.php';   // origin=* を付けるとキー無しでブラウザから呼べる
+  // 題名・著者の照合用に、空白・記号・中黒を除いて比べる
+  function foldForMatch(s){
+    return String(s || '').normalize('NFKC').replace(/[\s・=＝、,。.!！?？「」『』〜~\-‐－―ー：:]/g, '').toLowerCase();
+  }
+  // 「スター (小説)」のような曖昧さ回避の後ろの括弧は外して、題名が一致し、著者名が出てくる記事だけを使う
+  function pickWikiNovelPage(pages, title, author){
+    const want = foldForMatch(title);
+    const who = foldForMatch(author);
+    return pages.find(p => {
+      const cats = (p.categories || []).map(c => c.title).join(' ');
+      if(/曖昧さ回避/.test(cats)) return false;
+      if(foldForMatch(String(p.title).replace(/\s*[（(][^）)]*[）)]\s*$/, '')) !== want) return false;
+      const body = foldForMatch((p.extract || '') + ' ' + cats);
+      return who ? body.includes(who) : /小説/.test(p.extract || '');
+    }) || null;
+  }
+  async function fetchWikiNovel(title, author){
+    const common = {
+      action: 'query', format: 'json', origin: '*', redirects: '1',
+      prop: 'extracts|categories', exintro: '1', explaintext: '1', exlimit: 'max', cllimit: 'max', clshow: '!hidden'
+    };
+    const query = async params => {
+      const res = await fetch(WIKI_API + '?' + new URLSearchParams(Object.assign({}, common, params)).toString());
+      if(!res.ok) return [];
+      const data = await res.json();
+      return Object.values((data && data.query && data.query.pages) || {}).filter(p => !('missing' in p));
+    };
+    // ① 題名そのまま・「(小説)」付きの記事 ② 見つからなければ題名と著者で検索
+    let page = pickWikiNovelPage(await query({ titles: [title, title + ' (小説)'].join('|') }), title, author);
+    if(!page){
+      page = pickWikiNovelPage(await query({ generator: 'search', gsrsearch: title + ' ' + (author || '') + ' 小説', gsrlimit: '6' }), title, author);
+    }
+    if(!page) return null;
+    return {
+      title: page.title,
+      extract: page.extract || '',
+      categories: (page.categories || []).map(c => String(c.title).replace(/^Category:/, ''))
+    };
+  }
+
+  /* ---------- 点数でジャンルを選ぶ ---------- */
+  function scoreNovelGenres(src){
+    const scores = {};
+    const add = (genre, n) => { scores[genre] = (scores[genre] || 0) + n; };
+    const cats = src.wikiCats.join('\n');
+    // 記事の書き出し（「〜による日本の恋愛小説。」）にジャンルが書かれていることが多い。後ろの受賞歴などは見ない
+    const lead = src.wikiText.slice(0, 160);
+    NOVEL_GENRE_RULES.forEach(([genre, strong, loose]) => {
+      if(strong.test(cats)) add(genre, 3);
+      if(strong.test(lead)) add(genre, 2);
+      const hits = (src.desc.match(new RegExp(loose.source, 'g')) || []).length;
+      if(hits) add(genre, Math.min(2, hits));   // 紹介文は1回なら1点、何度も出てくれば2点
+      if(loose.test(src.title)) add(genre, 1);
+    });
+    src.history.forEach(label => add(label, 1.5));
+    if(src.overseas) add('海外文学', 3);
+    return Object.keys(scores).map(g => ({ genre: g, score: scores[g] })).sort((a, b) => b.score - a.score);
+  }
+  // 2点以上（Wikipedia の分類か、紹介文に何度も出てくる）を上から3つ。無ければいちばん上の1つだけ
+  function pickTopGenres(ranked){
+    const strong = ranked.filter(r => r.score >= 2).slice(0, 3);
+    if(strong.length) return strong.map(r => r.genre);
+    return ranked.length ? [ranked[0].genre] : [];
+  }
+  // 書き方：「連作短編集」「長編小説」のような言葉から
+  function novelStyleFromText(text){
+    if(/連作短編|連作短篇|短編集|短篇集|作品集|アンソロジー/.test(text)) return 'short';
+    if(/長編|長篇/.test(text)) return 'long';
+    if(/短編小説|短篇小説|中編小説|中篇小説/.test(text)) return 'single';
+    return null;
+  }
+  // 同じ著者の小説に付けたジャンル（この本自身は除く）
+  function sameAuthorNovelGenres(author, excludeId){
+    const name = normalizeAuthorName(author);
+    if(!name) return [];
+    const counts = {};
+    books.forEach(b => {
+      if(b.id === excludeId || !isNovelMajor(findMajor(b.majorCategory))) return;
+      if(!normalizeAuthorName(b.author).includes(name)) return;
+      minorLabelsOf(b).forEach(l => { counts[l] = (counts[l] || 0) + 1; });
+    });
+    return Object.keys(counts).sort((a, b) => counts[b] - counts[a]).slice(0, 2);
+  }
+
+  /* ---------- AI(Gemini)に選んでもらう ---------- */
+  const GENRE_AI_SYSTEM = 'You classify Japanese books for a personal reading log. Answer only with JSON.';
+  const GENRE_AI_SCHEMA = {
+    type: 'object',
+    properties: {
+      genres: { type: 'array', items: { type: 'string' } },
+      form: { type: 'string', enum: ['long', 'single', 'short', ''] }
+    },
+    required: ['genres']
+  };
+  function parseGenreAiResponse(data){
+    const cand = data && data.candidates && data.candidates[0];
+    if(!cand) return { ok: false, kind: (data && data.promptFeedback && data.promptFeedback.blockReason) ? 'blocked' : 'empty' };
+    const text = ((cand.content && cand.content.parts) || [])
+      .filter(p => p && typeof p.text === 'string' && !p.thought)
+      .map(p => p.text).join('');
+    let obj = null;
+    try{ obj = JSON.parse(text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')); }catch(e){ /* 下で扱う */ }
+    if(!obj || !Array.isArray(obj.genres)) return { ok: false, kind: 'badjson' };
+    return { ok: true, value: { genres: obj.genres.map(g => String(g).trim()).filter(Boolean), form: String(obj.form || '') } };
+  }
+  function askAiNovelGenres(ctx, allowed){
+    const prompt = [
+      'Pick the genres of this novel.',
+      'Title: ' + ctx.title,
+      'Author: ' + (ctx.author || '(unknown)'),
+      ctx.publisher ? 'Publisher: ' + ctx.publisher : '',
+      ctx.wiki ? 'Wikipedia summary: ' + ctx.wiki.extract.replace(/\s+/g, ' ').slice(0, 600) : '',
+      ctx.wiki && ctx.wiki.categories.length ? 'Wikipedia categories: ' + ctx.wiki.categories.join(' / ').slice(0, 700) : '',
+      ctx.desc ? 'Publisher description or table of contents: ' + ctx.desc.replace(/\s+/g, ' ').slice(0, 900) : '',
+      '',
+      'Allowed genres (copy these exact strings): ' + allowed.join(' / '),
+      'Return JSON {"genres": [...], "form": "..."}:',
+      '- genres: 1 to 3 allowed genres, the most central first. Judge by what the story is mainly about (e.g. 青春 for school or youth stories, 家族 for parent-child or family stories, お仕事 for stories centered on a job or workplace). Do not add a genre for a minor element.',
+      '- form: "long" for one novel-length story, "single" for one short story or novella, "short" for a collection of stories (including 連作短編集), "" if unsure.',
+      'If you do not know this book and the material above is too thin to judge, return an empty genres list.'
+    ].filter(Boolean).join('\n');
+    const job = {
+      cancelled: false, abort: null,
+      buildBody(level){
+        const body = {
+          systemInstruction: { parts: [{ text: GENRE_AI_SYSTEM }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024 }
+        };
+        if(level <= 1){
+          body.generationConfig.responseJsonSchema = GENRE_AI_SCHEMA;
+          body.safetySettings = OCR_SAFETY;
+        }
+        if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: 'LOW' };
+        return body;
+      },
+      parse: parseGenreAiResponse
+    };
+    // 返事が遅いときは待たずに、Wikipedia・紹介文からの推定で進める
+    const timer = new Promise(resolve => setTimeout(() => {
+      job.cancelled = true;
+      if(job.abort) job.abort();
+      resolve(null);
+    }, 20000));
+    return Promise.race([runOcr(job, null).catch(() => null), timer]);
+  }
+
+  /* ---------- まとめ：小説のジャンルと書き方を推定する ----------
+     info: { title, author, publisher, isbn, description, excludeId }
+     返り値: { labels: ['青春', '家族'], style: 'long'|'single'|'short'|null, via: ['Wikipedia', …] } */
+  async function estimateNovelGenres(info){
+    const title = String(info.title || '').replace(/\s*\n\s*/g, '').trim();
+    const novel = categories.find(isNovelMajor);
+    if(!title || !novel) return { labels: [], style: null, via: [] };
+    const author = String(info.author || '').split(/[、,，/]/)[0].trim();
+    const online = navigator.onLine !== false;
+    const [wiki, desc] = await Promise.all([
+      online ? withTimeoutValue(fetchWikiNovel(cleanTitle(title), author).catch(() => null), 6000, null) : null,
+      info.description != null ? info.description
+        : !online ? ''
+        : info.isbn ? withTimeoutValue(fetchDescription(info.isbn).catch(() => ''), 6000, '')
+        : withTimeoutValue(fetchDescriptionByTitle(cleanTitle(title), author).catch(() => ''), 6000, '')
+    ]);
+    const history = sameAuthorNovelGenres(author, info.excludeId);
+    const allowed = novel.minors.map(m => m.label);
+    const toAllowed = list => {
+      const out = [];
+      list.forEach(label => {
+        const m = findMinorByLabel(novel, label);
+        if(m && !out.includes(m.label)) out.push(m.label);
+      });
+      return out;
+    };
+    let labels = [], via = [], aiForm = '';
+    if(online && readOcrKey()){
+      refreshOcrModelsIfStale();
+      const res = await askAiNovelGenres({ title, author, publisher: info.publisher, wiki, desc }, allowed);
+      if(res){
+        labels = toAllowed(res.genres || []).slice(0, 3);
+        aiForm = res.form || '';
+        if(labels.length) via.push('AI');
+      }
+    }
+    const wikiCats = wiki ? wiki.categories : [];
+    if(!labels.length){
+      const ranked = scoreNovelGenres({
+        wikiCats, wikiText: wiki ? wiki.extract : '', desc: desc || '', title,
+        history, overseas: wikiCats.some(c => OVERSEAS_NOVEL_CAT.test(c))
+      });
+      labels = toAllowed(pickTopGenres(ranked)).slice(0, 3);
+      if(labels.length){
+        if(wiki) via.push('Wikipedia');
+        if(desc) via.push('内容紹介');
+        if(history.length && labels.some(l => history.includes(l))) via.push('同じ著者の本');
+      }
+    } else if(wikiCats.some(c => OVERSEAS_NOVEL_CAT.test(c)) && !labels.includes('海外文学') && labels.length < 3){
+      // 海外の作品かどうかは AI に聞かなくても Wikipedia の分類で確かに分かる
+      const m = findMinorByLabel(novel, '海外文学');
+      if(m) labels.push(m.label);
+    }
+    const style = (['long', 'single', 'short'].includes(aiForm) ? aiForm : null) ||
+      (wiki && novelStyleFromText(wiki.extract)) ||
+      novelStyleFromText([title, desc].join('\n')) || null;
+    return { labels, style, via, wikiTitle: wiki ? wiki.title : '' };
   }
 
   /* ---------- 表紙 ---------- */
@@ -6712,8 +7408,8 @@
       if(major){
         const labels = [];
         if(guess.minor) labels.push(guess.minor);
-        if(isNovelMajor(major)) guessNovelGenres(book, history).forEach(l => labels.push(l));
-        else history.minorLabels.forEach(l => { if(major.label === history.majorLabel && !guess.minor) labels.push(l); });
+        // 小説のジャンルは下の autoPickNovelGenres が Wikipedia・紹介文から調べて足す
+        if(!isNovelMajor(major)) history.minorLabels.forEach(l => { if(major.label === history.majorLabel && !guess.minor) labels.push(l); });
         labels.forEach(label => {
           if(minors.length >= (isNovelMajor(major) ? 3 : 1)) return;   // 小説以外は1冊1ジャンル
           // 小分類に無いジャンルは自動で追加する（違っていれば登録画面で外してもらう）
@@ -6731,7 +7427,12 @@
       renderMajorChips();
       renderMinorChips();
       autoFilled.category = categoryKey();
-      catText = [major && major.label, minors.map(m => m.label).join('・'), formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／');
+      // 小説のジャンルと書き方は、このあと調べてジャンル欄の下に知らせるので、ここには書かない
+      catText = isNovelMajor(major)
+        ? [major.label, formatLabel(selectedFormat)].filter(Boolean).join('／') + '（ジャンルは下で調べています）'
+        : [major && major.label, minors.map(m => m.label).join('・'), formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／');
+      // 小説なら、ジャンル（青春・家族など）を Wikipedia・紹介文から調べて、ジャンル欄に入れる
+      if(isNovelMajor(major)) autoPickNovelGenres('lookup', { isbn: book.isbn || '', description: book.description });
     }
     const msgParts = [];
     if(catText) msgParts.push('分類：' + catText + (addedMinorLabels.length ? '（小分類「' + addedMinorLabels.join('」「') + '」を新しく追加）' : ''));
