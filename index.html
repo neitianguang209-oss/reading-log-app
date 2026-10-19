@@ -309,7 +309,7 @@
   }
   .book-cover img{ width:100%; height:100%; object-fit:cover; }
   /* 表紙の左端に、背と表紙の境目の折り目(溝)をうっすら入れて本の厚みを出す */
-  .book-cover::before, .detail-cover-big::before, .cover-frame.has-image::before{
+  .book-cover::before, .detail-cover-big::before, .cover-frame.has-image::before, .sc-cover::before{
     content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
     background:linear-gradient(90deg,
       rgba(0,0,0,.20) 0, rgba(255,255,255,.16) 1.5px, rgba(0,0,0,.10) 4px,
@@ -518,6 +518,98 @@
   }
   .detail-cover-big img{ width:100%; height:100%; object-fit:cover; }
   .detail-cover-big .mono{ font-size:40px; inset:10px; }
+  /* 表紙は押すと大きく見られる。右下の小さな印で押せることを知らせる */
+  .detail-cover-big{ cursor:zoom-in; -webkit-tap-highlight-color:transparent; transition:transform .15s ease; }
+  .detail-cover-big:active{ transform:scale(.97); }
+  .cover-zoom-mark{
+    position:absolute; right:6px; bottom:6px; z-index:2; width:24px; height:24px; border-radius:50%;
+    background:rgba(30,27,24,.52); display:flex; align-items:center; justify-content:center; pointer-events:none;
+  }
+  .cover-zoom-mark svg{ width:13px; height:13px; fill:none; stroke:#FBF8F1; stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+
+  /* ---------- 表紙を大きく見せる画面 ----------
+     友だちに見せる前提なので、表紙が映えるよう暗い地に1冊だけ置く。
+     表紙を押すと文字を消して、写真だけを画面いっぱいにする。 */
+  .showcase{
+    position:absolute; inset:0; z-index:46; display:flex; flex-direction:column; color:var(--paper);
+    background:radial-gradient(130% 75% at 50% 16%, #4B4036 0%, #2B241E 52%, #191512 100%);
+    opacity:0; visibility:hidden; transition:opacity .25s ease, visibility 0s linear .25s;
+  }
+  .showcase.show{ opacity:1; visibility:visible; transition:opacity .25s ease; }
+  .sc-top{
+    flex:0 0 auto; display:flex; align-items:center; gap:10px;
+    padding:calc(10px + env(safe-area-inset-top)) var(--side) 4px;
+  }
+  .sc-hint{ flex:1; min-width:0; text-align:center; font-size:11.5px; color:rgba(251,248,241,.5); transition:opacity .2s ease; }
+  .sc-share{
+    flex:0 0 auto; height:40px; display:inline-flex; align-items:center; gap:6px; padding:0 15px 0 12px;
+    border:none; border-radius:var(--pill); background:rgba(251,248,241,.14); color:var(--paper);
+    font-family:inherit; font-size:13.5px; font-weight:600; cursor:pointer; transition:opacity .2s ease, background .15s ease;
+  }
+  .sc-share:active{ background:rgba(251,248,241,.24); }
+  .sc-share:disabled{ opacity:.6; }
+  .sc-share svg{ width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+  .sc-scroll{ flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; padding:0 var(--side) calc(32px + env(safe-area-inset-bottom)); }
+  .sc-stage{ display:flex; justify-content:center; align-items:flex-end; padding:14px 0 30px; }
+  .sc-cover{
+    position:relative; display:block; padding:0; border:none; background:#3A3129; cursor:zoom-in;
+    border-radius:2px 4px 4px 2px; overflow:hidden; -webkit-tap-highlight-color:transparent;
+    box-shadow:0 1px 2px rgba(0,0,0,.4), 0 14px 30px rgba(0,0,0,.42), 0 30px 60px rgba(0,0,0,.25);
+    animation:sc-rise .45s cubic-bezier(.2,.8,.2,1) both;
+  }
+  @keyframes sc-rise{ from{ transform:translateY(14px) scale(.96); opacity:0; } to{ transform:none; opacity:1; } }
+  /* 幅は画像の縦横比(--ar、読み込み後にJSで入れる)から決める。小さい画像でも同じ大きさに引き伸ばす */
+  .sc-cover{ --ar:.72; width:min(62vw, 240px, calc(46vh * var(--ar))); }
+  .sc-cover img{ display:block; width:100%; height:auto; }
+  .sc-cover.no-image{ width:min(56vw, 210px); aspect-ratio:128 / 176; }
+  .sc-cover.no-image .mono{ font-size:clamp(48px, 14vw, 72px); inset:14px; }
+  /* 写真だけ：文字と操作を消して、表紙を画面いっぱいに */
+  .showcase.photo-only{ background:#100E0C; }
+  .showcase.photo-only .sc-hint, .showcase.photo-only .sc-share{ opacity:0; pointer-events:none; }
+  .showcase.photo-only .sc-info{ display:none; }
+  .showcase.photo-only .sc-stage{ min-height:100%; align-items:center; padding:0; }
+  .showcase.photo-only .sc-cover{ cursor:zoom-out; border-radius:2px; width:min(100%, calc((100dvh - 120px) * var(--ar))); }
+  .showcase.photo-only .sc-cover.no-image{ width:min(84vw, 320px); }
+  .sc-info{ text-align:center; animation:sc-fade .5s ease .08s both; }
+  @keyframes sc-fade{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:none; } }
+  .sc-title{ font-family:var(--serif); font-size:24px; font-weight:600; line-height:1.45; letter-spacing:.04em; text-wrap:balance; }
+  .sc-author{ margin-top:7px; font-size:13.5px; color:rgba(251,248,241,.72); }
+  .sc-meta{ display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:8px 12px; margin-top:14px; }
+  .sc-meta .stars.mini .star, .sc-meta .stars.mini .star svg{ width:15px; height:15px; }
+  .sc-meta .star .fill{ fill:var(--ochre); stroke:var(--ochre); }
+  .sc-meta .star .base{ stroke:rgba(251,248,241,.35); }
+  .sc-meta .rating-label{ color:rgba(251,248,241,.85); font-size:13px; margin-left:4px; }
+  .sc-genre{ font-size:12px; padding:3px 10px; border-radius:var(--pill); border:1px solid rgba(251,248,241,.28); color:rgba(251,248,241,.85); }
+  .sc-recommend{
+    margin:26px auto 0; max-width:30em; padding:0 6px;
+    font-family:var(--serif); font-size:17px; line-height:1.85; letter-spacing:.02em; color:var(--paper);
+  }
+  .sc-recommend::before{ content:'“'; display:block; font-family:var(--latin); font-size:40px; line-height:.6; color:var(--ochre); margin-bottom:10px; }
+  .sc-recommend .by{ display:block; margin-top:8px; font-family:inherit; font-size:12px; letter-spacing:.08em; color:rgba(251,248,241,.5); }
+  .sc-synopsis{
+    margin:26px 0 0; padding:18px 18px 16px; text-align:left; border-radius:var(--radius);
+    background:rgba(251,248,241,.07); box-shadow:inset 0 0 0 1px rgba(251,248,241,.08);
+  }
+  .sc-label{ font-family:var(--serif); font-size:13px; font-weight:600; letter-spacing:.2em; color:var(--ochre); margin-bottom:8px; }
+  .sc-synopsis p{ margin:0; font-size:14.5px; line-height:1.95; color:rgba(251,248,241,.9); white-space:pre-wrap; }
+  .sc-src{ margin-top:10px; font-size:11px; color:rgba(251,248,241,.45); }
+  .sc-find{
+    display:inline-flex; align-items:center; gap:6px; margin-top:2px; padding:7px 14px; border-radius:var(--pill);
+    border:1px solid rgba(251,248,241,.3); background:transparent; color:var(--paper); font-family:inherit; font-size:13px; cursor:pointer;
+  }
+  .sc-find svg{ width:14px; height:14px; fill:var(--ochre); }
+  .sc-find .ai-spinner{ width:12px; height:12px; border-color:rgba(251,248,241,.3); border-top-color:var(--paper); }
+  .sc-read{ margin-top:22px; font-size:11.5px; letter-spacing:.06em; color:rgba(251,248,241,.42); }
+
+  .detail-recommend{ font-family:var(--serif); font-size:16px; padding-left:12px; border-left:2px solid var(--ochre); }
+  /* ---------- 詳細：あらすじ ---------- */
+  .synopsis-text{ font-size:14.5px; line-height:1.9; color:var(--ink); white-space:pre-wrap; }
+  .synopsis-text.clamp{ display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+  .synopsis-more{ margin-top:6px; padding:2px 0; border:none; background:none; color:var(--accent); font-family:inherit; font-size:13px; cursor:pointer; }
+  .synopsis-src{ margin-top:8px; font-size:11.5px; color:var(--ink-faint); }
+  .synopsis-empty{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--ink-faint); }
+  .synopsis-empty .auto-pick-btn{ margin-top:0; }
+  .synopsis-empty .ai-spinner{ width:12px; height:12px; border-width:2px; }
   /* 詳細でも、表紙は短い棚板の上に立てる */
   .detail-board{ width:188px; margin:0 auto; border-radius:2px; }
   .detail-title-block{ text-align:center; padding:16px var(--side) 0; }
@@ -639,6 +731,8 @@
   textarea{ resize:vertical; min-height:70px; transition:min-height .2s ease; }
   #kikkakeInput:focus{ min-height:160px; }
   #titleInput{ resize:none; min-height:0; overflow:hidden; font-family:var(--serif); font-weight:600; font-size:17px; letter-spacing:.02em; }
+  #synopsisInput{ resize:none; overflow:hidden; font-size:14px; line-height:1.85; }
+  #synopsisNote:empty{ display:none; }
   input:focus, textarea:focus{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-tint); }
   input:disabled{ background:var(--surface-alt); color:var(--ink-faint); cursor:not-allowed; }
   input.field-invalid, textarea.field-invalid{ border-color:var(--danger); box-shadow:0 0 0 3px rgba(168,71,58,.14); }
@@ -1585,6 +1679,16 @@
         <label class="field-label">書き方<span class="opt">任意</span></label>
         <div class="status-row" id="styleChipRow"></div>
         <p class="field-note">判型は本の形、書き方は中身の組み立てです。小説は長編・短編・短編集、それ以外の本は「一冊一テーマ」（一冊通して一つの話）・「単元ごと」（数ページで一つの項目）・「エッセイ」から選べます。短編集を選ぶと、感想の下に各話のメモ欄が出ます。</p>
+
+        <div class="field-label-row">
+          <label class="field-label">あらすじ<span class="opt">任意・人に見せるとき用</span></label>
+          <button class="auto-pick-btn" id="synopsisFindBtn" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>
+            自動で探す
+          </button>
+        </div>
+        <textarea id="synopsisInput" placeholder="どんな話か（バーコード・題名検索で登録すると自動で入ります）"></textarea>
+        <p class="field-note" id="synopsisNote"></p>
       </div>
 
       <hr class="divider">
@@ -1697,6 +1801,9 @@
           <span class="rating-label" id="ratingLabel">0.0</span>
         </div>
         <p class="rating-hint">星の左半分／右半分をタップして0.5刻みで評価。同じ位置を再タップすると取り消せます。</p>
+
+        <label class="field-label">おすすめのひとこと<span class="opt">表紙を大きく見せる画面と、共有する画像に出ます</span></label>
+        <textarea id="recommendInput" rows="2" placeholder="例：最後の一行で全部ひっくり返る。週末に一気読みしてほしい"></textarea>
 
         <label class="field-label">次にやりたいこと</label>
         <textarea id="nextActionInput" placeholder="読んで得た気づきをどう行動に移すか"></textarea>
@@ -1815,6 +1922,26 @@
   </div>
 
   <!-- 写真から引用を読み取る：なぞる画面 -->
+  <!-- 表紙を大きく見せる画面（詳細の表紙を押すと開く）。友だちに本を見せるとき用 -->
+  <div class="showcase" id="showcase" role="dialog" aria-modal="true" aria-label="表紙を大きく見る">
+    <div class="sc-top">
+      <button class="cap-icon-btn" id="scCloseBtn" type="button" aria-label="閉じる">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+      <span class="sc-hint" id="scHint">表紙をタップすると、写真だけを大きく</span>
+      <button class="sc-share" id="scShareBtn" type="button">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3.5M7.5 8L12 3.5 16.5 8"/><path d="M5 11.5v7.5a1.5 1.5 0 0 0 1.5 1.5h11a1.5 1.5 0 0 0 1.5-1.5v-7.5"/></svg>
+        共有
+      </button>
+    </div>
+    <div class="sc-scroll" id="scScroll">
+      <div class="sc-stage" id="scStage">
+        <button class="sc-cover" id="scCover" type="button" aria-label="写真だけを大きく表示"></button>
+      </div>
+      <div class="sc-info" id="scInfo"></div>
+    </div>
+  </div>
+
   <div class="capture-screen" id="captureScreen">
     <div class="cap-header">
       <button class="cap-icon-btn" id="capCloseBtn" type="button" aria-label="閉じる">
@@ -2376,6 +2503,12 @@
         : (raw.impression ? [{ date: '', text: raw.impression }] : []),
       rating: typeof raw.rating === 'number' ? raw.rating : 0,
       nextAction: raw.nextAction || '',
+      // 友だちに勧めるとき用：あらすじ（どこから取ったか）と、自分のひとこと。ISBN はあらすじを探し直すのに使う
+      synopsis: raw.synopsis || '',
+      synopsisSource: raw.synopsisSource || '',
+      recommend: raw.recommend || '',
+      isbn: raw.isbn || '',
+      coverAuto: raw.coverAuto === true,   // 表紙を自動入力で入れたか（自分で撮った写真なら false）
       cover: raw.cover || null,
       coverColorIndex: typeof raw.coverColorIndex === 'number' ? raw.coverColorIndex : (index % palette.length),
       majorCategory: raw.majorCategory || null,
@@ -2679,6 +2812,7 @@
       ocrSnapshotCards();   // 写真の読み取り中なら、終わったときに入れる先(本と付箋)を控えておく
     }
     if(name !== 'Form' && typeof closeQuoteCapture === 'function') closeQuoteCapture(true);
+    closeShowcase();   // 表紙を大きく見る画面は、画面を移るときに閉じる
     if(name !== 'List' && typeof exitSelectMode === 'function') exitSelectMode();
     document.querySelectorAll('.scrolled').forEach(el => el.classList.remove('scrolled'));
     document.querySelectorAll('.app-screen').forEach(el => el.classList.remove('active'));
@@ -2891,7 +3025,8 @@
     ['気づき', b => (b.memos || []).map(m => m.insight)],
     ['各話の感想', b => (b.stories || []).reduce((a, st) => a.concat([st.title, st.impression]), [])],
     ['人物メモ', b => (b.characters || []).reduce((a, c) => a.concat([c.name, c.profile, c.reason]), [])],
-    ['次にやりたいこと', b => [b.nextAction]]
+    ['次にやりたいこと', b => [b.nextAction]],
+    ['おすすめのひとこと', b => [b.recommend]]
   ];
   // 空白で区切った言葉は、それぞれが本のどこかに入っていれば一致とする
   function searchHit(b, terms){
@@ -3272,6 +3407,7 @@
       });
       add('kikkake', 'text', 'きっかけ・期待', b.kikkake, 'kikkake');
       add('next', 'text', '次にやりたいこと', b.nextAction, 'next');
+      add('next', 'text', 'おすすめのひとこと', b.recommend, 'recommend');
     });
     return out;
   }
@@ -4362,6 +4498,384 @@
       '</div>'
     );
   }
+  // 「おまかせ」「探す」ボタンの小さな星の印
+  const PICK_SPARKLE_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l1.6 4.4 4.4 1.6-4.4 1.6L12 15.5l-1.6-4.4L6 9.5l4.4-1.6z"/><path d="M18.5 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/></svg>';
+
+  /* ---------- 表紙を大きく見せる画面 ---------- */
+  let showcaseBookId = null;
+  function openShowcase(b){
+    showcaseBookId = b.id;
+    const sc = document.getElementById('showcase');
+    sc.classList.remove('photo-only');
+    renderShowcase(b);
+    document.getElementById('scScroll').scrollTop = 0;
+    sc.classList.add('show');
+    sc.setAttribute('aria-hidden', 'false');
+  }
+  function closeShowcase(){
+    const sc = document.getElementById('showcase');
+    if(!sc.classList.contains('show')) return false;
+    sc.classList.remove('show', 'photo-only');
+    sc.setAttribute('aria-hidden', 'true');
+    showcaseBookId = null;
+    return true;
+  }
+  function showcaseIsOpen(){
+    return document.getElementById('showcase').classList.contains('show');
+  }
+  function renderShowcase(b){
+    const cover = document.getElementById('scCover');
+    cover.className = 'sc-cover' + (b.cover ? '' : ' no-image');
+    cover.style.background = b.cover ? '' : palette[b.coverColorIndex % palette.length];
+    cover.style.removeProperty('--ar');
+    cover.innerHTML = b.cover
+      ? '<img src="' + b.cover + '" alt="">'
+      : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>';
+    const coverImgEl = cover.querySelector('img');
+    if(coverImgEl){
+      const setRatio = () => { if(coverImgEl.naturalWidth) cover.style.setProperty('--ar', (coverImgEl.naturalWidth / coverImgEl.naturalHeight).toFixed(4)); };
+      if(coverImgEl.complete) setRatio(); else coverImgEl.addEventListener('load', setRatio, { once: true });
+    }
+    upgradeShowcaseCover(b);
+    const genres = minorLabelsOf(b);
+    const major = b.majorCategory ? findMajor(b.majorCategory) : null;
+    const tags = genres.length ? genres : (major ? [major.label] : []);
+    const meta = (b.rating > 0 ? miniStarsHTML(b.rating) : '') +
+      tags.map(t => '<span class="sc-genre">' + escapeHTML(t) + '</span>').join('');
+    const authorLine = [b.author, b.publisher].filter(Boolean).join('　・　');
+    let html = '<div class="sc-title">' + escapeHTML(b.title || '').replace(/\n/g, '<br>') + '</div>' +
+      (authorLine ? '<div class="sc-author">' + escapeHTML(authorLine) + '</div>' : '') +
+      (meta ? '<div class="sc-meta">' + meta + '</div>' : '');
+    if(b.recommend){
+      html += '<div class="sc-recommend">' + escapeHTML(b.recommend).replace(/\n/g, '<br>') + '<span class="by">わたしのひとこと</span></div>';
+    }
+    html += '<div class="sc-synopsis"><div class="sc-label">あらすじ</div>' + (b.synopsis
+      ? '<p>' + escapeHTML(b.synopsis) + '</p>' +
+        (synopsisSourceLabel(b.synopsisSource) ? '<div class="sc-src">' + escapeHTML(synopsisSourceLabel(b.synopsisSource)) + '</div>' : '')
+      : '<button class="sc-find" type="button" id="scFindBtn">' + PICK_SPARKLE_SVG + 'あらすじを探す</button>') +
+      '</div>';
+    if(b.status === 'done' && b.endDate) html += '<div class="sc-read">' + escapeHTML(specDateText(b.endDate)) + ' 読了</div>';
+    const info = document.getElementById('scInfo');
+    info.innerHTML = html;
+    const findBtn = info.querySelector('#scFindBtn');
+    if(findBtn){
+      findBtn.addEventListener('click', async () => {
+        findBtn.disabled = true;
+        findBtn.innerHTML = '<span class="ai-spinner"></span>探しています…';
+        let r = { text: '' };
+        try{ r = await findSynopsisForSavedBook(b); }catch(e){ console.warn('あらすじの取得に失敗しました', e); }
+        if(showcaseBookId === b.id) renderShowcase(b);
+        if(currentDetailId === b.id) renderDetailBody(b);
+        if(!r.text) showToast(navigator.onLine === false ? 'オフラインなので探せませんでした' : 'あらすじが見つかりませんでした。編集画面で書けます');
+      });
+    }
+  }
+  /* 保存している表紙は小さい（自動入力の表紙は200〜600px）ので、画面いっぱいに出すとぼやける。
+     自動入力で入れた表紙なら、同じ ISBN の大きい画像（Amazon、840〜2500px）を見せるときだけ使う。保存はしない。
+     ・自分で撮った・選んだ写真は、その写真を見せたいはずなので触らない
+     ・ISBN が違うと別の本の画像が返ることがあるので、自動入力でその ISBN から入れた表紙に限り、
+       さらに縦横の比が今の表紙とほぼ同じときだけ差し替える */
+  function largeCoverCandidates(b){
+    if(navigator.onLine === false || !b.cover) return [];
+    let isbn10 = '';
+    const amazon = /m\.media-amazon\.com\/images\/P\/([0-9X]{10})\./.exec(b.cover);
+    const hanmoto = /img\.hanmoto\.com\/bd\/img\/(978\d{10})\.jpg/.exec(b.cover);
+    if(amazon) isbn10 = amazon[1];
+    else if(hanmoto) isbn10 = isbn13to10(hanmoto[1]);
+    else if(b.coverAuto === true && /^978\d{10}$/.test(b.isbn || '')) isbn10 = isbn13to10(b.isbn);
+    return isbn10 ? ['https://m.media-amazon.com/images/P/' + isbn10 + '.09._SCRMZZZZZZ_.jpg'] : [];
+  }
+  function sameCoverShape(a, b){
+    if(!a || !b || !a.naturalWidth || !b.naturalWidth) return false;
+    const ra = a.naturalWidth / a.naturalHeight, rb = b.naturalWidth / b.naturalHeight;
+    return Math.abs(ra - rb) / ra < 0.1;
+  }
+  function upgradeShowcaseCover(b){
+    if(!b.cover) return;
+    const candidates = largeCoverCandidates(b);
+    if(!candidates.length) return;
+    const probe = new Image();
+    probe.onload = () => {
+      const img = document.querySelector('#scCover img');
+      if(showcaseBookId !== b.id || !img) return;
+      const swap = () => {
+        // 今の表紙よりはっきり大きく、形（縦横の比）が同じときだけ
+        if(probe.naturalHeight > img.naturalHeight * 1.25 && sameCoverShape(probe, img)) img.src = probe.src;
+      };
+      if(img.complete && img.naturalWidth) swap(); else img.addEventListener('load', swap, { once: true });
+    };
+    probe.src = candidates[0];
+  }
+  document.getElementById('detailCover').addEventListener('click', () => {
+    const b = books.find(x => x.id === currentDetailId);
+    if(b) openShowcase(b);
+  });
+  document.getElementById('scCloseBtn').addEventListener('click', closeShowcase);
+  // 表紙を押すと、文字を消して写真だけを大きく。もう一度押すと戻る
+  document.getElementById('scCover').addEventListener('click', () => {
+    const sc = document.getElementById('showcase');
+    sc.classList.toggle('photo-only');
+    document.getElementById('scScroll').scrollTop = 0;
+  });
+  // 写真だけのときは、表紙の外を押しても戻る
+  document.getElementById('scStage').addEventListener('click', e => {
+    const sc = document.getElementById('showcase');
+    if(e.target.id === 'scStage' && sc.classList.contains('photo-only')) sc.classList.remove('photo-only');
+  });
+  document.getElementById('scShareBtn').addEventListener('click', () => {
+    const b = books.find(x => x.id === showcaseBookId);
+    if(b) shareBookCard(b);
+  });
+
+  /* ---------- おすすめカードを画像にして共有 ----------
+     表紙・書名・著者・評価・ジャンル・ひとことを、生成りの紙に並べた1枚（1080×1350）にする。
+     スマホでは共有メニュー（LINE など）へ渡し、使えないパソコンでは画像を保存して紹介文をコピーする。
+     付箋や感想は入れない（人に見せる前提なので、自分のメモは出さない）。 */
+  const CARD_SERIF = '"Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", serif';
+  const CARD_SANS = '-apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", sans-serif';
+  function loadImageForCanvas(src){
+    return new Promise(resolve => {
+      const img = new Image();
+      // 他のサイトの画像は、許可されていなければ描けない（描くと画像を書き出せなくなる）ので、そのときは無地の表紙にする
+      if(!/^data:/.test(src)) img.crossOrigin = 'anonymous';
+      const timer = setTimeout(() => resolve(null), 8000);
+      img.onload = () => { clearTimeout(timer); resolve(img.naturalWidth > 20 ? img : null); };
+      img.onerror = () => { clearTimeout(timer); resolve(null); };
+      img.src = src;
+    });
+  }
+  // 日本語を幅に合わせて折り返す。行頭に句読点や閉じかっこが来ないよう、前の行に残す
+  function wrapCanvasText(ctx, text, maxWidth, maxLines){
+    const NO_HEAD = '、。，．,.」』）)］】！？!?ー…ぁぃぅぇぉっゃゅょァィゥェォッャュョ';
+    const lines = [];
+    String(text || '').split('\n').forEach(para => {
+      let line = '';
+      for(const ch of para){
+        if(ctx.measureText(line + ch).width > maxWidth && line && !NO_HEAD.includes(ch)){
+          lines.push(line);
+          line = ch;
+        } else {
+          line += ch;
+        }
+      }
+      lines.push(line);
+    });
+    if(lines.length > maxLines){
+      const kept = lines.slice(0, maxLines);
+      let last = kept[maxLines - 1];
+      while(last && ctx.measureText(last + '…').width > maxWidth) last = last.slice(0, -1);
+      kept[maxLines - 1] = last + '…';
+      return kept;
+    }
+    return lines;
+  }
+  function drawCardStar(ctx, x, y, r, fill){
+    const pts = [];
+    for(let i = 0; i < 10; i++){
+      const a = -Math.PI / 2 + i * Math.PI / 5;
+      const rr = i % 2 ? r * .45 : r;
+      pts.push([x + Math.cos(a) * rr, y + Math.sin(a) * rr]);
+    }
+    const path = () => { ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); };
+    ctx.save();
+    path();
+    ctx.lineWidth = 2.5; ctx.strokeStyle = 'rgba(90,70,50,.35)'; ctx.stroke();
+    if(fill > 0){
+      ctx.beginPath(); ctx.rect(x - r, y - r, r * 2 * fill, r * 2); ctx.clip();
+      path(); ctx.fillStyle = '#A8473A'; ctx.fill();
+    }
+    ctx.restore();
+  }
+  async function buildShareCanvas(b){
+    const W = 1080, H = 1350, M = 96;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    // 明朝体が読み込まれるのを少しだけ待つ（間に合わなければ端末の明朝で描く）
+    if(document.fonts && document.fonts.load){
+      await withTimeoutValue(Promise.all([
+        document.fonts.load('600 60px "Shippori Mincho"'), document.fonts.load('500 36px "Shippori Mincho"')
+      ]).catch(() => null), 2500, null);
+    }
+    // 表紙：自動で入れた表紙なら、版元ドットコムの大きい画像のほうがくっきりする
+    let img = null;
+    if(b.cover){
+      img = await loadImageForCanvas(b.cover);
+      for(const src of largeCoverCandidates(b)){
+        const big = await loadImageForCanvas(src);
+        // 形が違う画像は別の本かもしれないので使わない（いまの表紙が描けないときも使わない）
+        if(big && img && sameCoverShape(big, img) && big.naturalHeight > img.naturalHeight){ img = big; break; }
+      }
+    }
+    let cw, ch;
+    if(img){
+      const ratio = img.naturalWidth / img.naturalHeight;
+      ch = 520; cw = ch * ratio;
+      if(cw > 440){ cw = 440; ch = cw / ratio; }
+    } else { cw = 360; ch = 495; }
+    const tags = minorLabelsOf(b).slice(0, 3);
+    const quote = b.recommend || '';
+    // ひとことが無ければ、あらすじの書き出しを添える
+    const body = quote || (b.synopsis ? b.synopsis.replace(/\s+/g, ' ') : '');
+    const authorLine = [b.author, b.publisher].filter(Boolean).join('　・　');
+    const foot = b.status === 'done' && b.endDate ? specDateText(b.endDate) + ' 読了' : '';
+
+    // shelfY（棚板の高さ）を基準に全部を描き、最後に描いた文字の下端を返す
+    const paint = shelfY => {
+      // 地：生成りの紙と、四隅をわずかに沈ませる
+      ctx.fillStyle = '#F3EDE1';
+      ctx.fillRect(0, 0, W, H);
+      const vignette = ctx.createRadialGradient(W / 2, H * .38, H * .2, W / 2, H * .5, H * .85);
+      vignette.addColorStop(0, 'rgba(255,252,244,.55)');
+      vignette.addColorStop(1, 'rgba(160,140,110,.16)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, W, H);
+
+      // 表紙を棚板の上に立てる
+      const cx = (W - cw) / 2, cy = shelfY - ch;
+      ctx.save();
+      ctx.shadowColor = 'rgba(50,38,25,.38)'; ctx.shadowBlur = 36; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 14;
+      ctx.fillStyle = '#5A4E3D';
+      ctx.fillRect(cx, cy, cw, ch);
+      ctx.restore();
+      if(img){
+        ctx.drawImage(img, cx, cy, cw, ch);
+      } else {
+        ctx.fillStyle = palette[b.coverColorIndex % palette.length];
+        ctx.fillRect(cx, cy, cw, ch);
+        ctx.strokeStyle = 'rgba(251,244,228,.32)'; ctx.lineWidth = 2;
+        ctx.strokeRect(cx + 22, cy + 22, cw - 44, ch - 44);
+        ctx.fillStyle = 'rgba(251,246,234,.94)';
+        ctx.font = '600 150px ' + CARD_SERIF;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(monogram(b.title), W / 2, cy + ch / 2 + 6);
+      }
+      // 背と表紙の境目の折り目
+      const fold = ctx.createLinearGradient(cx, 0, cx + 30, 0);
+      fold.addColorStop(0, 'rgba(0,0,0,.22)'); fold.addColorStop(.12, 'rgba(255,255,255,.16)');
+      fold.addColorStop(.35, 'rgba(0,0,0,.10)'); fold.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = fold;
+      ctx.fillRect(cx, cy, 30, ch);
+      // 棚板
+      const boardW = Math.max(cw + 180, 560);
+      ctx.fillStyle = '#8C7C63'; ctx.fillRect((W - boardW) / 2, shelfY, boardW, 4);
+      ctx.fillStyle = '#4A4033'; ctx.fillRect((W - boardW) / 2, shelfY + 4, boardW, 14);
+      const boardShadow = ctx.createLinearGradient(0, shelfY + 18, 0, shelfY + 46);
+      boardShadow.addColorStop(0, 'rgba(60,45,30,.22)'); boardShadow.addColorStop(1, 'rgba(60,45,30,0)');
+      ctx.fillStyle = boardShadow;
+      ctx.fillRect((W - boardW) / 2 + 10, shelfY + 18, boardW - 20, 28);
+
+      // 書名・著者
+      ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      let y = shelfY + 120;
+      ctx.fillStyle = '#3A3129';
+      ctx.font = '600 58px ' + CARD_SERIF;
+      wrapCanvasText(ctx, (b.title || '').replace(/\n/g, ''), W - M * 2, 2).forEach(line => { ctx.fillText(line, W / 2, y); y += 76; });
+      y -= 10;
+      if(authorLine){
+        ctx.fillStyle = '#6E6357';
+        ctx.font = '400 30px ' + CARD_SANS;
+        ctx.fillText(authorLine, W / 2, y + 8);
+        y += 64;
+      }
+      // 評価とジャンル
+      if(b.rating > 0 || tags.length){
+        const starR = 17, starGap = 42;
+        const ratingText = b.rating > 0 ? b.rating.toFixed(1) : '';
+        ctx.font = '400 26px ' + CARD_SANS;
+        const tagText = tags.join('・');
+        const starsW = b.rating > 0 ? starGap * 5 + ctx.measureText(ratingText).width + 14 : 0;
+        const tagW = tagText ? ctx.measureText(tagText).width + (starsW ? 44 : 0) : 0;
+        let x = W / 2 - (starsW + tagW) / 2;
+        if(b.rating > 0){
+          for(let i = 0; i < 5; i++) drawCardStar(ctx, x + starR + i * starGap, y - 9, starR, Math.max(0, Math.min(1, b.rating - i)));
+          ctx.textAlign = 'left'; ctx.fillStyle = '#6E6357';
+          ctx.fillText(ratingText, x + starGap * 5 + 6, y);
+          x += starsW;
+        }
+        if(tagText){
+          ctx.textAlign = 'left'; ctx.fillStyle = '#22443B';
+          ctx.fillText(tagText, x + (starsW ? 44 : 0), y);
+          if(starsW){ ctx.fillStyle = 'rgba(90,70,50,.3)'; ctx.fillRect(x + 21, y - 24, 1.5, 28); }
+        }
+        ctx.textAlign = 'center';
+        y += 50;
+      }
+      // ひとこと（またはあらすじの書き出し）
+      if(body){
+        const top = y + 8;
+        ctx.fillStyle = quote ? '#C9A45B' : 'rgba(90,70,50,.25)';
+        ctx.fillRect(W / 2 - 28, top, 56, 3);
+        y = top + 66;
+        ctx.fillStyle = quote ? '#3A3129' : '#5A4E3D';
+        ctx.font = quote ? '500 36px ' + CARD_SERIF : '400 29px ' + CARD_SANS;
+        const lineH = quote ? 60 : 50;
+        wrapCanvasText(ctx, body, W - M * 2 - 20, 4).forEach(line => { ctx.fillText(line, W / 2, y); y += lineH; });
+        y -= lineH - 14;
+      } else {
+        y -= 36;
+      }
+      // 下の小さな添え書き（読了日）
+      if(foot){
+        ctx.fillStyle = 'rgba(110,99,87,.6)';
+        ctx.font = '400 22px ' + CARD_SANS;
+        ctx.fillText(foot, W / 2, H - 56);
+      }
+      return y;
+    };
+    // 一度描いて中身の高さを測り、表紙の上端から文字の下端までが上下の真ん中に来るよう描き直す
+    const BASE = 640;
+    const bottom = paint(BASE);
+    const blockH = bottom - (BASE - ch);
+    const area = H - (foot ? 120 : 60);   // 読了日の添え書きの分は下をあける
+    const top = Math.max(70, (area - blockH) / 2);
+    paint(top + ch);
+    return canvas;
+  }
+  function shareTextOf(b){
+    const lines = ['『' + (b.title || '').replace(/\n/g, '') + '』' + (b.author ? ' ' + b.author : '')];
+    if(b.recommend) lines.push(b.recommend);
+    return lines.join('\n');
+  }
+  let shareBusy = false;
+  async function shareBookCard(b){
+    if(shareBusy) return;
+    shareBusy = true;
+    const btn = document.getElementById('scShareBtn');
+    btn.disabled = true;
+    try{
+      const canvas = await buildShareCanvas(b);
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', .92));
+      if(!blob) throw new Error('画像にできませんでした');
+      const name = ((b.title || 'book').replace(/\n/g, '').replace(/[\\/:*?"<>|]/g, '').slice(0, 40) || 'book') + '.jpg';
+      const file = new File([blob], name, { type: 'image/jpeg' });
+      const text = shareTextOf(b);
+      if(navigator.canShare && navigator.canShare({ files: [file] })){
+        try{
+          await navigator.share({ files: [file], text });
+        }catch(e){
+          if(e && e.name !== 'AbortError') throw e;   // 共有をやめただけなら何もしない
+        }
+      } else {
+        // 共有メニューが無い（パソコンなど）：画像を保存し、紹介文はコピーしておく
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        let copied = false;
+        try{ await navigator.clipboard.writeText(text); copied = true; }catch(e){ /* コピーできなくても画像は保存できている */ }
+        showToast(copied ? 'おすすめカードの画像を保存し、紹介文をコピーしました' : 'おすすめカードの画像を保存しました');
+      }
+    }catch(e){
+      console.warn('共有に失敗しました', e);
+      showToast('共有できませんでした。もう一度試してください');
+    }finally{
+      shareBusy = false;
+      btn.disabled = false;
+    }
+  }
+
   /* ---------- 詳細：本の情報（ジャンル・判型と書き方・読んだ期間） ---------- */
   function specDateText(str){
     const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str || '');
@@ -4434,6 +4948,14 @@
     // 分類・判型と書き方・読んだ期間は、図書カードのように1枚にまとめて見せる
     const specRows = buildSpecRows(b);
     if(specRows) html += '<div class="info-card spec-card">' + specRows + '</div>';
+    // あらすじ：長ければ4行で畳む。無ければ探すボタン
+    html += '<div class="info-card synopsis-card"><div class="ic-label">あらすじ</div>' + (b.synopsis
+      ? '<div class="synopsis-text clamp" id="detailSynopsis">' + escapeHTML(b.synopsis) + '</div>' +
+        '<button class="synopsis-more" type="button" id="detailSynopsisMore" hidden>続きを読む</button>' +
+        (synopsisSourceLabel(b.synopsisSource) ? '<div class="synopsis-src">' + escapeHTML(synopsisSourceLabel(b.synopsisSource)) + '</div>' : '')
+      : '<div class="synopsis-empty"><span>まだありません</span>' +
+          '<button class="auto-pick-btn" type="button" id="detailSynopsisFind">' + PICK_SPARKLE_SVG + 'あらすじを探す</button></div>') +
+      '</div>';
     if(b.kikkake){
       html += '<div class="info-card" data-find-key="kikkake"><div class="ic-label">きっかけ・期待</div><div class="ic-text">' +
         findTextHTML(b.kikkake) + '</div></div>';
@@ -4487,10 +5009,14 @@
     const impressionsToShow = (b.impressions && b.impressions.length)
       ? b.impressions
       : (b.impression ? [{ date: '', text: b.impression }] : []);
-    if(impressionsToShow.length || b.nextAction || b.rating > 0){
+    if(impressionsToShow.length || b.nextAction || b.rating > 0 || b.recommend){
       html += '<div class="info-card">';
       if(b.rating > 0){
         html += '<div class="ic-label">評価</div><div class="rating-row" id="detailRatingRow" style="margin-bottom:10px;"></div>';
+      }
+      if(b.recommend){
+        html += '<div data-find-key="recommend" style="margin-bottom:12px;"><div class="ic-label">おすすめのひとこと</div><div class="ic-text detail-recommend">' +
+          findTextHTML(b.recommend) + '</div></div>';
       }
       if(impressionsToShow.length){
         html += '<div class="ic-label">' + (b.style === 'short' && stories.length ? '全体の感想' : '感想') + '</div>';
@@ -4522,6 +5048,29 @@
     }
     el.innerHTML = html;
 
+    const synEl = el.querySelector('#detailSynopsis');
+    if(synEl){
+      const more = el.querySelector('#detailSynopsisMore');
+      // 4行に収まっていれば「続きを読む」は出さない（画面に出てから測る）
+      requestAnimationFrame(() => {
+        more.hidden = synEl.clientHeight ? synEl.scrollHeight <= synEl.clientHeight + 2 : (synEl.textContent || '').length < 110;
+      });
+      more.addEventListener('click', () => {
+        const open = synEl.classList.toggle('clamp') === false;
+        more.textContent = open ? '閉じる' : '続きを読む';
+      });
+    }
+    const synFindEl = el.querySelector('#detailSynopsisFind');
+    if(synFindEl){
+      synFindEl.addEventListener('click', async () => {
+        synFindEl.disabled = true;
+        synFindEl.innerHTML = '<span class="ai-spinner"></span>探しています…';
+        let r = { text: '' };
+        try{ r = await findSynopsisForSavedBook(b); }catch(e){ console.warn('あらすじの取得に失敗しました', e); }
+        if(currentDetailId === b.id) renderDetailBody(b);
+        if(!r.text) showToast(navigator.onLine === false ? 'オフラインなので探せませんでした' : 'あらすじが見つかりませんでした。編集画面で書けます');
+      });
+    }
     const genreAutoEl = el.querySelector('[data-genre-auto]');
     if(genreAutoEl){
       genreAutoEl.addEventListener('click', async () => {
@@ -4575,9 +5124,12 @@
     memoSortOrder = (b.stories && b.stories.length) ? 'story' : 'page';
     memoEmotionFilter = new Set();
     const coverEl = document.getElementById('detailCover');
-    coverEl.innerHTML = b.cover
+    coverEl.innerHTML = (b.cover
       ? '<img src="' + b.cover + '">'
-      : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>';
+      : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>') +
+      '<span class="cover-zoom-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></span>';
+    coverEl.setAttribute('role', 'button');
+    coverEl.setAttribute('aria-label', '表紙を大きく見る');
     coverEl.style.background = b.cover ? 'none' : palette[b.coverColorIndex % palette.length];
     document.getElementById('detailTitle').innerHTML = escapeHTML(b.title).replace(/\n/g, '<br>');
     const authorEl = document.getElementById('detailAuthor');
@@ -5525,6 +6077,7 @@
   function resizeFormTextareas(){
     autoResizeTitle();
     document.querySelectorAll('#memoList .memo-quote-input').forEach(autoResizeTextarea);
+    autoResizeTextarea(document.getElementById('synopsisInput'));
   }
   function autoResizeTitle(){
     autoResizeTextarea(titleInputEl);
@@ -5616,6 +6169,10 @@
     document.getElementById('kikkakeInput').value = '';
     document.getElementById('impressionList').innerHTML = '';
     document.getElementById('nextActionInput').value = '';
+    document.getElementById('recommendInput').value = '';
+    setFormSynopsis('', '');
+    formIsbn = '';
+    formLoadedCover = { src: null, auto: false };
     rating = 0;
     renderStars();
     // 追加するのはたいてい「今日から読み始める本」なので、日付を先に入れておく
@@ -5657,6 +6214,10 @@
       : (b.impression ? [{ date: '', text: b.impression }] : []);
     legacyImpressions.forEach(imp => addImpression(imp));
     document.getElementById('nextActionInput').value = b.nextAction || '';
+    document.getElementById('recommendInput').value = b.recommend || '';
+    setFormSynopsis(b.synopsis || '', b.synopsisSource || '');
+    formIsbn = b.isbn || '';
+    formLoadedCover = { src: coverImg ? coverImg.src : null, auto: !!b.coverAuto };
     rating = b.rating || 0;
     renderStars();
     startDateInput.value = b.startDate || '';
@@ -5684,8 +6245,40 @@
       stories: gatherStories(),
       rating: rating,
       nextAction: document.getElementById('nextActionInput').value.trim(),
-      cover: coverImg ? coverImg.src : null
+      recommend: document.getElementById('recommendInput').value.trim(),
+      synopsis: document.getElementById('synopsisInput').value.trim(),
+      synopsisSource: formSynopsisSource(),
+      isbn: formIsbn,
+      cover: coverImg ? coverImg.src : null,
+      // 今の表紙が、自動入力で入れたもの（この画面で入れた、または前から自動の表紙のまま）か
+      coverAuto: !!coverImg && ((!!autoFilled.cover && coverImg.src === autoFilled.cover) ||
+        (formLoadedCover.auto && coverImg.src === formLoadedCover.src))
     };
+  }
+  let formLoadedCover = { src: null, auto: false };
+  /* ---------- フォームのあらすじ欄 ----------
+     自動で入れた文は出どころ（版元の紹介文・Wikipedia など）を覚えておき、
+     自分で書き換えたら「自分で書いた」扱いにする。 */
+  let formIsbn = '';
+  function setFormSynopsis(text, source){
+    const input = document.getElementById('synopsisInput');
+    input.value = text;
+    input.dataset.autoText = source && source !== 'manual' ? text : '';
+    input.dataset.source = source || '';
+    updateSynopsisNote();
+  }
+  function formSynopsisSource(){
+    const input = document.getElementById('synopsisInput');
+    const value = input.value.trim();
+    if(!value) return '';
+    if(input.dataset.autoText && value === input.dataset.autoText.trim()) return input.dataset.source || '';
+    return 'manual';
+  }
+  function updateSynopsisNote(message){
+    const note = document.getElementById('synopsisNote');
+    const src = formSynopsisSource();
+    note.textContent = message || (src && src !== 'manual' ? synopsisSourceLabel(src) + '。書き換えてもかまいません。' : '');
+    note.style.display = note.textContent ? '' : 'none';
   }
   function openFormNew(){
     resetForm();
@@ -5910,6 +6503,11 @@
     }
     if(e.key !== 'Escape') return;
     if(handleCaptureEscape()) return;
+    if(showcaseIsOpen()){
+      const sc = document.getElementById('showcase');
+      if(sc.classList.contains('photo-only')) sc.classList.remove('photo-only'); else closeShowcase();
+      return;
+    }
     const editor = document.getElementById('fullscreenEditor');
     if(editor.classList.contains('show')){ closeFullscreenEditor(); return; }
     const overlays = document.querySelectorAll('.modal-overlay.show');
@@ -7109,14 +7707,8 @@
   }
   // ISBN が分からない(手で入力した)本は、国会図書館で題名と著者から ISBN を探してから紹介文を取る
   async function fetchDescriptionByTitle(title, author){
-    const params = { title: title, cnt: 10, mediatype: 'books' };
-    if(author) params.creator = author;
-    const items = await fetchNdl(params);
-    // 同じ著者の別の本（アンソロジーや翻訳版）を拾わないよう、題名が一致する日本の本だけを使う
-    const want = foldForMatch(title);
-    const same = items.filter(it => it.isbn && foldForMatch(it.title) === want);
-    const hit = same.find(it => it.paper && /^9784/.test(it.isbn)) || same.find(it => /^9784/.test(it.isbn)) || same[0];
-    return hit ? fetchDescription(hit.isbn) : '';
+    const isbn = await findIsbnByTitle(title, author);
+    return isbn ? fetchDescription(isbn) : '';
   }
 
   /* ---------- Wikipedia の作品の記事 ---------- */
@@ -7327,6 +7919,202 @@
     return { labels, style, via, wikiTitle: wiki ? wiki.title : '' };
   }
 
+  /* ---------- あらすじ ----------
+     友だちに勧めるときにざっと見せられるよう、本の紹介文を1つ持っておく。
+       ① 版元の内容紹介（openBD。帯や裏表紙と同じ文なのでネタバレしない）
+       ② Google Books の説明
+       ③ Wikipedia の作品記事の「あらすじ」
+     の順に探す。③は結末まで書いてあることが多いので、Gemini のキーがあれば
+     ネタバレなしの短い紹介に書き直してもらい、無ければ書き出しの数文だけを使う。 */
+  const SYNOPSIS_MAX = 400;
+  function synopsisSourceLabel(src){
+    return ({
+      publisher: '出版社の内容紹介より',
+      google: 'Google ブックスの紹介より',
+      wikipedia: 'Wikipedia のあらすじの冒頭より（先の展開に触れていることがあります）',
+      ai: 'Wikipedia のあらすじをもとに、AI がネタバレなしでまとめた紹介',
+      manual: ''
+    })[src] || '';
+  }
+  // 長い文は、文の切れ目（。）で SYNOPSIS_MAX 字以内に収める
+  function trimSynopsis(text, max){
+    const s = String(text || '').replace(/\r/g, '').replace(/[ \t　]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+    const limit = max || SYNOPSIS_MAX;
+    if(s.length <= limit) return s;
+    const cut = s.slice(0, limit);
+    const end = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('」'));
+    return end > limit * 0.4 ? cut.slice(0, end + 1) : cut.replace(/\s*\S*$/, '') + '…';
+  }
+  async function fetchOpenBdSynopsis(isbn){
+    const res = await fetch('https://api.openbd.jp/v1/get?isbn=' + isbn);
+    if(!res.ok) return '';
+    const data = await res.json();
+    const d = data && data[0];
+    const list = (d && d.onix && d.onix.CollateralDetail && d.onix.CollateralDetail.TextContent) || [];
+    // 03 = 内容紹介、02 = 短い紹介。04（目次）は使わない
+    const pick = type => (list.find(t => t.TextType === type && t.Text) || {}).Text || '';
+    return pick('03') || pick('02');
+  }
+  async function fetchGoogleSynopsis(isbn){
+    const res = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + isbn);
+    if(!res.ok) return '';
+    const data = await res.json();
+    const v = ((data && data.items) || []).find(x => x.volumeInfo && x.volumeInfo.description);
+    return v ? v.volumeInfo.description : '';
+  }
+  // 国会図書館で、題名が一致する日本の本の ISBN を探す（手で登録した本など、ISBN が分からないとき）。
+  // 同じ著者の別の本（アンソロジーや翻訳版）を拾わないよう、題名が一致する日本の本だけを使う
+  async function findIsbnByTitle(title, author){
+    // 著者名(creator)も付けて検索すると、国会図書館の返事が極端に遅くなる（12秒以上）ことがあるので、
+    // 題名だけで検索して、著者名は結果の中で照らし合わせる
+    const items = await fetchNdl({ title: title, cnt: 20, mediatype: 'books' });
+    const want = foldForMatch(title);
+    const who = foldForMatch(author);
+    let same = items.filter(it => it.isbn && foldForMatch(it.title) === want);
+    if(who){
+      const byAuthor = same.filter(it => (it.authors || []).some(a => {
+        const fa = foldForMatch(a);
+        return fa && (fa.includes(who) || who.includes(fa));
+      }));
+      if(byAuthor.length) same = byAuthor;
+    }
+    const hit = same.find(it => it.paper && /^9784/.test(it.isbn)) || same.find(it => /^9784/.test(it.isbn)) || same[0];
+    return hit ? hit.isbn : '';
+  }
+  async function fetchWikiSynopsis(title, author){
+    const page = await fetchWikiNovel(title, author);
+    if(!page) return '';
+    const params = {
+      action: 'query', format: 'json', origin: '*', redirects: '1', titles: page.title,
+      prop: 'extracts', explaintext: '1', exsectionformat: 'wiki'
+    };
+    const res = await fetch(WIKI_API + '?' + new URLSearchParams(params).toString());
+    if(!res.ok) return '';
+    const data = await res.json();
+    const p = Object.values((data && data.query && data.query.pages) || {})[0];
+    const text = (p && p.extract) || '';
+    // 「== あらすじ ==」（作品によっては「=== あらすじ ===」の小見出し）の節を、次の見出しまで
+    const m = /\n(=+)\s*(あらすじ|ストーリー|物語)\s*\1\s*\n([\s\S]*?)(?=\n=+[^=\n]+=+\s*\n|$)/.exec('\n' + text);
+    if(!m) return '';
+    return m[3].split('\n').filter(line => line.trim() && !/^=+.*=+$/.test(line.trim())).join('\n');
+  }
+  const SYNOPSIS_AI_SCHEMA = { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] };
+  function askAiSpoilerFree(title, source){
+    const prompt = [
+      'Below is the plot section of a Wikipedia article about the book 『' + title + '』.',
+      'Write a short spoiler-free introduction of the book in natural Japanese, for recommending it to a friend:',
+      '- 2 to 3 sentences, at most 140 Japanese characters.',
+      '- Use only facts from the text below. Describe only the premise and the first part of the story.',
+      '- Do not reveal twists, deaths, culprits, or the ending.',
+      'Return JSON {"text": "..."}.',
+      '',
+      source.slice(0, 2500)
+    ].join('\n');
+    const job = {
+      cancelled: false, abort: null,
+      buildBody(level){
+        const body = {
+          systemInstruction: { parts: [{ text: 'You write short, spoiler-free book introductions in Japanese. Answer only with JSON.' }] },
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 1024 }
+        };
+        if(level <= 1){
+          body.generationConfig.responseJsonSchema = SYNOPSIS_AI_SCHEMA;
+          body.safetySettings = OCR_SAFETY;
+        }
+        if(level === 0) body.generationConfig.thinkingConfig = { thinkingLevel: 'LOW' };
+        return body;
+      },
+      parse(data){
+        const cand = data && data.candidates && data.candidates[0];
+        if(!cand) return { ok: false, kind: 'empty' };
+        const text = ((cand.content && cand.content.parts) || []).filter(p => p && typeof p.text === 'string' && !p.thought).map(p => p.text).join('');
+        let obj = null;
+        try{ obj = JSON.parse(text.trim().replace(/^```(?:json)?\s*/, '').replace(/\s*```$/, '')); }catch(e){ /* 下で扱う */ }
+        if(!obj || typeof obj.text !== 'string' || !obj.text.trim()) return { ok: false, kind: 'badjson' };
+        return { ok: true, value: { text: obj.text.trim() } };
+      }
+    };
+    const timer = new Promise(resolve => setTimeout(() => { job.cancelled = true; if(job.abort) job.abort(); resolve(null); }, 20000));
+    return Promise.race([runOcr(job, null).catch(() => null), timer]);
+  }
+  // info: { title, author, isbn } → { text, source, isbn }（見つからなければ text は ''）
+  async function findSynopsis(info){
+    const title = cleanTitle(String(info.title || '').replace(/\s*\n\s*/g, '').trim());
+    const author = String(info.author || '').split(/[、,，/]/)[0].trim();
+    if(!title || navigator.onLine === false) return { text: '', source: '', isbn: info.isbn || '' };
+    let isbn = info.isbn || '';
+    if(!isbn) isbn = await withTimeoutValue(findIsbnByTitle(title, author).catch(() => ''), 8000, '');
+    if(isbn){
+      const fromPublisher = await withTimeoutValue(fetchOpenBdSynopsis(isbn).catch(() => ''), 6000, '');
+      if(fromPublisher) return { text: trimSynopsis(fromPublisher), source: 'publisher', isbn };
+      const fromGoogle = await withTimeoutValue(fetchGoogleSynopsis(isbn).catch(() => ''), 6000, '');
+      if(fromGoogle) return { text: trimSynopsis(fromGoogle), source: 'google', isbn };
+    }
+    const plot = await withTimeoutValue(fetchWikiSynopsis(title, author).catch(() => ''), 8000, '');
+    if(plot){
+      if(readOcrKey()){
+        const res = await askAiSpoilerFree(title, plot);
+        if(res && res.text) return { text: trimSynopsis(res.text), source: 'ai', isbn };
+      }
+      // キーが無いときは、ネタバレを避けるため最初の2文（物語の入り口）だけ
+      const first = plot.split('\n').find(line => line.trim().length >= 20) || plot;
+      const sentences = first.match(/[^。]+。/g) || [first];
+      return { text: trimSynopsis(sentences.slice(0, 2).join(''), 140), source: 'wikipedia', isbn };
+    }
+    return { text: '', source: '', isbn };
+  }
+  // 登録済みの本に、詳細画面などからあらすじを付ける
+  async function findSynopsisForSavedBook(b){
+    const r = await findSynopsis({ title: b.title, author: b.author, isbn: b.isbn });
+    let changed = false;
+    if(r.isbn && !b.isbn){ b.isbn = r.isbn; changed = true; }
+    if(r.text && !b.synopsis){ b.synopsis = r.text; b.synopsisSource = r.source; changed = true; }
+    if(changed){ saveBooks(); cloudSetBook(b); }
+    return r;
+  }
+  // フォームの「自動で探す」と、自動入力のあと（あらすじ欄が空のときだけ入れる）
+  let synopsisToken = 0;
+  async function fillFormSynopsis(manual, info){
+    const input = document.getElementById('synopsisInput');
+    const btn = document.getElementById('synopsisFindBtn');
+    const title = document.getElementById('titleInput').value.trim();
+    if(!title){ if(manual) updateSynopsisNote('先にタイトルを入れると探せます。'); return; }
+    // 自動のときは、自分で書いたあらすじには触らない（前の検索で自動で入れた文なら入れ替える）
+    if(!manual && formSynopsisSource() === 'manual') return;
+    const token = ++synopsisToken;
+    const session = lookupToken;
+    const before = input.value;
+    btn.disabled = true;
+    updateSynopsisNote('あらすじを探しています…');
+    let r = { text: '', source: '' };
+    try{
+      r = await findSynopsis(Object.assign({ title, author: document.getElementById('authorInput').value, isbn: formIsbn }, info || {}));
+    }catch(e){ console.warn('あらすじの取得に失敗しました', e); }
+    if(token !== synopsisToken || session !== lookupToken || !formIsOpen()) return;
+    btn.disabled = false;
+    if(r.isbn && !formIsbn) formIsbn = r.isbn;
+    // 探している間に自分で書いた文は上書きしない
+    if(input.value !== before){ updateSynopsisNote(); return; }
+    if(!r.text){
+      updateSynopsisNote(navigator.onLine === false ? 'オフラインなので探せませんでした。' : 'あらすじが見つかりませんでした。自分で書くこともできます。');
+      scheduleAutosave();
+      return;
+    }
+    if(before.trim() && manual && formSynopsisSource() === 'manual' && !confirm('いまのあらすじを、見つかった紹介文に置き換えますか？\n\n' + r.text.slice(0, 120) + (r.text.length > 120 ? '…' : ''))){
+      updateSynopsisNote();
+      return;
+    }
+    setFormSynopsis(r.text, r.source);
+    autoResizeTextarea(input);
+    scheduleAutosave();
+  }
+  document.getElementById('synopsisFindBtn').addEventListener('click', () => fillFormSynopsis(true));
+  document.getElementById('synopsisInput').addEventListener('input', e => {
+    autoResizeTextarea(e.target);
+    updateSynopsisNote();
+  });
+
   /* ---------- 表紙 ---------- */
   function imageLoads(url){
     return new Promise(resolve => {
@@ -7388,6 +8176,9 @@
     setIfFound('publisherInput', cleanPublisher(book.publisher));
     autoResizeTitle();
     checkDuplicateTitle();   // 検索から入れたときも二重登録に気づけるように
+    // ISBN を覚えておき、あらすじ（出版社の内容紹介）も一緒に入れる
+    formIsbn = book.isbn || '';
+    fillFormSynopsis(false, { isbn: formIsbn });
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
     // ジャンル・線引き・書き方を決めるために紹介文も取りに行く
