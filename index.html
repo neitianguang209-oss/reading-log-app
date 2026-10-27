@@ -308,6 +308,10 @@
     background-color:var(--surface-alt);
   }
   .book-cover img{ width:100%; height:100%; object-fit:cover; }
+  /* 表紙の置き場。新書のように細長い本・横に広い本は、表紙を切らずにその形のまま棚板に立てる
+     （形は画像を読み込んだときに fitCoverToImage が決める） */
+  .cover-slot{ aspect-ratio:3/4.3; display:flex; align-items:flex-end; justify-content:center; }
+  .cover-slot > .book-cover{ flex:none; }
   /* 表紙の左端に、背と表紙の境目の折り目(溝)をうっすら入れて本の厚みを出す */
   .book-cover::before, .detail-cover-big::before, .cover-frame.has-image::before, .sc-cover::before{
     content:''; position:absolute; inset:0; pointer-events:none; z-index:1;
@@ -2178,6 +2182,11 @@
         ['sf', 'SF'], ['fantasy', 'ファンタジー'], ['history', '歴史・時代'], ['horror', 'ホラー'],
         ['economy', '経済・金融'], ['overseas', '海外文学']
       ])},
+      // v7：実際の出来事・人物を取材して書いた本。物語のように読めても作り話ではないので小説と分け、
+      // 知識を学ぶ教養書や、行動を変える実用・自己啓発とも分ける（伝記もここ）
+      { id:'nonfiction', label:'ノンフィクション', hasCharacters:true, minors: minors('nonfiction', [
+        ['report', 'ルポ・ドキュメント'], ['bio', '伝記・人物'], ['memoir', '体験記・手記']
+      ])},
       { id:'liberal', label:'教養', minors: minors('liberal', [
         ['philosophy', '哲学・思想'], ['psychology', '心理学'], ['history', '歴史・伝記'], ['politics', '政治・国際'],
         ['society', '社会'], ['economy', '経済'], ['science', '科学・技術'], ['art', '芸術・文化'], ['language', '言葉']
@@ -2196,6 +2205,9 @@
   const MINOR_ALIASES = {
     '小説': { 'サスペンス': 'サスペンス・犯罪', '犯罪': 'サスペンス・犯罪', '心理': 'サスペンス・犯罪', '政治': '社会派', '社会': '社会派',
       '時代': '歴史・時代', '歴史': '歴史・時代', '仕事': 'お仕事', '経済': '経済・金融', '金融': '経済・金融', '海外': '海外文学' },
+    'ノンフィクション': { 'ルポ': 'ルポ・ドキュメント', 'ルポルタージュ': 'ルポ・ドキュメント', 'ドキュメント': 'ルポ・ドキュメント',
+      'ドキュメンタリー': 'ルポ・ドキュメント', '伝記': '伝記・人物', '自伝': '伝記・人物', '評伝': '伝記・人物', '人物': '伝記・人物',
+      '手記': '体験記・手記', '体験記': '体験記・手記' },
     '教養': { '哲学': '哲学・思想', '思想': '哲学・思想', '宗教': '哲学・思想', '歴史': '歴史・伝記', '伝記': '歴史・伝記', '自伝': '歴史・伝記',
       '政治': '政治・国際', '国際': '政治・国際', '地政学': '政治・国際', '法律': '社会', '教育': '社会', '地理・旅行': '社会',
       '科学': '科学・技術', '技術': '科学・技術', 'IT': '科学・技術', 'IT・技術': '科学・技術', '数学': '科学・技術', '医学': '科学・技術',
@@ -2420,6 +2432,13 @@
   function ensureCategoriesForBook(b){
     if(!b.majorCategory) return false;
     let major = findMajor(b.majorCategory);
+    // 固定idの大分類（他の端末で付けたノンフィクションなど）がこの端末に無ければ、既定の形で足す
+    const def = !major && defaultCategories().find(c => c.id === b.majorCategory);
+    if(def){
+      major = def;
+      categories.push(major);
+      categoriesChangedDuringMigration = true;
+    }
     if(!major && String(b.majorCategory).startsWith('c:')){
       major = { id: b.majorCategory, label: b.majorCategory.slice(2), minors: [] };
       categories.push(major);
@@ -2509,6 +2528,9 @@
       recommend: raw.recommend || '',
       isbn: raw.isbn || '',
       coverAuto: raw.coverAuto === true,   // 表紙を自動入力で入れたか（自分で撮った写真なら false）
+      // 登録済みの本の見直し（ノンフィクションへの付け直し・小さい表紙の差し替え）を済ませた版。
+      // 本に持たせてクラウドへ送るので、別の端末が同じ本をもう一度見直す（戻した分類を動かす）ことは無い
+      reviewV: typeof raw.reviewV === 'number' ? raw.reviewV : 0,
       cover: raw.cover || null,
       coverColorIndex: typeof raw.coverColorIndex === 'number' ? raw.coverColorIndex : (index % palette.length),
       majorCategory: raw.majorCategory || null,
@@ -2586,7 +2608,7 @@
      届いた時点で正しく移る。
      移行は一度だけ走り、あとからユーザーが消した分類は復活しない。 */
   const CAT_SCHEMA_KEY = 'reading-log-cat-schema';
-  const CAT_SCHEMA_VERSION = 6;
+  const CAT_SCHEMA_VERSION = 7;   // v7：大分類「ノンフィクション」を足した（下の「足りない大分類を足す」で入る）
   const CAT_MOVES_STORAGE_KEY = 'reading-log-cat-moves';
   function loadCategoryMoves(){
     try{
@@ -2900,10 +2922,10 @@
     card.dataset.bookId = b.id;
     attachBookCardPress(card, b.id);
     card.innerHTML =
-      '<div class="book-cover" style="' + coverBgStyle(b) + '">' +
+      '<div class="cover-slot"><div class="book-cover" style="' + coverBgStyle(b) + '">' +
         buildCoverInnerHTML(b) + buildCoverBadgesHTML(b) +
         '<span class="select-check"><svg viewBox="0 0 24 24"><path d="M6 12.5l4 4 8-9"/></svg></span>' +
-      '</div>' +
+      '</div></div>' +
       '<div class="shelf-board"></div>' +
       '<div class="book-title">' + escapeHTML(b.title).replace(/\n/g, '<br>') + '</div>' +
       '<div class="book-meta">' + escapeHTML(b.author || '') + '</div>' +
@@ -5124,6 +5146,7 @@
     memoSortOrder = (b.stories && b.stories.length) ? 'story' : 'page';
     memoEmotionFilter = new Set();
     const coverEl = document.getElementById('detailCover');
+    coverEl.style.width = coverEl.style.height = '';   // 前の本の表紙の形を残さない
     coverEl.innerHTML = (b.cover
       ? '<img src="' + b.cover + '">'
       : '<span class="mono">' + escapeHTML(monogram(b.title)) + '</span>') +
@@ -5203,6 +5226,7 @@
   }
   function clearCoverImage(){
     if(coverImg){ coverImg.remove(); coverImg = null; }
+    coverFrame.style.width = coverFrame.style.height = '';
     coverPlaceholder.style.display = 'flex';
     coverFrame.classList.remove('has-image');
     pickBtn.textContent = '画像を選択する';
@@ -6337,14 +6361,18 @@
       savedBook = Object.assign({}, data, {
         id: editingBookId,
         coverColorIndex: prev ? prev.coverColorIndex : Math.floor(Math.random() * palette.length),
-        createdAt: prev ? prev.createdAt : Date.now()
+        createdAt: prev ? prev.createdAt : Date.now(),
+        // 見直し済みの印は引き継ぐ（落とすと、自分で戻した分類を次の見直しでまた動かしてしまう）
+        reviewV: prev ? (prev.reviewV || 0) : BOOK_REVIEW_VERSION
       });
       if(idx >= 0){ books[idx] = savedBook; } else { books.push(savedBook); }
     } else {
+      // 新しく登録する本は、今の分類・表紙の決め方で入れるので見直さなくてよい
       savedBook = Object.assign({}, data, {
         id: uid(),
         coverColorIndex: Math.floor(Math.random() * palette.length),
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        reviewV: BOOK_REVIEW_VERSION
       });
       books.push(savedBook);
       editingBookId = savedBook.id;
@@ -7032,6 +7060,7 @@
       const activeId = document.querySelector('.app-screen.active')?.id;
       if(activeId === 'screenList'){ renderList(); }
       if(activeId === 'screenStats'){ renderStats(); }
+      scheduleSavedBookReview();
     }, err => {
       console.warn('クラウドの同期に失敗しました', err);
       showSyncBanner('クラウドとの同期が一時的に失敗しています。この端末内の記録を表示しています。', true);
@@ -7455,7 +7484,8 @@
       // 2桁目が1(日本)以外は海外の作品
       const overseas = n >= 920 ? '海外文学' : undefined;
       if(n >= 910 && [2, 3, 8].includes(form)) return { major: '小説', minor: overseas };
-      if(n >= 910 && [4, 5, 6].includes(form)) return { major: '教養', style: 'essay', minor: overseas };
+      if(n >= 910 && form === 6) return { major: 'ノンフィクション' };     // 記録・手記・ルポルタージュ
+      if(n >= 910 && [4, 5].includes(form)) return { major: '教養', style: 'essay', minor: overseas };
       return null;
     }
     // 小分類は、今の一覧に無ければ自動で追加される
@@ -7478,7 +7508,7 @@
       return { major: '教養', minor: '哲学' };
     }
     if(cls === 2){
-      if(div === 28) return { major: '教養', minor: '伝記' };
+      if(div === 28) return { major: 'ノンフィクション', minor: '伝記' };
       if(div === 29) return { major: '教養', minor: '地理・旅行' };
       return { major: '教養', minor: '歴史' };
     }
@@ -7517,7 +7547,7 @@
     if(k === 11) return { major: '教養', minor: '心理学' };
     if(k === 10 || k === 12) return { major: '教養', minor: '哲学' };
     if(k >= 14 && k <= 16) return { major: '教養', minor: '宗教' };
-    if(k === 23) return { major: '教養', minor: '伝記' };
+    if(k === 23) return { major: 'ノンフィクション', minor: '伝記' };
     if(k === 25 || k === 26) return { major: '教養', minor: '地理・旅行' };
     if(k >= 20 && k <= 22) return { major: '教養', minor: '歴史' };
     if(k === 31) return { major: '教養', minor: '政治' };
@@ -7536,6 +7566,13 @@
   function guessCategory(book){
     const base = (book.ndc && guessFromNdc(book.ndc)) || (book.ccode && guessFromCcode(book.ccode)) || null;
     if(base && base.major === '小説') return base;
+    // ノンフィクション：書誌の分類が記録・手記・伝記か、紹介文に「ノンフィクション」「ルポ」とある本
+    // （エンジェルフライトのように、書誌では題材の業界＝商業に分類されている本もあるため、紹介文も見る）
+    const text = [book.title, book.series, book.description].join('\n');
+    if((base && base.major === 'ノンフィクション') || NONFICTION_WORDS.test(text)){
+      if(/成功法則|成功哲学|の教え|流仕事術/.test(text)) return { major: '自己啓発', minor: '生き方・考え方' };
+      return { major: 'ノンフィクション', minor: nonfictionMinor(text) };
+    }
     const refined = refineNonFiction(book, base);
     if(refined && base && base.style && !refined.style) refined.style = base.style;
     return refined;
@@ -7567,6 +7604,19 @@
     if(/メンタル|不安|ストレス|心が|折れない|自己肯定感|自信/.test(text)) return 'メンタル';
     return '生き方・考え方';
   }
+  // 「ドキュメント」は「ドキュメント作成術」のような仕事の本にも出てくるので使わない
+  const NONFICTION_WORDS = /ノンフィクション|ルポルタージュ|ルポ|ドキュメンタリー/;
+  function nonfictionMinor(text){
+    if(/伝記|自伝|評伝|生涯|半生/.test(text)) return '伝記・人物';
+    if(/手記|体験記|闘病|日記/.test(text)) return '体験記・手記';
+    return 'ルポ・ドキュメント';
+  }
+  // Wikipedia の作品記事が、ノンフィクションの本だと言っているか（分類と書き出しの両方で確かめる）
+  function wikiSaysNonfiction(wiki){
+    if(!wiki) return false;
+    const cats = (wiki.categories || []).join('\n');
+    return /ノンフィクション|ルポルタージュ/.test(cats) && /ノンフィクション|ルポルタージュ|ドキュメンタリー/.test(String(wiki.extract || '').slice(0, 200));
+  }
   function liberalMinor(text){
     if(/哲学|思想|宗教/.test(text)) return '哲学・思想';
     if(/心理/.test(text)) return '心理学';
@@ -7587,7 +7637,7 @@
     // ① 辞書
     if((ndc >= 280 && ndc < 290) || has(/伝記|自伝|評伝|半生/)){
       if(has(/成功法則|成功哲学|の教え|流仕事術|ルール|習慣/)) return { major: '自己啓発', minor: '生き方・考え方' };
-      return { major: '教養', minor: '歴史・伝記' };
+      return { major: 'ノンフィクション', minor: '伝記・人物' };
     }
     if((ndc >= 140 && ndc < 150) || has(/心理学/)){
       // 入門書・解説書は教養。対人関係の変え方や、生き方・勇気のような心の持ち方に応用した本は自己啓発
@@ -7718,18 +7768,20 @@
     return String(s || '').normalize('NFKC').replace(/[\s・=＝、,。.!！?？「」『』〜~\-‐－―ー：:]/g, '').toLowerCase();
   }
   // 「スター (小説)」のような曖昧さ回避の後ろの括弧は外して、題名が一致し、著者名が出てくる記事だけを使う
-  function pickWikiNovelPage(pages, title, author){
+  // loose：記事名が「題名＋副題」（エンジェルフライト 国際霊柩送還士）でもよい。著者名が出てくる記事に限る
+  function pickWikiNovelPage(pages, title, author, loose){
     const want = foldForMatch(title);
     const who = foldForMatch(author);
     return pages.find(p => {
       const cats = (p.categories || []).map(c => c.title).join(' ');
       if(/曖昧さ回避/.test(cats)) return false;
-      if(foldForMatch(String(p.title).replace(/\s*[（(][^）)]*[）)]\s*$/, '')) !== want) return false;
+      const got = foldForMatch(String(p.title).replace(/\s*[（(][^）)]*[）)]\s*$/, ''));
+      if(got !== want && !(loose && who && want.length >= 4 && got.startsWith(want))) return false;
       const body = foldForMatch((p.extract || '') + ' ' + cats);
       return who ? body.includes(who) : /小説/.test(p.extract || '');
     }) || null;
   }
-  async function fetchWikiNovel(title, author){
+  async function fetchWikiNovel(title, author, loose){
     const common = {
       action: 'query', format: 'json', origin: '*', redirects: '1',
       prop: 'extracts|categories', exintro: '1', explaintext: '1', exlimit: 'max', cllimit: 'max', clshow: '!hidden'
@@ -7741,9 +7793,9 @@
       return Object.values((data && data.query && data.query.pages) || {}).filter(p => !('missing' in p));
     };
     // ① 題名そのまま・「(小説)」付きの記事 ② 見つからなければ題名と著者で検索
-    let page = pickWikiNovelPage(await query({ titles: [title, title + ' (小説)'].join('|') }), title, author);
+    let page = pickWikiNovelPage(await query({ titles: [title, title + ' (小説)'].join('|') }), title, author, loose);
     if(!page){
-      page = pickWikiNovelPage(await query({ generator: 'search', gsrsearch: title + ' ' + (author || '') + ' 小説', gsrlimit: '6' }), title, author);
+      page = pickWikiNovelPage(await query({ generator: 'search', gsrsearch: title + ' ' + (author || '') + (loose ? '' : ' 小説'), gsrlimit: '6' }), title, author, loose);
     }
     if(!page) return null;
     return {
@@ -8125,6 +8177,38 @@
       img.src = url;
     });
   }
+  /* 表紙の枠を、画像の縦横の比に合わせる。
+     枠は決まった形（棚は3:4.3）だが、本は新書(約0.62)〜単行本(約0.71)と形がまちまちで、
+     枠いっぱいに切り抜くと書名や帯の端が切れて「はみ出した」ように見える。
+     形の差が小さい(4%未満)ときはそのまま枠に合わせ、大きいときは枠の中で表紙の形のまま置く。 */
+  function fitCoverToImage(img){
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if(!w || !h || w < 20) return;
+    const ar = w / h;
+    const shelf = img.parentElement && img.parentElement.classList.contains('book-cover') ? img.parentElement : null;
+    if(shelf && shelf.parentElement && shelf.parentElement.classList.contains('cover-slot')){
+      const slotAr = 3 / 4.3;
+      if(Math.abs(ar - slotAr) / slotAr < 0.04) return;
+      // 細長い本は高さいっぱい・幅を詰める。横に広い本は幅いっぱい・高さを詰めて棚板に立てる
+      shelf.style.width = (ar < slotAr ? ar / slotAr * 100 : 100) + '%';
+      shelf.style.aspectRatio = String(ar);
+      return;
+    }
+    const box = img.parentElement;
+    if(!box) return;
+    // 詳細(128×176)と登録画面(94×126)は高さを保ち、幅を表紙の形に合わせる（横に広すぎる本は高さを詰める）
+    const size = box.id === 'detailCover' ? { h: 176, maxW: 150 } : box.id === 'coverFrame' ? { h: 126, maxW: 108 } : null;
+    if(!size) return;
+    const boxAr = box.id === 'detailCover' ? 128 / 176 : 94 / 126;
+    if(Math.abs(ar - boxAr) / boxAr < 0.04){ box.style.width = box.style.height = ''; return; }
+    const width = Math.min(size.maxW, Math.round(size.h * ar));
+    box.style.width = width + 'px';
+    box.style.height = Math.round(width / ar) + 'px';
+  }
+  // 画像が読み込まれるたびに（棚・詳細・登録画面のどれでも）形を合わせる。load は泡立たないので捕まえる側で受ける
+  document.addEventListener('load', e => {
+    if(e.target && e.target.tagName === 'IMG') fitCoverToImage(e.target);
+  }, true);
   function isbn13to10(isbn){
     const core = isbn.slice(3, 12);
     let sum = 0;
@@ -8132,13 +8216,16 @@
     const check = (11 - sum % 11) % 11;
     return core + (check === 10 ? 'X' : check);
   }
-  // 版元ドットコム → Amazon → 検索で得た画像 → 国会図書館 の順に、実際に表示できるものを使う
-  // （Amazonは画像が無いと1×1の透明画像を返すので、imageLoads の幅チェックで弾く）
+  // Amazon の大きい画像 → 版元ドットコム → Amazon の中くらい → 検索で得た画像 → 国会図書館 の順に、実際に表示できるものを使う
+  // （版元ドットコムは幅200pxほどしか無く、棚や詳細で引き伸ばすとぼやけるので後回し。
+  //   Amazonは画像が無いと1×1の透明画像を返すので、imageLoads の幅チェックで弾く）
   async function findCoverUrl(book){
     const candidates = [];
     if(book.isbn){
+      const isbn10 = book.isbn.startsWith('978') ? isbn13to10(book.isbn) : '';
+      if(isbn10) candidates.push('https://m.media-amazon.com/images/P/' + isbn10 + '.09._SCRMZZZZZZ_.jpg');
       candidates.push('https://img.hanmoto.com/bd/img/' + book.isbn + '.jpg');
-      if(book.isbn.startsWith('978')) candidates.push('https://m.media-amazon.com/images/P/' + isbn13to10(book.isbn) + '.09.LZZZZZZZ.jpg');
+      if(isbn10) candidates.push('https://m.media-amazon.com/images/P/' + isbn10 + '.09.LZZZZZZZ.jpg');
     }
     if(book.cover) candidates.push(book.cover);
     if(book.isbn) candidates.push('https://ndlsearch.ndl.go.jp/thumbnail/' + book.isbn + '.jpg');
@@ -8147,7 +8234,56 @@
     }
     return null;
   }
-  // 取り込めるなら端末内に画像として保存し、配信元が許可しない場合はURLのまま使う
+  /* 取り込めるなら端末内に画像として保存し、配信元が許可しない場合はURLのまま使う。
+     大きい画像（1000〜2500px）を一度に小さくするとギザギザになるので、半分ずつ縮めて
+     AUTO_COVER_MAX_SIZE に収める。端末の保存容量（約5MB）に何十冊も入るよう、写真より少し小さくする。
+     縁に付いた白い余白（Amazon の画像にときどきある）は、上下左右とも同じ色が続く所だけ切る。 */
+  const AUTO_COVER_MAX_SIZE = 520;
+  function trimFlatMargins(canvas){
+    const w = canvas.width, h = canvas.height;
+    let data;
+    try{ data = canvas.getContext('2d').getImageData(0, 0, w, h).data; }catch(e){ return canvas; }
+    const px = (x, y) => { const i = (y * w + x) * 4; return [data[i], data[i + 1], data[i + 2]]; };
+    const corner = px(0, 0);
+    const near = (p) => Math.abs(p[0] - corner[0]) + Math.abs(p[1] - corner[1]) + Math.abs(p[2] - corner[2]) < 24;
+    // ほぼ白（または真っ黒）の縁だけを余白とみなす。表紙のデザインの地色は切らない
+    if(!(Math.min(...corner) > 235 || Math.max(...corner) < 20)) return canvas;
+    const rowFlat = y => { for(let x = 0; x < w; x += 2) if(!near(px(x, y))) return false; return true; };
+    const colFlat = x => { for(let y = 0; y < h; y += 2) if(!near(px(x, y))) return false; return true; };
+    let top = 0, bottom = h - 1, left = 0, right = w - 1;
+    while(top < h / 4 && rowFlat(top)) top++;
+    while(bottom > h * 3 / 4 && rowFlat(bottom)) bottom--;
+    while(left < w / 4 && colFlat(left)) left++;
+    while(right > w * 3 / 4 && colFlat(right)) right--;
+    // 余白は片側だけでなく向かい合う両側にあるときだけ（白地の表紙の端を削らないように）
+    const cutV = top > 2 && (h - 1 - bottom) > 2, cutH = left > 2 && (w - 1 - right) > 2;
+    if(!cutV && !cutH) return canvas;
+    const sx = cutH ? left : 0, sy = cutV ? top : 0;
+    const sw = (cutH ? right + 1 : w) - sx, sh = (cutV ? bottom + 1 : h) - sy;
+    const out = document.createElement('canvas');
+    out.width = sw; out.height = sh;
+    out.getContext('2d').drawImage(canvas, sx, sy, sw, sh, 0, 0, sw, sh);
+    return out;
+  }
+  function shrinkCanvas(canvas, maxSize){
+    let src = canvas;
+    const scale = Math.min(1, maxSize / Math.max(src.width, src.height));
+    const tw = Math.round(src.width * scale), th = Math.round(src.height * scale);
+    while(src.width / 2 >= tw && src.height / 2 >= th){
+      const half = document.createElement('canvas');
+      half.width = Math.round(src.width / 2); half.height = Math.round(src.height / 2);
+      const hc = half.getContext('2d');
+      hc.imageSmoothingQuality = 'high';
+      hc.drawImage(src, 0, 0, half.width, half.height);
+      src = half;
+    }
+    const out = document.createElement('canvas');
+    out.width = tw; out.height = th;
+    const oc = out.getContext('2d');
+    oc.imageSmoothingQuality = 'high';
+    oc.drawImage(src, 0, 0, tw, th);
+    return out;
+  }
   function coverUrlToData(url){
     return new Promise(resolve => {
       const img = new Image();
@@ -8157,7 +8293,7 @@
           const canvas = document.createElement('canvas');
           canvas.width = img.naturalWidth; canvas.height = img.naturalHeight;
           canvas.getContext('2d').drawImage(img, 0, 0);
-          resizeImage(canvas.toDataURL('image/jpeg', COVER_QUALITY), COVER_MAX_SIZE, COVER_QUALITY).then(resolve);
+          resolve(shrinkCanvas(trimFlatMargins(canvas), AUTO_COVER_MAX_SIZE).toDataURL('image/jpeg', 0.82));
         }catch(e){
           resolve(url);
         }
@@ -8181,6 +8317,7 @@
     fillFormSynopsis(false, { isbn: formIsbn });
 
     const categoryKey = () => [selectedMajorId, selectedMinorIds.join(','), selectedFormat, selectedStyle].join('|');
+    let baseMsg = '', coverSearching = false;   // あとから分類がノンフィクションに変わったら書き換える
     // ジャンル・線引き・書き方を決めるために紹介文も取りに行く
     if(book.isbn && !book.description){
       setLookupNote('「' + book.title + '」のジャンルを調べています…', true);
@@ -8224,19 +8361,25 @@
         : [major && major.label, minors.map(m => m.label).join('・'), formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／');
       // 小説なら、ジャンル（青春・家族など）を Wikipedia・紹介文から調べて、ジャンル欄に入れる
       if(isNovelMajor(major)) autoPickNovelGenres('lookup', { isbn: book.isbn || '', description: book.description });
+      // 書誌では小説や題材の分野に入っていても、Wikipedia にノンフィクションとあればそちらにする
+      if(!major || major.id !== 'nonfiction') checkNonfictionByWiki(book, token, newCatText => {
+        baseMsg = baseMsg.replace(/分類：[^。]*。/, '分類：' + newCatText + '。');
+        setLookupNote(baseMsg + (coverSearching ? '表紙を探しています…' : ''), true);
+      });
     }
     const msgParts = [];
     if(catText) msgParts.push('分類：' + catText + (addedMinorLabels.length ? '（小分類「' + addedMinorLabels.join('」「') + '」を新しく追加）' : ''));
     if(categoryReplaceable && selectedMajorId) msgParts.push('分類と書き方は推定なので、違っていたら直してください');
     if(!selectedMajorId) msgParts.push('大分類は選んでください');
-    const baseMsg = '「' + book.title + '」の情報を入れました。' + msgParts.map(p => p + '。').join('');
+    baseMsg = '「' + book.title + '」の情報を入れました。' + msgParts.map(p => p + '。').join('');
 
     // 前の検索で自動で入れた表紙は、今回の本の表紙に入れ替える
     if(coverImg && autoFilled.cover && coverImg.src === autoFilled.cover) clearCoverImage();
     autoFilled.cover = null;
     if(coverImg){ setLookupNote(baseMsg, true); return; }
     setLookupNote(baseMsg + '表紙を探しています…', true);
-    const url = await findCoverUrl(book);
+    coverSearching = true;
+    const url = await findCoverUrl(book).finally(() => { coverSearching = false; });
     if(token !== lookupToken) return;
     if(url && !coverImg){
       const cover = await coverUrlToData(url);
@@ -8246,6 +8389,179 @@
       setLookupNote(baseMsg, true);
     } else if(!coverImg){
       setLookupNote(baseMsg + '表紙画像は見つからなかったので、必要なら写真を選んでください。', true);
+    }
+  }
+  function nonfictionMajor(){
+    return categories.find(c => c.id === 'nonfiction') || categories.find(c => c.label === 'ノンフィクション') || null;
+  }
+  async function checkNonfictionByWiki(book, token, onSwitch){
+    if(navigator.onLine === false || !book.title) return;
+    const author = (book.authors || [])[0] || '';
+    const wiki = await withTimeoutValue(fetchWikiNovel(cleanTitle(book.title), author, true).catch(() => null), 7000, null);
+    if(token !== lookupToken || !formIsOpen() || !wikiSaysNonfiction(wiki)) return;
+    if(categoryKeyNow() !== autoFilled.category) return;   // 調べている間に自分で選び直していたら触らない
+    const nf = nonfictionMajor();
+    if(!nf) return;
+    const r = ensureMinor(nf, nonfictionMinor([book.title, book.description, wiki.extract].join('\n')));
+    if(r.added){ saveCategories(); cloudSaveSettings(); }
+    selectedMajorId = nf.id;
+    selectedMinorIds = [r.minor.id];
+    if(selectedStyle && !allowedStyles(nf.id).some(s => s[0] === selectedStyle)) selectedStyle = null;
+    renderMajorChips();
+    renderMinorChips();
+    hideGenreNote();
+    autoFilled.category = categoryKeyNow();
+    if(onSwitch) onSwitch([nf.label, r.minor.label, formatLabel(selectedFormat), styleLabel(selectedStyle)].filter(Boolean).join('／') + '（Wikipedia にノンフィクションとあったため）');
+    scheduleAutosave();
+  }
+  /* ---------- 登録済みの本を一度だけ見直す（2026-10-27） ----------
+     ① ノンフィクションの大分類ができる前に登録した本で、Wikipedia の記事か
+        あらすじに「ノンフィクション」とある本を、ノンフィクションへ移す
+     ② バーコードで入れた小さい表紙（版元ドットコムの幅200pxほど）を、
+        同じ ISBN の大きい画像に差し替える。形（縦横の比）が同じときだけ
+     ログインしてクラウドと同期できているときだけ、裏で1冊ずつ進める。
+     終わった本には reviewV を付けて送るので、どの端末でも1冊につき1回だけ。 */
+  const BOOK_REVIEW_VERSION = 1;
+  let bookReviewStarted = false;
+  function scheduleSavedBookReview(){
+    if(bookReviewStarted || !currentUser || navigator.onLine === false) return;
+    bookReviewStarted = true;
+    setTimeout(() => reviewSavedBooks().catch(e => console.warn('登録済みの本の見直しに失敗しました', e)), 4000);
+  }
+  // 2枚の表紙が同じ絵か。12×18に縮めて色の差を平均する（同じ絵なら10未満、文庫と単行本のように絵が違うと50以上）
+  function coverLooksSame(a, b){
+    const thumb = img => {
+      const c = document.createElement('canvas');
+      c.width = 12; c.height = 18;
+      const ctx = c.getContext('2d');
+      ctx.drawImage(img, 0, 0, 12, 18);
+      return ctx.getImageData(0, 0, 12, 18).data;
+    };
+    try{
+      const A = thumb(a), B = thumb(b);
+      let sum = 0, n = 0;
+      for(let i = 0; i < A.length; i += 4){
+        sum += Math.abs(A[i] - B[i]) + Math.abs(A[i + 1] - B[i + 1]) + Math.abs(A[i + 2] - B[i + 2]);
+        n += 3;
+      }
+      return sum / n < 20;
+    }catch(e){
+      return false;   // 配信元が読み取りを許さない画像は比べられないので、差し替えない
+    }
+  }
+  function loadImage(src){
+    return new Promise(resolve => {
+      const img = new Image();
+      if(/^https?:/.test(src)) img.crossOrigin = 'anonymous';   // 絵を見比べられるように
+      const timer = setTimeout(() => resolve(null), 10000);
+      img.onload = () => { clearTimeout(timer); resolve(img.naturalWidth > 20 ? img : null); };
+      img.onerror = () => { clearTimeout(timer); resolve(null); };
+      img.src = src;
+    });
+  }
+  // 自動入力で入れたらしい小さい表紙か（自分で撮った写真は COVER_MAX_SIZE まで大きいので、幅260px以下なら自動入力のもの）
+  async function smallAutoCover(b){
+    if(!b.cover) return null;
+    if(/^https?:/.test(b.cover)) return /img\.hanmoto\.com|media-amazon\.com/.test(b.cover) ? await loadImage(b.cover) : null;
+    const img = await loadImage(b.cover);
+    if(!img) return null;
+    return (b.coverAuto || img.naturalWidth <= 260) ? img : null;
+  }
+  async function upgradeSavedCover(b){
+    const current = await smallAutoCover(b);
+    if(!current || current.naturalWidth >= AUTO_COVER_MAX_SIZE * 0.8) return false;
+    let isbns = /^978\d{10}$/.test(b.isbn || '') ? [b.isbn] : [];
+    const fromUrl = /img\.hanmoto\.com\/bd\/img\/(978\d{10})\.jpg/.exec(b.cover);
+    if(!isbns.length && fromUrl) isbns = [fromUrl[1]];
+    // ISBN を持っていない本は、同じ題名・著者の本（単行本・文庫など）を国会図書館で探して、表紙の絵が同じ版を選ぶ
+    if(!isbns.length) isbns = await withTimeoutValue(isbnsByTitle(cleanTitle(b.title), b.author).catch(() => []), 13000, []);
+    for(const isbn of isbns.slice(0, 4)){
+      const url = 'https://m.media-amazon.com/images/P/' + isbn13to10(isbn) + '.09._SCRMZZZZZZ_.jpg';
+      const big = await loadImage(url);
+      // 別の版（文庫と単行本など）・別の本の画像を拾わないよう、今の表紙と形も絵も同じで、はっきり大きいときだけ
+      if(!big || big.naturalHeight < current.naturalHeight * 1.5 || !sameCoverShape(big, current) || !coverLooksSame(big, current)) continue;
+      const data = await coverUrlToData(url);
+      if(!data || !data.startsWith('data:')) return false;
+      b.cover = data;
+      b.coverAuto = true;
+      if(!b.isbn) b.isbn = isbn;   // 表紙の絵で版まで確かめた ISBN なので、あらすじ探しにも使える
+      return true;
+    }
+    return false;
+  }
+  async function isbnsByTitle(title, author){
+    const items = await fetchNdl({ title: title, cnt: 20, mediatype: 'books' });
+    const want = foldForMatch(title), who = foldForMatch(author);
+    const out = [];
+    items.forEach(it => {
+      if(!/^978/.test(it.isbn || '') || foldForMatch(it.title) !== want) return;
+      if(who && !(it.authors || []).some(a => { const fa = foldForMatch(a); return fa && (fa.includes(who) || who.includes(fa)); })) return;
+      if(!out.includes(it.isbn)) out.push(it.isbn);
+    });
+    return out;
+  }
+  async function moveToNonfictionIfNeeded(b){
+    const major = findMajor(b.majorCategory);
+    const nf = nonfictionMajor();
+    if(!nf || (major && major.id === nf.id)) return false;
+    let says = NONFICTION_WORDS.test(b.synopsis || '') && !/小説/.test(b.synopsis || '');
+    let wiki = null;
+    if(!says){
+      wiki = await withTimeoutValue(fetchWikiNovel(cleanTitle(b.title), b.author, true).catch(() => null), 7000, null);
+      says = wikiSaysNonfiction(wiki);
+    }
+    if(!says) return false;
+    const r = ensureMinor(nf, nonfictionMinor([b.title, b.synopsis, wiki ? wiki.extract : ''].join('\n')));
+    if(r.added){ saveCategories(); cloudSaveSettings(); }
+    b.majorCategory = nf.id;
+    b.minorCategories = [r.minor.id];
+    if(b.style && !allowedStyles(nf.id).some(s => s[0] === b.style)) b.style = null;
+    return true;
+  }
+  async function reviewSavedBooks(){
+    const moved = [];
+    let covers = 0;
+    const targets = books.filter(b => (b.reviewV || 0) < BOOK_REVIEW_VERSION).map(b => b.id);
+    for(const id of targets){
+      if(!currentUser || navigator.onLine === false) break;
+      const b = books.find(x => x.id === id);
+      // 編集中の本は、書いている内容とぶつからないよう今回は飛ばす（次に開いたときに見直す）
+      if(!b || (formIsOpen() && editingBookId === id)) continue;
+      // 調べている間にクラウドから届いた一覧で本の入れ物が入れ替わることがあるので、写しで調べて、変わった所だけ最新の本に当てる
+      const work = JSON.parse(JSON.stringify(b));
+      let changedCat = false, changedCover = false;
+      try{ changedCat = await moveToNonfictionIfNeeded(work); }catch(e){ console.warn('分類の見直しに失敗しました', b.title, e); }
+      try{ changedCover = await upgradeSavedCover(work); }catch(e){ console.warn('表紙の差し替えに失敗しました', b.title, e); }
+      const latest = books.find(x => x.id === id);
+      if(!latest || (formIsOpen() && editingBookId === id)) continue;
+      if(changedCat){
+        latest.majorCategory = work.majorCategory;
+        latest.minorCategories = work.minorCategories;
+        latest.style = work.style;
+        moved.push(latest.title.replace(/\n/g, ' '));
+      }
+      if(changedCover){
+        latest.cover = work.cover;
+        latest.coverAuto = true;
+        if(!latest.isbn) latest.isbn = work.isbn;
+        covers++;
+      }
+      latest.reviewV = BOOK_REVIEW_VERSION;
+      saveBooks();
+      cloudSetBook(latest);
+    }
+    if(moved.length || covers){
+      const activeId = document.querySelector('.app-screen.active')?.id;
+      if(activeId === 'screenList') renderList();
+      if(activeId === 'screenStats') renderStats();
+      if(activeId === 'screenDetail' && currentDetailId){
+        const cur = books.find(x => x.id === currentDetailId);
+        if(cur) renderDetailBody(cur);
+      }
+      const parts = [];
+      if(moved.length) parts.push('「' + moved.slice(0, 2).join('」「') + '」' + (moved.length > 2 ? 'など' + moved.length + '冊' : '') + 'をノンフィクションに移しました');
+      if(covers) parts.push(covers + '冊の表紙をきれいな画像にしました');
+      showToast(parts.join('。'));
     }
   }
   async function lookupByIsbn(isbn, fallbackBook){
