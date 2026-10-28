@@ -1876,6 +1876,7 @@
         <button class="menu-action-btn" id="importBtn" type="button">JSONファイルから読み込む</button>
         <input type="file" id="importFileInput" accept="application/json">
         <p class="field-note">読み込むと、現在の記録はすべて置き換えられます。書き出したファイルは大切に保管してください。</p>
+        <p class="field-note" id="storageInfo" style="margin-top:6px;"></p>
         <hr class="divider" style="margin:16px 0;">
         <p class="field-note" id="loggedInAs" style="margin:0 0 14px;"></p>
         <button class="menu-action-btn" id="logoutBtn" type="button">ログアウトする</button>
@@ -2074,6 +2075,8 @@
   async function sendCloudBackup(){
     try{
       if(!books || books.length === 0) return;       // 空は送らない
+      if(/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return;   // 手元の試験データで本番の控えを上書きしない
+      if(!coversHydrated && !coverDbFailed) return;  // 表紙を戻す前は送らない（表紙の抜けた控えで上書きしない）
       const payload = { books: books.map(toStoredBook), goals: goals, categories: categories };
       const json = JSON.stringify(payload);
       if(json === lastBackupJson) return;            // 変化が無ければ送らない
@@ -2132,20 +2135,137 @@
       return [];
     }
   }
+  /* ---------- 表紙画像の置き場所（IndexedDB） ----------
+     localStorage は1つのサイトで約5MBまでしか入らず、表紙画像(1冊40〜80KB)が
+     何十冊分も入るとiPhoneで「容量がいっぱい」になっていた。表紙画像だけを
+     容量の大きい IndexedDB（数百MB以上入る）へ分けて置き、localStorage には
+     文章だけを置く。クラウド（Firestore）へ送る内容はこれまでと同じで、表紙も含む。
+     ・起動時は localStorage の文章をすぐ読み、表紙は IndexedDB から戻してから
+       bootApp() を始める（戻す前にクラウドへ送って表紙を消してしまわないように）。
+     ・表紙を戻し終わるまでは IndexedDB の表紙を消さない（足すだけ）。
+     ・IndexedDB が使えない端末では、これまでどおり localStorage に表紙ごと置く。 */
+  const COVER_DB_NAME = 'reading-log';
+  const COVER_STORE = 'covers';
+  let coverDb = null;              // 開けたら IDBDatabase
+  let coverDbFailed = false;       // 開けなかった（この端末では使えない）
+  let coversHydrated = false;      // 起動時に表紙を戻し終えたか
+  const coverCache = new Map();    // IndexedDB に入っている表紙 id → data URL（書き込みを差分だけにする）
+  const isDataCover = c => typeof c === 'string' && c.startsWith('data:');
+  function openCoverDb(){
+    return new Promise((resolve, reject) => {
+      if(!window.indexedDB){ reject(new Error('IndexedDB なし')); return; }
+      const req = indexedDB.open(COVER_DB_NAME, 1);
+      req.onupgradeneeded = () => { if(!req.result.objectStoreNames.contains(COVER_STORE)) req.result.createObjectStore(COVER_STORE); };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+      req.onblocked = () => reject(new Error('IndexedDB blocked'));
+    });
+  }
+  function readAllCovers(dbh){
+    return new Promise((resolve, reject) => {
+      const out = new Map();
+      const req = dbh.transaction(COVER_STORE, 'readonly').objectStore(COVER_STORE).openCursor();
+      req.onsuccess = () => {
+        const cur = req.result;
+        if(cur){ if(isDataCover(cur.value)) out.set(String(cur.key), cur.value); cur.continue(); }
+        else resolve(out);
+      };
+      req.onerror = () => reject(req.error);
+    });
+  }
+  // 端末の保存場所を「消されにくい」扱いにしてもらう（iPhoneは容量が減ったときに消すことがあるため）
+  function requestPersistentStorage(){
+    try{
+      if(navigator.storage && navigator.storage.persist){
+        navigator.storage.persisted().then(p => { if(!p) return navigator.storage.persist(); }).catch(() => {});
+      }
+    }catch(e){ /* 対応していない端末はそのまま */ }
+  }
+  // 起動時：IndexedDB の表紙を本に戻す。終わったら（失敗しても）resolve する
+  function hydrateCovers(){
+    return openCoverDb().then(dbh => {
+      coverDb = dbh;
+      coverDb.onversionchange = () => { coverDb.close(); coverDb = null; };
+      return readAllCovers(dbh);
+    }).then(stored => {
+      stored.forEach((v, k) => coverCache.set(k, v));
+      books.forEach(b => {
+        const c = coverCache.get(String(b.id));
+        if(c && !b.cover) b.cover = c;
+      });
+      coversHydrated = true;
+      saveBooks();   // 古い形式（localStorageに表紙ごと）からの移し替えもここで済む
+    }).catch(err => {
+      console.warn('IndexedDB が使えないため、表紙もこれまでどおり localStorage に置きます', err);
+      coverDbFailed = true;
+      coverDb = null;
+    });
+  }
+  // 表紙の変化だけを IndexedDB に書く。戻し終える前は消さない（足すだけ）。
+  // coverCache は書き込みが確定してから更新するので、「coverCache にある＝IndexedDB に確かに入っている」。
+  const coverWritesInFlight = new Map();   // id → 書き込み中の data URL
+  function syncCoversToDb(){
+    if(!coverDb) return;
+    try{
+      const tx = coverDb.transaction(COVER_STORE, 'readwrite');
+      const os = tx.objectStore(COVER_STORE);
+      const puts = new Map(), dels = [];
+      const liveIds = new Set();
+      books.forEach(b => {
+        const id = String(b.id);
+        liveIds.add(id);
+        if(isDataCover(b.cover)){
+          if(coverCache.get(id) !== b.cover && coverWritesInFlight.get(id) !== b.cover){ os.put(b.cover, id); puts.set(id, b.cover); }
+        } else if(coversHydrated && coverCache.has(id)){
+          os.delete(id); dels.push(id);   // 表紙を外した・URLの表紙に替えた
+        }
+      });
+      if(coversHydrated){
+        coverCache.forEach((v, id) => { if(!liveIds.has(id)){ os.delete(id); dels.push(id); } });
+      }
+      if(!puts.size && !dels.length){ tx.abort(); return; }
+      puts.forEach((v, id) => coverWritesInFlight.set(id, v));
+      tx.oncomplete = () => {
+        puts.forEach((v, id) => { coverCache.set(id, v); if(coverWritesInFlight.get(id) === v) coverWritesInFlight.delete(id); });
+        dels.forEach(id => coverCache.delete(id));
+        if(puts.size) writeLocalBooks();   // 確定した表紙を localStorage から外して軽くする
+      };
+      tx.onerror = tx.onabort = () => {
+        puts.forEach((v, id) => { if(coverWritesInFlight.get(id) === v) coverWritesInFlight.delete(id); });
+        if(tx.error) console.warn('表紙の保存に失敗しました', tx.error);
+      };
+    }catch(e){
+      console.warn('表紙の保存に失敗しました', e);
+    }
+  }
+  let storageWarned = false;
   function saveBooks(){
     scheduleCloudBackup();
+    syncCoversToDb();
+    writeLocalBooks();
+  }
+  function writeLocalBooks(){
     const stored = books.map(toStoredBook);
+    // IndexedDB に確かに入っている表紙（data URL）は localStorage から外す。
+    // まだ入っていない表紙・URLの表紙（短い）はそのまま置く
+    const forLocal = stored.map(b => (isDataCover(b.cover) && coverCache.get(String(b.id)) === b.cover) ? Object.assign({}, b, { cover: null }) : b);
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(forLocal));
     }catch(e){
-      // 容量超過（QuotaExceededError）など。
-      // 場所を取っているのは表紙画像なので、それだけ落としてでも文章は必ず残す。
+      // 容量超過（QuotaExceededError）など。表紙を外してでも文章は必ず残す。
       console.warn('localStorage保存に失敗しました', e);
       try{
         localStorage.setItem(STORAGE_KEY, JSON.stringify(stored.map(b => Object.assign({}, b, { cover: null }))));
-        showSyncBanner('この端末の保存容量がいっぱいのため、表紙画像だけ端末から外しました。書いた文章はすべて残っています（ログインしていれば表紙はクラウドから戻ります）。', true);
+        // IndexedDB が使える端末では、表紙は画面の中に残っていて IndexedDB に入るので知らせなくてよい
+        if(coverDbFailed && !storageWarned){
+          storageWarned = true;
+          showSyncBanner('この端末では表紙画像を保存しきれないため、表紙だけ端末から外しました。書いた文章はすべて残っています（ログインしていれば表紙はクラウドから戻ります）。', false);
+        }
       }catch(e2){
-        alert('保存容量の上限に達しました。\n不要な記録を削除するか、メニューからデータを書き出してください。');
+        if(!storageWarned){
+          storageWarned = true;
+          alert('この端末の保存容量の上限に達しました。\n書いた内容はクラウドとバックアップには送られていますが、念のため設定から「JSONファイルに書き出す」で控えを取ってください。');
+        }
         console.warn('表紙を外しても保存できませんでした', e2);
       }
     }
@@ -2338,7 +2458,10 @@
   function toStoredBook(b){
     const isTsundoku = b.status === 'tsundoku';
     const isStay = b.status === 'stay';
-    return Object.assign({}, b, { status: (isTsundoku || isStay) ? 'reading' : b.status, tsundoku: isTsundoku, stay: isStay });
+    const out = Object.assign({}, b, { status: (isTsundoku || isStay) ? 'reading' : b.status, tsundoku: isTsundoku, stay: isStay });
+    // 「本のつながり」の表紙は相手の本から表示するので、写しは持たない（同じ画像が2つ入って容量を食っていた）
+    if(out.connection && out.connection.cover) out.connection = Object.assign({}, out.connection, { cover: null });
+    return out;
   }
   function readStoredStatus(raw){
     if(raw.status === 'done') return 'done';
@@ -6750,7 +6873,17 @@
       logoutBtn.textContent = 'ログイン / 新規登録して同期する';
     }
   }
-  function openDataMenu(){ refreshDataMenuAuthUI(); dataMenuOverlay.classList.add('show'); }
+  // 端末内の保存の様子（容量の心配が無いことを確かめられるように）
+  function refreshStorageInfo(){
+    const el = document.getElementById('storageInfo');
+    let textKB = 0;
+    try{ textKB = Math.round(((localStorage.getItem(STORAGE_KEY) || '').length * 2) / 1024); }catch(e){}
+    const coverCount = books.filter(b => isDataCover(b.cover)).length;
+    const where = coverDb ? '表紙は容量の大きい保存場所へ' : (coverDbFailed ? '表紙は文章と同じ場所へ' : '');
+    el.textContent = 'この端末の保存：文章 ' + (textKB >= 1024 ? (textKB / 1024).toFixed(1) + 'MB' : textKB + 'KB') +
+      '・表紙 ' + coverCount + '冊' + (where ? '（' + where + '）' : '');
+  }
+  function openDataMenu(){ refreshDataMenuAuthUI(); refreshStorageInfo(); dataMenuOverlay.classList.add('show'); }
   function closeDataMenu(){ dataMenuOverlay.classList.remove('show'); }
 
   function exportBooks(){
@@ -6984,6 +7117,9 @@
       const local = localById.get(id);
       if(!local){ clearPendingCloud('set', id, p.set[id]); return; }   // 端末にも無ければ控えは不要
       const i = merged.findIndex(b => b.id === id);
+      // 以前の版は容量がいっぱいになると端末から表紙だけ外していた。その本を送り直して
+      // クラウドの表紙まで消さないよう、端末に表紙が無くクラウドにあるときはクラウドの表紙を使う
+      if(i >= 0 && !local.cover && merged[i].cover) local.cover = merged[i].cover;
       if(i >= 0){ merged[i] = local; } else { merged.push(local); }
       if(!resentPendingIds.has('set:' + id)) resend.push(() => cloudSetBook(local));
       resentPendingIds.add('set:' + id);
@@ -10081,7 +10217,10 @@
   ocrSetupOverlay.addEventListener('click', e => { if(e.target === ocrSetupOverlay) closeOcrSetup(); });
   document.getElementById('ocrSetupMenuBtn').addEventListener('click', () => openOcrSetup(null));
 
-  bootApp();
+  // 表紙を IndexedDB から戻してから始める（戻す前にクラウドと同期して表紙を消さないため）。
+  // 万一 IndexedDB が返ってこなくても、2.5秒で先へ進む（そのあいだ表紙は消さない設計）
+  requestPersistentStorage();
+  Promise.race([hydrateCovers(), new Promise(r => setTimeout(r, 2500))]).then(() => bootApp());
 </script>
 
 </body>
